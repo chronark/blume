@@ -681,6 +681,9 @@ const tabs = (
   );
 
 describe("ts2jsPlugin", () => {
+  // The first case pays the plugin's lazy `require("sucrase")`, which usually
+  // takes ~150ms on the Windows runner but has spiked past Bun's 5s default,
+  // so it gets an explicit timeout.
   it("expands a marked ts fence into TypeScript/JavaScript tabs", () => {
     const result = ts2js({
       lang: "ts",
@@ -693,7 +696,7 @@ describe("ts2jsPlugin", () => {
         { lang: "js", meta: null, value: 'const greeting = "hi";' }
       )
     );
-  });
+  }, 30_000);
 
   it("preserves formatting, JSX, and comments; elides type-only imports", () => {
     const value = [
