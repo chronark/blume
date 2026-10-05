@@ -11,6 +11,12 @@ export interface NotionOptions extends SharedSourceOptions {
   concurrency?: number;
   /** Notion database id. */
   database: string;
+  /**
+   * Read text typed in Notion as MDX, so components and Markdown in it
+   * render. Anyone who can edit the database can then run code at build
+   * time. Default false: text renders as written.
+   */
+  mdx?: boolean;
   /** Notion property names mapped onto Blume meta. */
   properties?: {
     /** Property holding the page description. */
@@ -31,6 +37,7 @@ export interface NotionOptions extends SharedSourceOptions {
 export const notionOptionsSchema = sharedSourceOptionsSchema.extend({
   concurrency: z.number().positive().optional(),
   database: z.string(),
+  mdx: z.boolean().optional(),
   properties: z
     .strictObject({
       description: z.string().optional(),

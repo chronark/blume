@@ -327,6 +327,86 @@ describe("notionSource", () => {
     expect(entry?.data.title).toBe("Use {x}");
   });
 
+  it("reads text blocks as MDX source when mdx is set", async () => {
+    const page = { ...PAGE, id: "mdx" };
+    const lists = new Map<string, BlockList>([
+      [
+        "mdx",
+        [
+          {
+            id: "cards",
+            paragraph: {
+              rich_text: [
+                rich(
+                  '<CardGroup cols={3}>\n<Card title="New" href="/a">\n**New release** in {version} — '
+                ),
+                {
+                  ...rich("the docs", { italic: true }),
+                  href: "https://x.dev/a",
+                },
+                rich(" and "),
+                rich("a`b", { code: true }),
+                rich("\n</Card>\n</CardGroup>"),
+              ],
+            },
+            type: "paragraph",
+          },
+          {
+            id: "esm",
+            paragraph: { rich_text: [rich('import { X } from "./x";')] },
+            type: "paragraph",
+          },
+          {
+            callout: { rich_text: [rich("Use <Badge>new</Badge>")] },
+            id: "note",
+            type: "callout",
+          },
+          {
+            code: { language: "mdx", rich_text: [rich("<Card />\n{y}")] },
+            id: "code",
+            type: "code",
+          },
+          {
+            id: "toggle",
+            toggle: { rich_text: [rich("More <b>")] },
+            type: "toggle",
+          },
+          {
+            id: "img",
+            image: {
+              caption: [rich("A <chart>")],
+              file: { url: "https://notion.so/signed/chart.png" },
+            },
+            type: "image",
+          },
+        ],
+      ],
+    ]);
+    const source = notionSource(
+      {
+        client: clientFor(lists, [page]),
+        database: "db1",
+        fetchImpl,
+        mdx: true,
+        name: "handbook",
+      },
+      await ctxFor()
+    );
+    const { entries } = await source.load();
+    const [entry] = entries;
+    const body = entry?.body.text ?? "";
+    // Text goes in as typed; Notion's own marks, links, and code still apply.
+    expect(body).toContain(
+      '<CardGroup cols={3}>\n<Card title="New" href="/a">\n**New release** in {version} — [*the docs*](https://x.dev/a) and ``a`b``\n</Card>\n</CardGroup>'
+    );
+    expect(body).toContain('import { X } from "./x";');
+    expect(body).toContain("<Callout>\nUse <Badge>new</Badge>\n</Callout>");
+    // Code, toggle titles, and captions are text either way.
+    expect(body).toContain("```mdx\n<Card />\n{y}\n```");
+    expect(body).toContain('<AccordionItem title={"More <b>"}>');
+    expect(body).toContain(String.raw`![A \<chart>](/blume-assets/handbook/`);
+  });
+
   it("retries a rate-limited query and recovers", async () => {
     let calls = 0;
     const flaky = {
@@ -1020,7 +1100,12 @@ describe("resolveSources (notion)", () => {
     const config = blumeConfigSchema.parse({
       content: {
         sources: [
-          notion({ concurrency: 2, database: "db1", prefix: "handbook" }),
+          notion({
+            concurrency: 2,
+            database: "db1",
+            mdx: true,
+            prefix: "handbook",
+          }),
         ],
       },
     });

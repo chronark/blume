@@ -133,6 +133,7 @@ export default defineConfig({
 - `mdx-remote`, `sanity`, `notion`, and `obsidian` become `mdxRemote()`, `sanity()`, `notion()`, and `obsidian()`, with every other field moving into the call unchanged. `{ type: "custom", source }` becomes `custom(source)`.
 - `content.root`, `content.include`, and `content.exclude` are still the shorthand for a single folder, but they can't sit beside `sources` any more. Move them into the `filesystem()` entry.
 - Release pages from `githubReleases()` publish in one language now, so a multi-locale site no longer copies them to every other locale's URL (`/de/changelog/…`). If other sites link to those copies, add [redirects](/docs/deployment#redirects) to the default-locale pages.
+- Text typed in Notion renders as written now: a component, `{`, or Markdown character in a `notion()` page shows as typed instead of being read as MDX. If your Notion pages hold components or Markdown typed as text, set [`mdx: true`](/docs/content/sources/notion#writing-mdx-in-notion) on the source.
 
 ## API references
 

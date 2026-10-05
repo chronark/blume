@@ -299,6 +299,17 @@ const renderParts = (
 export const renderInline = (parts: InlinePart[]): string =>
   renderParts(parts, escapeProse);
 
+const asTyped = (text: string): string => text;
+
+/**
+ * A block's inline content as MDX source, for a source whose site author
+ * opted in to reading its text that way: marks still become delimiters and
+ * code stays a code span, but the text goes in as typed, so a component, an
+ * expression, or Markdown written in the CMS renders.
+ */
+export const renderInlineMdx = (parts: InlinePart[]): string =>
+  renderParts(parts, asTyped);
+
 // A destination with whitespace, a control character, or parentheses ends
 // early in `[label](…)`; CommonMark's pointy-bracket form carries it intact.
 // oxlint-disable-next-line no-control-regex -- control characters are exactly what the bare form refuses.
@@ -331,13 +342,18 @@ export const destination = (url: string): string => {
  * `data:`) never becomes a clickable link on the docs site (see
  * `safe-links.ts`). The parts stay parts then, so their runs merge with their
  * neighbors'. A label escapes a bare URL too: GFM autolinks nothing inside a
- * link, so its specials would read as syntax.
+ * link, so its specials would read as syntax — unless `mdx` reads the label
+ * as MDX source, like {@link renderInlineMdx}.
  */
-export const linkParts = (parts: InlinePart[], href?: string): InlinePart[] =>
+export const linkParts = (
+  parts: InlinePart[],
+  href?: string,
+  mdx = false
+): InlinePart[] =>
   href && isSafeHref(href)
     ? [
         {
-          markdown: `[${renderParts(parts, escapeMarkdownText)}](${destination(href)})`,
+          markdown: `[${renderParts(parts, mdx ? asTyped : escapeMarkdownText)}](${destination(href)})`,
         },
       ]
     : parts;
