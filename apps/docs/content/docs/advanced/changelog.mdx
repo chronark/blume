@@ -75,8 +75,6 @@ Each takes a map of locale code to text too, like a [header tab label](/docs/con
 
 The page appears only when nothing already occupies the `/changelog` route. To replace it with your own design, add a [custom page](/docs/advanced/custom-pages) at `pages/changelog.astro` — it takes over and Blume stops generating the default index. The `<Update>` component the previous timeline was built from still ships for a custom page that wants inline release notes. It isn't one of the MDX components, so import it in the `.astro` page itself: `import Update from "blume/components/content/Update.astro";`.
 
-A header [tab](/docs/content/navigation#tabs) pointing at `/changelog` opens this index — no `href` needed.
-
 ## From GitHub Releases
 
 Rather than authoring entries by hand, point the built-in [`githubReleases()` source](/docs/content/sources/github-releases) at a repo and every release becomes a `type: changelog` entry — the same timeline and feed, fed straight from the releases you already publish. Blume's own [changelog](/changelog) is built this way:
@@ -97,6 +95,25 @@ content: {
 ```
 
 The release name becomes the title, its tag becomes `changelog.version`, and its published date sorts the timeline. Each release page also gets a unique meta description summarized from its notes — markdown stripped, section headings and changeset commit-hash prefixes dropped, trimmed to the search-snippet length [`blume audit`](/docs/cli/audit) checks for — instead of falling back to the site description. A private repo authenticates with the `GITHUB_TOKEN` environment variable. See [GitHub Releases](/docs/content/sources/github-releases) for every option.
+
+## Keep entries out of the sidebar
+
+Changelog entries are ordinary pages, so the generated sidebar lists them like any other: a `changelog/` folder, or a `githubReleases()` source with `prefix: "changelog"`, becomes a Changelog group, newest entry first, that grows with every release. Previous/next links run through it too, so the last docs page can lead into the newest release.
+
+To keep the entries out of the docs sidebar, link the changelog with a header [tab](/docs/content/navigation#tabs) rather than a [header action](/docs/content/navigation#header-actions):
+
+```ts blume.config.ts
+navigation: {
+  tabs: [
+    { label: "Docs", path: "/" },
+    { label: "Changelog", path: "/changelog" },
+  ],
+}
+```
+
+The `/changelog` tab opens the index, with no `href` needed, and owns the `changelog/` section: pages outside it stop listing the releases, and their previous/next links stay among the docs. An entry's own page shows the release list as its sidebar. The index, the [RSS feed](#the-rss-feed), `llms.txt`, the sitemap, and search still list every entry. The tab's `path` has to match the folder or `prefix` the entries live under. The `Docs` tab at `/` is optional; it gives readers a tab to return to.
+
+Setting `sidebar.hidden` on the entries doesn't do this: it unlists them everywhere, the index and the feed included.
 
 ## The RSS feed
 

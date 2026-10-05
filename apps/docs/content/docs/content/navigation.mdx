@@ -304,6 +304,8 @@ navigation: {
 
 Like tab labels, a `label` here can be a map of locale code to text on a [multilingual](/docs/content/i18n#per-locale-navigation) site.
 
+An action is only a link, so a changelog linked this way still lists its entries in the sidebar. Link it with a [tab](#tabs) to [keep them out](/docs/advanced/changelog#keep-entries-out-of-the-sidebar).
+
 `cta` is singular on purpose — a docs header has room for exactly one thing a reader is being asked to do, and a row of buttons asks for nothing. Secondary links belong in `actions`, or in [`featured`](#featured-links) if they should sit with the sidebar instead.
 
 An `http(s)` or protocol-relative href opens in a new tab; a route stays in the tab, and is validated against your pages at build time like a `featured` link — so a page served by another app on the same host (`/signup` on the product, say) should be written as an absolute URL. `actions` are hidden below the `sm` breakpoint, where the header has room for the logo and the navigation toggle and nothing else. `cta` hides there too, except on a page with no navigation toggle — a landing page on `PageLayout` with no tabs — where it stays, since nothing else can surface it on a phone.
