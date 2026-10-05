@@ -24,6 +24,8 @@ agents: {
 
 Se uma página de conteúdo ou personalizada já ocupa essa rota, o servidor não é gerado: o build emite um aviso, e o `llms.txt` e os outros [documentos de descoberta](/docs/discoverability/agent-discovery) o deixam de fora.
 
+[Adicione um servidor MCP à sua documentação](/guides/mcp-server-for-documentation) mostra o passo a passo, desde ativá-lo até implantar o servidor e conectar um cliente.
+
 ## Ferramentas e recursos [#tools-and-resources]
 
 O servidor expõe ferramentas somente leitura — `search_docs`, `get_page`, `list_pages` e `get_navigation` — e cada página como um recurso MCP (`resources/list` enumera as páginas em suas URLs servidas com o tipo `text/markdown`, deixando de fora as cópias de fallback de i18n das páginas não traduzidas, assim como `list_pages` faz; `resources/read` retorna o [Markdown para agentes](/docs/discoverability/markdown) da página, a mesma saída de `get_page`), então clientes que anexam contexto por URI podem navegar pela documentação sem chamar uma ferramenta. Ele publica documentos de descoberta em `/.well-known/mcp.json` e `/.well-known/mcp/server-card.json`. O server card segue o schema da extensão Server Card da [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) (`name` em DNS reverso, endpoints de transporte `remotes`), com campos de compatibilidade no formato de initialize (`serverInfo`, `capabilities`, `transports`) para scanners construídos com base na revisão anterior da proposta. O menu **Connect to MCP** de cada página oferece instalação copiar-e-colar para Claude Code, Cursor, VS Code e Codex (exibido assim que [`deployment.site`](/docs/deployment) estiver definido).

@@ -23,15 +23,15 @@ npx blume migrate fumadocs --codex
 
 移行元のフレームワークを指定してください。省略した場合は、Blume がプロジェクト内のファイルから自動的に検出します。指定したフレームワークとプロジェクトの内容が異なるように見える場合、Blume は警告を表示したうえで、指定されたフレームワークのまま処理を続行します:
 
-| 移行元 | 検出の手がかり |
-| --- | --- |
-| `mintlify` | `docs.json` または `mint.json` |
-| `fumadocs` | `source.config.ts`、または `package.json` 内の `fumadocs-core`、`fumadocs-ui`、`fumadocs-mdx` |
-| `docusaurus` | `docusaurus.config.*` |
-| `starlight` | `package.json` 内の `@astrojs/starlight` |
-| `nextra` | `package.json` 内の `nextra` |
+| 移行元 | 検出の手がかり | ガイド |
+| --- | --- | --- |
+| `mintlify` | `docs.json` または `mint.json` | [Mintlify からの移行](/guides/migrate-from-mintlify) |
+| `fumadocs` | `source.config.ts`、または `package.json` 内の `fumadocs-core`、`fumadocs-ui`、`fumadocs-mdx` | [Fumadocs からの移行](/guides/migrate-from-fumadocs) |
+| `docusaurus` | `docusaurus.config.*` | [Docusaurus からの移行](/guides/migrate-from-docusaurus) |
+| `starlight` | `package.json` 内の `@astrojs/starlight` | [Starlight からの移行](/guides/migrate-from-starlight) |
+| `nextra` | `package.json` 内の `nextra` | [Nextra からの移行](/guides/migrate-from-nextra) |
 
-各移行元には、プレイブック内に専用のマッピングリファレンスがあります。これら以外で構築されたサイトも移行できます。移行元を指定せずにコマンドを実行すると、エージェントはまずリポジトリの内容を洗い出し、その後プレイブックの一般的なルールに沿って作業します。
+各移行元には、プレイブック内に専用のマッピングリファレンスがあります。これら以外で構築されたサイトも移行できます。移行元を指定せずにコマンドを実行すると、エージェントはまずリポジトリの内容を洗い出し、その後プレイブックの一般的なルールに沿って作業します。[MkDocs Material ガイド](/guides/migrate-from-mkdocs-material)では、この方法による移行を順を追って説明しています。
 
 ## エージェントが行うこと [#what-the-agent-does]
 

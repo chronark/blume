@@ -24,6 +24,8 @@ agents: {
 
 यदि कोई कंटेंट या कस्टम पृष्ठ पहले से ही उस रूट का उपयोग कर रहा है, तो सर्वर जनरेट नहीं किया जाता: बिल्ड एक चेतावनी देता है, और `llms.txt` तथा अन्य [डिस्कवरी दस्तावेज़](/docs/discoverability/agent-discovery) इसे शामिल नहीं करते।
 
+[अपने दस्तावेज़ों में MCP सर्वर जोड़ें](/guides/mcp-server-for-documentation) गाइड इसे चालू करने से लेकर सर्वर को डिप्लॉय करने और किसी क्लाइंट को कनेक्ट करने तक की पूरी प्रक्रिया चरण-दर-चरण बताती है।
+
 ## टूल और संसाधन [#tools-and-resources]
 
 सर्वर केवल-पढ़ने योग्य टूल उपलब्ध कराता है — `search_docs`, `get_page`, `list_pages`, और `get_navigation` — तथा प्रत्येक पृष्ठ को एक MCP संसाधन के रूप में (`resources/list` पृष्ठों को उनके सर्व किए गए URL पर `text/markdown` प्रकार के साथ सूचीबद्ध करता है, और `list_pages` की तरह ही बिना अनुवाद वाले पृष्ठों की i18n फ़ॉलबैक प्रतियों को छोड़ देता है; `resources/read` पृष्ठ का [एजेंट Markdown](/docs/discoverability/markdown) लौटाता है, वही आउटपुट जो `get_page` देता है), जिससे URI द्वारा संदर्भ जोड़ने वाले क्लाइंट बिना कोई टूल कॉल किए दस्तावेज़ ब्राउज़ कर सकते हैं। यह `/.well-known/mcp.json` और `/.well-known/mcp/server-card.json` पर डिस्कवरी दस्तावेज़ प्रकाशित करता है। सर्वर कार्ड [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) Server Card एक्सटेंशन स्कीमा का पालन करता है (रिवर्स-DNS `name`, `remotes` ट्रांसपोर्ट एंडपॉइंट), साथ ही प्रस्ताव के पुराने संशोधन के अनुसार बने स्कैनर के लिए initialize-आकार वाले संगतता फ़ील्ड (`serverInfo`, `capabilities`, `transports`) भी शामिल हैं। प्रत्येक पृष्ठ का **Connect to MCP** मेन्यू Claude Code, Cursor, VS Code, और Codex के लिए कॉपी-एंड-गो इंस्टॉल प्रदान करता है ([`deployment.site`](/docs/deployment) सेट होने के बाद दिखाया जाता है)।

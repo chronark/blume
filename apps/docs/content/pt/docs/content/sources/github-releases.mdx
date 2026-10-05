@@ -38,3 +38,5 @@ changelog: {
 ```
 
 Um repositório privado se autentica com a variável de ambiente `GITHUB_TOKEN` — o mesmo token usado pelos outros recursos do GitHub, nunca colocado direto na sua config; o adapter declara essa variável, então um build sem ela gera um aviso. Para um repositório no GitHub Enterprise Server, defina `baseUrl` como a API REST dele (`https://<host>/api/v3`); o `GITHUB_TOKEN` é enviado para lá, então ele precisa ser um token desse servidor. Como [toda source remota](/docs/content/sources#caching-and-offline-builds), ela fica em cache em `.blume/cache/<source>/` e é servida offline se a API estiver inacessível. Como o changelog é um conteúdo complementar, uma falha na busca sem cache (por exemplo, um build de CI sem token) resulta em um changelog vazio com um aviso, em vez de quebrar o build — defina `GITHUB_TOKEN` nos seus ambientes de CI e de deploy para preenchê-lo.
+
+[Transforme releases do GitHub em um changelog de produto](/guides/github-releases-changelog-website) mostra o processo de ponta a ponta: uma timeline de changelog, uma página por release e um feed RSS, reconstruídos toda vez que você publica uma release.

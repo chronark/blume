@@ -23,6 +23,8 @@ navigation: {
 }
 ```
 
+[Documente eventos do Kafka com AsyncAPI](/guides/asyncapi-kafka-documentation) mostra o passo a passo para tópicos do Kafka, com código de producer e de consumer ao lado da referência.
+
 ## Versões da spec [#spec-versions]
 
 Specs AsyncAPI **2.x são normalizadas para 3.x automaticamente** com o conversor oficial do AsyncAPI. Assim, os canais `publish`/`subscribe` viram páginas de operação `send`/`receive` com URLs estáveis. Se depois você atualizar o próprio arquivo da spec com o conversor, nada muda de lugar. O conversor é uma peer dependency opcional, então um site com uma spec 1.x ou 2.x precisa instalá-lo (`npm install @asyncapi/converter`). Sem ele, o build falha e mostra esse comando de instalação. Uma spec 3.x não precisa de nada extra. As operações são agrupadas por tag, e as operações sem tag ficam agrupadas pelo endereço do canal.

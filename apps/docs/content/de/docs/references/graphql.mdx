@@ -39,6 +39,8 @@ navigation: {
 }
 ```
 
+[GraphQL-Doku aus deinem Schema generieren](/guides/graphql-documentation-website) führt dich Schritt für Schritt vom Schema bis zur deployten Seite – inklusive eines Try-it-Panels, das eine Sandbox abfragt.
+
 ## Generierte Beispiele [#generated-examples]
 
 Jede Operationsseite enthält eine vollständige, gültige Beispiel-Operation – eine Variable pro Argument, typisiert anhand des Schemas, mit einem Selection Set begrenzter Tiefe über den Rückgabetyp. Dazu kommen passende Beispielvariablen und eine Beispielantwort, die dieselbe Selection widerspiegelt. Deklariert ein Argument einen Standardwert, beginnt die zugehörige Variable mit diesem Wert, und als deprecated markierte Felder lässt die Selection weg. Die Code-Beispiele zeigen den exakten HTTP-Request (ein JSON-`POST` von `{ query, variables }`) in jeder konfigurierten Sprache. Dir stehen dieselben [Sprachen](/docs/references/openapi#code-samples-and-schemas) wie bei `openapi()` zur Verfügung, und mit `codeSamples: false` werden keine angezeigt:

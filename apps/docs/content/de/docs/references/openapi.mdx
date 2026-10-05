@@ -21,6 +21,8 @@ export default defineConfig({
 
 Damit wird die Referenz unter `/reference` (einer Übersichtsseite) eingebunden, jede Operation unter `/reference/<tag>/<operation>`. `spec` ist entweder eine `http(s)`-URL oder ein Pfad zu einer lokalen Datei in deinem Projekt. Blume parst sie mit dem [OpenAPI-Parser von Scalar](https://github.com/scalar/scalar) – Swagger-2.0- und OpenAPI-3.0-Spezifikationen werden automatisch auf 3.1 aktualisiert, und Spezifikationen in 3.1 und [3.2](#openapi-32) werden so gelesen, wie sie geschrieben sind. Ein Adapter ist eine einfache Beschreibung der Referenz – keine geparste Spezifikation –, sodass Blume ihn vorab validieren und in die generierte Website einbetten kann; lässt du `reference` weg (oder leer), wird überhaupt keine Referenz gerendert. Du dokumentierst stattdessen eine eventgesteuerte API oder eine GraphQL-API? Sieh dir [AsyncAPI](/docs/references/asyncapi) und [GraphQL](/docs/references/graphql) an.
 
+Um von der Spezifikation, die dein Framework generiert, zu einer deployten Referenz zu kommen, folge der Anleitung für [FastAPI](/guides/fastapi-documentation-website), [Django REST Framework](/guides/django-rest-framework-api-documentation), [NestJS](/guides/nestjs-api-documentation-website), [Spring Boot](/guides/spring-boot-api-documentation), [Hono](/guides/hono-zod-api-documentation), [Fastify](/guides/fastify-api-documentation), [Elysia](/guides/elysia-api-documentation) oder [oRPC](/guides/orpc-openapi-documentation). [API-Doku aus einer OpenAPI-Spezifikation generieren](/guides/openapi-documentation-website) geht von einer beliebigen Spezifikationsdatei aus.
+
 Die Referenz fügt von sich aus keinen Header-Tab hinzu. Um sie sichtbar zu machen, richte einen [Navigations-Tab](/docs/content/navigation#tabs) auf ihre Route aus – dadurch wird beim nativen Renderer auch die Sidebar mit den Operationen auf diesen Tab beschränkt:
 
 ```ts blume.config.ts
@@ -140,6 +142,8 @@ paths:
             $ref: ./code_samples/go/list_plants.go
 ```
 
+[SDK-Beispiele zu generierter API-Dokumentation hinzufügen](/guides/openapi-sdk-code-samples) führt durch Beispiele für ein TypeScript- und ein Python-SDK, mit einer Prüfung, die Beispiele erkennt, die ein SDK-Release kaputt gemacht hat.
+
 ## Try-it-Playground
 
 Nativ gerenderte Operationsseiten bringen standardmäßig ein interaktives **Try it**-Panel mit. Blume generiert das Formular aus der Operation selbst: ein Eingabefeld pro Pfad-, Query- und Header-Parameter, einen Body-Editor, der aus dem Request-Body-Schema erstellt wird, und alles ist mit den Beispielen aus der Spezifikation vorausgefüllt. Werte werden so übertragen, wie die Spezifikation sie beschreibt: Array- und Objektparameter folgen ihrem `style` und `explode` (`tags=dog&tags=cat` in einer Query, `1,2` in einem Pfad, `filter[color]=red` bei `deepObject`), und ein `application/x-www-form-urlencoded`- oder `multipart/form-data`-Body wird als Formularfelder statt als JSON gesendet. Eine Serverauswahl listet die Server der Operation auf (ihre eigenen `servers`, sonst die ihres Pfads, sonst die der Spezifikation, wobei jede `{variable}` auf ihrem `default` steht), mit einem Freitextfeld für jede andere Basis-URL, und die Auth-Eingaben entsprechen der [aufgelösten Security](#authorization) der Operation – Bearer-Token, API-Key und Basic-Credentials, wobei OAuth2 als Feld zum Einfügen eines Tokens umgesetzt ist (bring einen Access-Token mit; Blume führt den Flow nicht aus).
@@ -175,6 +179,8 @@ reference: [
 
 Der eingebaute Proxy leitet Requests nur an die Origins weiter, die deine Spezifikationen in `servers` deklarieren (auf Dokument-, Pfad- oder Operationsebene, mit Variablen auf ihren Standardwerten) – auch über Redirects hinweg –, sodass ein öffentliches Doku-Deployment nicht auf andere Hosts in seinem Netzwerk gerichtet werden kann. Eine im Panel eingegebene **Custom base URL** ist kein dokumentierter Server: Bei aktiviertem Proxy werden Requests an sie mit einem 403 abgelehnt. Er leitet nur die Header weiter, die das Panel selbst setzt – die eingegebenen Zugangsdaten und Header-Parameter sowie den `Content-Type` des Bodys –, sodass Cookies, Zugangsdaten, die der Browser für die Doku-Website mitschickt (etwa HTTP-Basic-Auth bei einer passwortgeschützten Preview), und Header, die dein Host hinzufügt (`X-Forwarded-For`, `CF-*`, `X-Vercel-*`), nie bei der API ankommen. Er liest einen Request-Body nur bis zu 4 MB (alles Größere erhält einen `413`), und jede Response, die er weiterleitet, enthält `Content-Security-Policy: sandbox`, `X-Content-Type-Options: nosniff` und `Cross-Origin-Resource-Policy: same-origin` – plus `Content-Disposition: attachment` bei HTML oder SVG –, sodass eine API-Fehlerseite, die ihre Eingabe zurückgibt, kein Skript auf dem Origin der Doku ausführen kann. Der Proxy ist außerdem pro lesender Person [rate-limitiert](/docs/configuration/rate-limiting), wie jede Server-Route, die Lesende aufrufen können.
 
+Wenn ein Try-it-Request blockiert wird, reproduziert [CORS-Fehler in einem Playground für API-Dokumentation beheben](/guides/api-documentation-cors-errors) das Problem, liest den Preflight aus, den der Browser sendet, und behebt es mit einer CORS-Policy auf deiner API oder mit dem eingebauten Proxy.
+
 ## Mehrere Spezifikationen [#multiple-specs]
 
 Verwende `sources`, um mehr als eine Spezifikation aus einem Adapter zu veröffentlichen. Jede Quelle bekommt ihre eigene Übersichtsroute und eigene Operationsseiten und teilt sich die Anzeigeoptionen des Adapters. Gib jeder Quelle ein `label`, das unverändert ihre Gruppe in der Sidebar benennt und aus dem ihre Route abgeleitet wird, oder setze eine explizite `route`:
@@ -191,6 +197,8 @@ reference: [
 ```
 
 `spec` ist eine Kurzform für ein `sources` mit einem einzigen Eintrag, du greifst also nur dann zu `sources`, wenn du mehr als eine Spezifikation hast. Wenn zwei Spezifikationen unterschiedliche Anzeigeoptionen brauchen – zum Beispiel eine andere Auswahl an Codebeispielen –, liste stattdessen zwei `openapi()`-Adapter auf, jeden mit eigener `route`. Eine eingebettete [Scalar](/docs/references/scalar)-Referenz neben nativen Seiten ist ein eigener `scalar()`-Adapter in der Liste. Quellen werden in Listenreihenfolge aufgelöst, und wenn zwei auf dieselbe Route aufgelöst werden, gewinnt die erste (der Build warnt vor der verworfenen).
+
+[Mehrere OpenAPI-Spezifikationen auf einer Doku-Website kombinieren](/guides/multiple-openapi-specs-documentation) baut auf diese Weise ein API-Portal auf, in dem die Spezifikation jedes Services auf einer eigenen Route und in einem eigenen Tab liegt.
 
 ### Indexierung pro Quelle [#per-source-indexing]
 
@@ -260,6 +268,8 @@ Das `target` jeder Action ist ein [JSONPath](https://www.rfc-editor.org/rfc/rfc9
 
 Overlays werden auf die Spezifikation in ihrer geschriebenen Form angewendet, bevor Blume sie auf OpenAPI 3.1 aktualisiert – ein Overlay zielt also auf die Version, in der du die Spezifikation geschrieben hast. Alles, was aus der Spezifikation gebaut wird, sieht das Ergebnis: die Operationsseiten, die Sidebar, die Suche, `llms.txt` und der MCP-Server. Mit `sources` gibst du jeder Quelle ihre eigenen `overlays`. Ein Overlay, das sich nicht anwenden lässt, lässt die Referenz genauso fehlschlagen wie eine unlesbare Spezifikation, sodass ein kaputtes Overlay nicht veröffentlichen kann, was es verbergen sollte.
 
+[Interne Endpoints aus öffentlicher API-Doku entfernen](/guides/openapi-overlays-public-docs) führt durch ein Overlay, das bei jedem Build interne Operationen aus einer generierten Spezifikation entfernt.
+
 ## Autorisierung [#authorization]
 
 Operationen, die [Security-Anforderungen](https://spec.openapis.org/oas/v3.1.0#security-requirement-object) deklarieren, rendern oberhalb ihrer Parameter einen **Authorization**-Abschnitt, und die generierten Codebeispiele senden Platzhalter-Zugangsdaten (`Authorization: Bearer YOUR_TOKEN`, einen API-Key-Header oder einen Query-Key – je nachdem, was das Security-Scheme verlangt). Es gibt nichts zu konfigurieren: Blume liest `security` aus der Spezifikation, sodass die Referenz immer dem entspricht, was die API tatsächlich durchsetzt.
@@ -296,6 +306,8 @@ Die [`callbacks`](https://spec.openapis.org/oas/v3.1.0#callback-object) einer Op
 
 Webhook-Seiten sind echte Seiten: Sie tauchen in der Suche, in `llms.txt` und im MCP-Server auf, und ihr Markdown teilt Agents mit, dass es sich um einen Request handelt, den die API sendet – so versucht ein Agent nicht, ihn aufzurufen.
 
+[Webhook-Dokumentation mit OpenAPI 3.1 schreiben](/guides/openapi-webhook-documentation) ergänzt die Webhook-Seiten um Signatur-Header und Empfangsbestätigungen und fügt eine Anleitung zum Empfangen mit einem funktionierenden Receiver in Node.js hinzu.
+
 ## Spezifikationswarnungen [#spec-warnings]
 
 Blume validiert eine Spezifikation nicht gegen das OpenAPI-Schema – nutze dafür einen Linter wie [Spectral](https://github.com/stoplightio/spectral) oder [oasdiff](https://github.com/oasdiff/oasdiff) in deiner CI. Blume warnt aber in `blume dev`, `blume build` und `blume check` vor Fehlern, die sonst ohne jeden Hinweis falsch gerendert würden, und vor Teilen einer Spezifikation, die es weglässt. Jede Warnung nennt die Spezifikation, und der Rest der Referenz wird trotzdem gebaut:
@@ -309,6 +321,8 @@ Blume validiert eine Spezifikation nicht gegen das OpenAPI-Schema – nutze daf�
 | `BLUME_OPENAPI_CODE_SAMPLE_REF` | Das `source` eines `x-codeSamples`-Eintrags ist ein `$ref`, den Blume nicht lesen kann oder der in ein Dokument hinein zeigt, daher wird dieses [Beispiel](#your-own-samples) weggelassen. |
 | `BLUME_OPENAPI_X_WEBHOOKS` | Eine Spezifikation in 3.1 oder neuer führt ihre Webhooks unter `x-webhooks`, der Extension, die 3.0-Tools lesen, und hat kein `webhooks`, daher wird keiner davon gerendert. Benenne das Feld in `webhooks` um. |
 | `BLUME_OPENAPI_REF_PATH_ITEM` | Ein Pfad oder Webhook ist ein `$ref` auf ein gemeinsam genutztes Path Item, etwa eines unter `components.pathItems`. Blume löst diese nicht auf, daher fehlen seine Operationen in der Referenz. Schreibe das Path Item direkt unter `paths` oder `webhooks`; seine Schemas, Parameter und Responses können `$ref`s bleiben. |
+
+[API-Dokumentation in der CI mit Backend-Änderungen synchron halten](/guides/openapi-documentation-ci) führt diese Prüfungen in GitHub Actions aus: Die Spezifikation wird aus dem Backend exportiert, der Build schlägt fehl, wenn die Spezifikation veraltet oder ungültig ist oder Breaking Changes enthält, und die Referenz wird daraus neu gebaut.
 
 ## Scalar stattdessen einbetten [#embedding-scalar-instead]
 

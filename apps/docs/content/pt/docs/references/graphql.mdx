@@ -39,6 +39,8 @@ navigation: {
 }
 ```
 
+O guia [Gere docs GraphQL a partir do seu schema](/guides/graphql-documentation-website) mostra o passo a passo, de um schema até um site publicado, com um painel Try it que faz queries em um sandbox.
+
 ## Exemplos gerados [#generated-examples]
 
 Toda página de operação traz uma operação de exemplo completa e válida. Ela tem uma variável por argumento, tipada a partir do schema, e um selection set de profundidade limitada sobre o tipo de retorno. A página também traz variáveis de exemplo e uma resposta de exemplo que segue a mesma seleção. Quando o argumento declara um valor padrão, a variável começa com esse valor, e a seleção deixa de fora os fields depreciados. Os exemplos de código mostram a requisição HTTP exata (um `POST` JSON de `{ query, variables }`) em cada linguagem configurada. As mesmas [linguagens](/docs/references/openapi#code-samples-and-schemas) do `openapi()` estão disponíveis, e `codeSamples: false` não mostra nenhum exemplo:

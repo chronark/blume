@@ -23,15 +23,15 @@ Troque `fumadocs` pelo seu framework, e `--codex` por `--claude` para usar o Cla
 
 Informe o framework do qual você está migrando, ou deixe de fora e o Blume o detecta pelos próprios arquivos do projeto. Se você informar um e o projeto parecer ser de outro, o Blume mostra um aviso e continua com o que você informou:
 
-| Origem | Detectado por |
-| --- | --- |
-| `mintlify` | `docs.json` ou `mint.json` |
-| `fumadocs` | `source.config.ts`, ou `fumadocs-core`, `fumadocs-ui` ou `fumadocs-mdx` no `package.json` |
-| `docusaurus` | `docusaurus.config.*` |
-| `starlight` | `@astrojs/starlight` no `package.json` |
-| `nextra` | `nextra` no `package.json` |
+| Origem | Detectado por | Guia |
+| --- | --- | --- |
+| `mintlify` | `docs.json` ou `mint.json` | [Migre do Mintlify](/guides/migrate-from-mintlify) |
+| `fumadocs` | `source.config.ts`, ou `fumadocs-core`, `fumadocs-ui` ou `fumadocs-mdx` no `package.json` | [Migre do Fumadocs](/guides/migrate-from-fumadocs) |
+| `docusaurus` | `docusaurus.config.*` | [Migre do Docusaurus](/guides/migrate-from-docusaurus) |
+| `starlight` | `@astrojs/starlight` no `package.json` | [Migre do Starlight](/guides/migrate-from-starlight) |
+| `nextra` | `nextra` no `package.json` | [Migre do Nextra](/guides/migrate-from-nextra) |
 
-Cada origem tem sua própria referência de mapeamento no playbook. Um site feito com qualquer outra ferramenta também pode ser migrado: rode o comando sem informar uma origem, e o agente primeiro faz um inventário do repositório e depois trabalha a partir das regras gerais do playbook.
+Cada origem tem sua própria referência de mapeamento no playbook. Um site feito com qualquer outra ferramenta também pode ser migrado: rode o comando sem informar uma origem, e o agente primeiro faz um inventário do repositório e depois trabalha a partir das regras gerais do playbook. O [guia do MkDocs Material](/guides/migrate-from-mkdocs-material) mostra uma migração feita dessa forma.
 
 ## O que o agente faz [#what-the-agent-does]
 
@@ -48,7 +48,7 @@ Ele termina com um resumo do que foi migrado, descartado ou aproximado, como lin
 
 ## Outros agentes [#other-agents]
 
-Sem `--codex` ou `--claude`, o comando informa a origem que detectou, mostra o caminho para o playbook (a [skill](/docs/advanced/skills) `blume-migrate` que vem incluída no pacote) e encerra sem alterar nada. Aponte qualquer outro agente para esse `SKILL.md`, ou instale a skill onde o seu agente procura skills, com o comando que ele mostra:
+Sem `--codex` ou `--claude`, o comando informa a origem que detectou, mostra o caminho para o playbook — a [skill](/docs/advanced/skills) `blume-migrate` que vem incluída no pacote — e encerra sem alterar nada. Aponte qualquer outro agente para esse `SKILL.md`, ou instale a skill onde o seu agente procura skills, com o comando que ele mostra:
 
 ```bash
 npx skills add haydenbleasel/blume --skill blume-migrate

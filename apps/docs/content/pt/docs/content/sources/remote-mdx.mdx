@@ -43,3 +43,5 @@ O token de um repositório privado é lido da variável de ambiente `GITHUB_TOKE
 As páginas remotas são renderizadas com total fidelidade de MDX e componentes: o conteúdo delas é materializado em um diretório de staging oculto e renderizado pelo Astro junto com a sua documentação local, então callouts, tabs e todos os outros componentes do Blume continuam funcionando.
 
 Como em toda source remota, as páginas buscadas ficam em cache para builds offline e são atualizadas com `blume sync`. Veja [Cache e builds offline](/docs/content/sources#caching-and-offline-builds).
+
+O guia [Monte um único portal de documentação a partir de vários repositórios do GitHub](/guides/documentation-multiple-repositories) usa essa source para trazer a pasta de documentação de cada repositório para um único site, fixado em uma release que só muda quando você a altera.

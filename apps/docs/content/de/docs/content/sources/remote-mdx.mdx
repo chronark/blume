@@ -43,3 +43,5 @@ Das Token für ein privates Repo wird aus der Umgebungsvariable `GITHUB_TOKEN` g
 Remote-Seiten werden vollständig als MDX mit allen Komponenten gerendert. Ihr Inhalt wird dafür in ein verstecktes Staging-Verzeichnis geschrieben und zusammen mit deinen lokalen Docs über Astro gerendert. So funktionieren Callouts, Tabs und alle anderen Blume-Komponenten weiterhin.
 
 Wie bei jeder Remote-Quelle werden abgerufene Seiten für Offline-Builds zwischengespeichert und mit `blume sync` aktualisiert – siehe [Caching und Offline-Builds](/docs/content/sources#caching-and-offline-builds).
+
+Die Anleitung [Ein Docs-Portal aus mehreren GitHub-Repositorys aufbauen](/guides/documentation-multiple-repositories) nutzt diese Quelle, um den Docs-Ordner jedes Repositorys in eine einzige Website zu holen. Jedes Repository ist dabei auf ein Release festgelegt, das erst wechselt, wenn du es selbst änderst.

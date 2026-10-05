@@ -23,15 +23,15 @@ npx blume migrate fumadocs --codex
 
 आप जिस फ़्रेमवर्क से माइग्रेट कर रहे हैं, उसका नाम दें। नाम न देने पर Blume प्रोजेक्ट की अपनी फ़ाइलों से उसका पता लगा लेता है। अगर आपका बताया गया फ़्रेमवर्क प्रोजेक्ट से मेल नहीं खाता, तो Blume चेतावनी देता है, लेकिन आपके बताए गए फ़्रेमवर्क के साथ ही आगे बढ़ता है:
 
-| स्रोत | किससे पहचाना जाता है |
-| --- | --- |
-| `mintlify` | `docs.json` या `mint.json` |
-| `fumadocs` | `source.config.ts`, या `package.json` में `fumadocs-core`, `fumadocs-ui` या `fumadocs-mdx` |
-| `docusaurus` | `docusaurus.config.*` |
-| `starlight` | `package.json` में `@astrojs/starlight` |
-| `nextra` | `package.json` में `nextra` |
+| स्रोत | किससे पहचाना जाता है | गाइड |
+| --- | --- | --- |
+| `mintlify` | `docs.json` या `mint.json` | [Mintlify से माइग्रेट करें](/guides/migrate-from-mintlify) |
+| `fumadocs` | `source.config.ts`, या `package.json` में `fumadocs-core`, `fumadocs-ui` या `fumadocs-mdx` | [Fumadocs से माइग्रेट करें](/guides/migrate-from-fumadocs) |
+| `docusaurus` | `docusaurus.config.*` | [Docusaurus से माइग्रेट करें](/guides/migrate-from-docusaurus) |
+| `starlight` | `package.json` में `@astrojs/starlight` | [Starlight से माइग्रेट करें](/guides/migrate-from-starlight) |
+| `nextra` | `package.json` में `nextra` | [Nextra से माइग्रेट करें](/guides/migrate-from-nextra) |
 
-प्लेबुक में हर स्रोत के लिए अलग मैपिंग संदर्भ है। किसी दूसरे टूल से बनी साइट भी माइग्रेट हो सकती है। इसके लिए कमांड को बिना स्रोत के चलाएँ। एजेंट पहले रिपॉज़िटरी की सूची तैयार करेगा, फिर प्लेबुक के सामान्य नियमों के आधार पर काम करेगा।
+प्लेबुक में हर स्रोत के लिए अलग मैपिंग संदर्भ है। किसी दूसरे टूल से बनी साइट भी माइग्रेट हो सकती है। इसके लिए कमांड को बिना स्रोत के चलाएँ। एजेंट पहले रिपॉज़िटरी की सूची तैयार करेगा, फिर प्लेबुक के सामान्य नियमों के आधार पर काम करेगा। [MkDocs Material गाइड](/guides/migrate-from-mkdocs-material) में इसी तरीके से किए गए माइग्रेशन को चरण-दर-चरण समझाया गया है।
 
 ## एजेंट क्या करता है [#what-the-agent-does]
 

@@ -21,6 +21,8 @@ export default defineConfig({
 
 Isso monta a referência em `/reference` (uma página de visão geral), com cada operação em `/reference/<tag>/<operation>`. O `spec` pode ser uma URL `http(s)` ou o caminho de um arquivo local no seu projeto. O Blume faz o parse dele com o [parser de OpenAPI do Scalar](https://github.com/scalar/scalar). Especificações Swagger 2.0 e OpenAPI 3.0 são convertidas para 3.1 automaticamente, e especificações 3.1 e [3.2](#openapi-32) são lidas do jeito que foram escritas. Um adaptador é uma descrição simples da referência, e não uma especificação já processada. Por isso o Blume consegue validá-lo de antemão e embuti-lo no site gerado. Se você deixar `reference` de fora (ou vazio), nenhuma referência é renderizada. Está documentando uma API orientada a eventos ou uma API GraphQL? Veja [AsyncAPI](/docs/references/asyncapi) e [GraphQL](/docs/references/graphql).
 
+Para ir da especificação gerada pelo seu framework até uma referência publicada, siga o guia de [FastAPI](/guides/fastapi-documentation-website), [Django REST Framework](/guides/django-rest-framework-api-documentation), [NestJS](/guides/nestjs-api-documentation-website), [Spring Boot](/guides/spring-boot-api-documentation), [Hono](/guides/hono-zod-api-documentation), [Fastify](/guides/fastify-api-documentation), [Elysia](/guides/elysia-api-documentation) ou [oRPC](/guides/orpc-openapi-documentation). O guia [Gerar a documentação da API a partir de uma especificação OpenAPI](/guides/openapi-documentation-website) parte de qualquer arquivo de especificação.
+
 A referência não adiciona uma aba ao cabeçalho sozinha. Para exibi-la, aponte uma [aba de navegação](/docs/content/navigation#tabs) para a rota dela. Isso também define o escopo da barra lateral de operações no renderizador nativo:
 
 ```ts blume.config.ts
@@ -140,6 +142,8 @@ paths:
             $ref: ./code_samples/go/list_plants.go
 ```
 
+O guia [Adicionar exemplos de SDK à documentação de API gerada](/guides/openapi-sdk-code-samples) mostra, passo a passo, exemplos para um SDK em TypeScript e outro em Python, com uma verificação que detecta exemplos quebrados por uma nova versão do SDK.
+
 ## Playground Try it [#try-it-playground]
 
 As páginas de operação renderizadas nativamente já vêm com um painel interativo **Try it**. O Blume gera o formulário a partir da própria operação. Cada parâmetro de caminho, de query e de header ganha um campo, o editor de corpo é montado a partir do schema do corpo da requisição e tudo vem pré-preenchido com os exemplos da especificação. Os valores são enviados do jeito que a especificação descreve: parâmetros de array e de objeto seguem o `style` e o `explode` deles (`tags=dog&tags=cat` em uma query, `1,2` em um caminho, `filter[color]=red` para `deepObject`), e um corpo `application/x-www-form-urlencoded` ou `multipart/form-data` é enviado como campos de formulário, e não como JSON. Um seletor de servidor lista os servidores da operação (os `servers` dela, senão os do caminho dela, senão os da especificação, com cada `{variable}` no seu `default`) e inclui um campo de texto livre para qualquer outra URL base. Os campos de autenticação seguem a [segurança resolvida](#authorization) da operação: token bearer, chave de API e credenciais basic. Para OAuth2, há um campo onde você cola o token. Você precisa trazer um access token, porque o Blume não executa o fluxo.
@@ -175,6 +179,8 @@ reference: [
 
 O proxy nativo só encaminha requisições para as origens declaradas em `servers` nas suas especificações (no nível do documento, do caminho ou da operação, com as variáveis nos seus valores padrão), inclusive quando segue redirecionamentos. Assim, uma documentação publicada não pode ser usada para acessar outros hosts da rede onde ela roda. Uma **Custom base URL** digitada no painel não conta como servidor documentado: com o proxy ativado, as requisições para ela são recusadas com um 403. O proxy só encaminha os headers que o próprio painel define (as credenciais e os parâmetros de header preenchidos, além do `Content-Type` do corpo). Assim, cookies, credenciais que o navegador anexa para o site de documentação (como a autenticação HTTP Basic de um preview protegido por senha) e headers adicionados pela sua hospedagem (`X-Forwarded-For`, `CF-*`, `X-Vercel-*`) nunca chegam à API. O proxy lê o corpo da requisição só até 4 MB, e qualquer coisa maior recebe um `413`. Toda resposta repassada por ele carrega `Content-Security-Policy: sandbox`, `X-Content-Type-Options: nosniff` e `Cross-Origin-Resource-Policy: same-origin`, além de `Content-Disposition: attachment` para HTML ou SVG. Assim, uma página de erro da API que ecoa a entrada não consegue executar scripts na origem da documentação. O proxy também tem [limite de requisições](/docs/configuration/rate-limiting) por leitor, assim como toda rota de servidor que um leitor pode chamar.
 
+Quando uma requisição do Try it é bloqueada, o guia [Corrigir erros de CORS em um playground de documentação de API](/guides/api-documentation-cors-errors) reproduz o problema, analisa o preflight que o navegador envia e o corrige com uma política de CORS na sua API ou com o proxy nativo.
+
 ## Várias especificações [#multiple-specs]
 
 Use `sources` para publicar mais de uma especificação com um único adaptador. Cada fonte ganha sua própria rota de visão geral e suas próprias páginas de operação, e todas compartilham as opções de exibição do adaptador. Dê um `label` a cada uma (ele nomeia o grupo dela na barra lateral exatamente como está escrito e serve para derivar a rota) ou defina uma `route` explícita:
@@ -191,6 +197,8 @@ reference: [
 ```
 
 `spec` é um atalho para um `sources` com uma única entrada, então você só precisa de `sources` quando tiver mais de uma especificação. Se duas especificações precisarem de opções de exibição diferentes, como conjuntos diferentes de exemplos de código, liste dois adaptadores `openapi()`, cada um com sua própria `route`. Para incorporar uma referência do [Scalar](/docs/references/scalar) ao lado das páginas nativas, adicione um adaptador `scalar()` separado na lista. As fontes são resolvidas na ordem da lista. Quando duas resolvem para a mesma rota, a primeira vence, e o build emite um aviso sobre a que foi descartada.
+
+O guia [Combinar várias especificações OpenAPI em um único site de documentação](/guides/multiple-openapi-specs-documentation) monta um portal de APIs desse jeito, com a especificação de cada serviço em sua própria rota e aba.
 
 ### Indexação por fonte [#per-source-indexing]
 
@@ -260,6 +268,8 @@ O `target` de cada ação é uma expressão [JSONPath](https://www.rfc-editor.or
 
 Os overlays são aplicados à especificação do jeito que ela foi escrita, antes de o Blume convertê-la para OpenAPI 3.1. Por isso, um overlay tem como alvo a versão em que você escreveu a especificação. Tudo o que é gerado a partir da especificação reflete o resultado: as páginas de operação, a barra lateral, a busca, o `llms.txt` e o servidor MCP. Com `sources`, dê a cada fonte seus próprios `overlays`. Um overlay que não pode ser aplicado faz a referência falhar, assim como acontece com uma especificação ilegível. Assim, um overlay quebrado não consegue publicar o que deveria esconder.
 
+O guia [Remover endpoints internos da documentação pública da API](/guides/openapi-overlays-public-docs) mostra, passo a passo, um overlay que remove as operações internas de uma especificação gerada a cada build.
+
 ## Autorização [#authorization]
 
 Operações que declaram [requisitos de segurança](https://spec.openapis.org/oas/v3.1.0#security-requirement-object) renderizam uma seção **Authorization** acima dos parâmetros. Os exemplos de código gerados enviam uma credencial placeholder de acordo com o esquema: `Authorization: Bearer YOUR_TOKEN`, um header de chave de API ou uma chave na query. Não há nada para configurar. O Blume lê `security` da especificação, então a referência sempre corresponde ao que a API realmente exige.
@@ -296,6 +306,8 @@ Os [`callbacks`](https://spec.openapis.org/oas/v3.1.0#callback-object) de uma op
 
 As páginas de webhook são páginas reais: elas aparecem na busca, no `llms.txt` e no servidor MCP, e o Markdown delas avisa aos agentes que se trata de uma requisição enviada pela API. Assim, um agente não vai tentar chamá-la.
 
+O guia [Escrever documentação de webhooks com OpenAPI 3.1](/guides/openapi-webhook-documentation) adiciona headers de assinatura e confirmações de recebimento às páginas de webhook, além de um guia de recebimento com um receptor funcional em Node.js.
+
 ## Avisos da especificação [#spec-warnings]
 
 O Blume não valida a especificação contra o schema do OpenAPI. Para isso, rode um linter como o [Spectral](https://github.com/stoplightio/spectral) ou o [oasdiff](https://github.com/oasdiff/oasdiff) no CI. Mas ele avisa, no `blume dev`, no `blume build` e no `blume check`, sobre erros que, de outra forma, seriam renderizados errado sem nenhum sinal, e sobre partes da especificação que ele deixa de fora. Cada aviso cita a especificação, e o resto da referência continua sendo gerado:
@@ -309,6 +321,8 @@ O Blume não valida a especificação contra o schema do OpenAPI. Para isso, rod
 | `BLUME_OPENAPI_CODE_SAMPLE_REF` | O `source` de uma entrada de `x-codeSamples` é um `$ref` que o Blume não consegue ler, ou que aponta para dentro de um documento, então esse [exemplo](#your-own-samples) fica de fora. |
 | `BLUME_OPENAPI_X_WEBHOOKS` | Uma especificação 3.1 ou posterior mantém os webhooks em `x-webhooks`, a extensão que as ferramentas de 3.0 leem, e não tem `webhooks`, então nenhum deles é renderizado. Renomeie o campo para `webhooks`. |
 | `BLUME_OPENAPI_REF_PATH_ITEM` | Um caminho ou webhook é um `$ref` para um path item compartilhado, como um que fica em `components.pathItems`. O Blume não resolve esses casos, então as operações dele ficam de fora da referência. Coloque o path item inline em `paths` ou `webhooks`. Os schemas, parâmetros e respostas dele podem continuar como `$ref`s. |
+
+O guia [Manter a documentação da API sincronizada com as mudanças do backend no CI](/guides/openapi-documentation-ci) roda essas verificações no GitHub Actions: ele exporta a especificação do backend, falha quando a especificação está desatualizada, inválida ou traz mudanças incompatíveis, e regenera a referência a partir dela.
 
 ## Incorporando o Scalar [#embedding-scalar-instead]
 

@@ -23,15 +23,15 @@ Ersetze `fumadocs` durch dein Framework. Wenn du Claude Code verwenden willst, e
 
 Gib das Framework an, von dem du migrierst. Wenn du es weglässt, erkennt Blume es anhand der Dateien im Projekt. Gibst du ein Framework an, das Projekt sieht aber nach einem anderen aus, warnt Blume dich und macht mit dem angegebenen weiter:
 
-| Quelle | Erkannt anhand von |
-| --- | --- |
-| `mintlify` | `docs.json` oder `mint.json` |
-| `fumadocs` | `source.config.ts` oder `fumadocs-core`, `fumadocs-ui` oder `fumadocs-mdx` in `package.json` |
-| `docusaurus` | `docusaurus.config.*` |
-| `starlight` | `@astrojs/starlight` in `package.json` |
-| `nextra` | `nextra` in `package.json` |
+| Quelle | Erkannt anhand von | Anleitung |
+| --- | --- | --- |
+| `mintlify` | `docs.json` oder `mint.json` | [Von Mintlify migrieren](/guides/migrate-from-mintlify) |
+| `fumadocs` | `source.config.ts` oder `fumadocs-core`, `fumadocs-ui` oder `fumadocs-mdx` in `package.json` | [Von Fumadocs migrieren](/guides/migrate-from-fumadocs) |
+| `docusaurus` | `docusaurus.config.*` | [Von Docusaurus migrieren](/guides/migrate-from-docusaurus) |
+| `starlight` | `@astrojs/starlight` in `package.json` | [Von Starlight migrieren](/guides/migrate-from-starlight) |
+| `nextra` | `nextra` in `package.json` | [Von Nextra migrieren](/guides/migrate-from-nextra) |
 
-Für jede Quelle gibt es im Playbook eine eigene Mapping-Referenz. Auch eine Seite, die mit einem anderen Framework gebaut wurde, lässt sich migrieren. Führ den Befehl einfach ohne Quelle aus. Der Agent sieht sich dann zuerst an, was im Repo liegt, und arbeitet anschließend nach den allgemeinen Regeln des Playbooks.
+Für jede Quelle gibt es im Playbook eine eigene Mapping-Referenz. Auch eine Seite, die mit einem anderen Framework gebaut wurde, lässt sich migrieren. Führ den Befehl einfach ohne Quelle aus. Der Agent sieht sich dann zuerst an, was im Repo liegt, und arbeitet anschließend nach den allgemeinen Regeln des Playbooks. Wie eine solche Migration abläuft, zeigt die [Anleitung für MkDocs Material](/guides/migrate-from-mkdocs-material).
 
 ## Was der Agent macht [#what-the-agent-does]
 

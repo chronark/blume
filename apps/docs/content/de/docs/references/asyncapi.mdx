@@ -23,6 +23,8 @@ navigation: {
 }
 ```
 
+[Kafka-Events mit AsyncAPI dokumentieren](/guides/asyncapi-kafka-documentation) zeigt dir das Schritt für Schritt für Kafka-Topics, mit Producer- und Consumer-Code neben der Referenz.
+
 ## Spezifikationsversionen [#spec-versions]
 
 **AsyncAPI-2.x-Spezifikationen werden automatisch auf 3.x normalisiert**, und zwar mit dem offiziellen AsyncAPI-Converter. So werden `publish`/`subscribe`-Kanäle auf `send`/`receive`-Operationsseiten mit stabilen URLs abgebildet. Wenn du die Spezifikationsdatei später selbst mit dem Converter aktualisierst, verschiebt sich also nichts. Der Converter ist eine optionale Peer-Dependency. Wenn deine Site eine 1.x- oder 2.x-Spezifikation nutzt, installiere ihn also (`npm install @asyncapi/converter`). Ohne ihn bricht der Build ab und nennt dir genau diesen Installationsbefehl. Eine 3.x-Spezifikation braucht nichts weiter. Operationen werden nach Tag gruppiert, Operationen ohne Tag unter ihrer Kanaladresse.

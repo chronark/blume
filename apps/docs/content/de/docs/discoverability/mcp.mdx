@@ -24,6 +24,8 @@ agents: {
 
 Wenn bereits eine Content-Seite oder eine eigene Seite die Route belegt, wird der Server nicht generiert: Der Build gibt eine Warnung aus, und `llms.txt` sowie die anderen [Discovery-Dokumente](/docs/discoverability/agent-discovery) lassen ihn weg.
 
+Der Guide [Einen MCP-Server zu deinen Docs hinzufügen](/guides/mcp-server-for-documentation) führt dich durch den gesamten Ablauf — vom Aktivieren über das Deployment des Servers bis zum Verbinden eines Clients.
+
 ## Tools und Ressourcen [#tools-and-resources]
 
 Der Server stellt schreibgeschützte Tools bereit — `search_docs`, `get_page`, `list_pages` und `get_navigation` — sowie jede Seite als MCP-Ressource (`resources/list` listet die Seiten unter ihren ausgelieferten URLs mit dem Typ `text/markdown` auf und lässt dabei wie `list_pages` i18n-Fallback-Kopien nicht übersetzter Seiten weg; `resources/read` gibt das [Agent-Markdown](/docs/discoverability/markdown) der Seite zurück, dieselbe Ausgabe wie `get_page`), sodass Clients, die Kontext per URI anhängen, die Docs ohne Tool-Aufruf durchstöbern können. Er veröffentlicht Discovery-Dokumente unter `/.well-known/mcp.json` und `/.well-known/mcp/server-card.json`. Die Server Card folgt dem Server-Card-Erweiterungsschema aus [SEP-2127](https://github.com/modelcontextprotocol/modelcontextprotocol/pull/2127) (Reverse-DNS-`name`, `remotes`-Transport-Endpunkte), ergänzt um initialize-förmige Kompatibilitätsfelder (`serverInfo`, `capabilities`, `transports`) für Scanner, die gegen die frühere Fassung des Proposals gebaut wurden. Das Menü **Connect to MCP** jeder Seite bietet eine Copy-and-go-Installation für Claude Code, Cursor, VS Code und Codex (sichtbar, sobald [`deployment.site`](/docs/deployment) gesetzt ist).

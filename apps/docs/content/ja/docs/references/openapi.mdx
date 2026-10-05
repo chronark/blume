@@ -21,6 +21,8 @@ export default defineConfig({
 
 これにより、リファレンスは `/reference`（概要ページ）にマウントされ、各オペレーションは `/reference/<tag>/<operation>` に配置されます。`spec` には `http(s)` URL か、プロジェクト内のローカルファイルへのパスを指定します。Blume は [Scalar の OpenAPI パーサー](https://github.com/scalar/scalar)で仕様を解析します。Swagger 2.0 と OpenAPI 3.0 の仕様は自動的に 3.1 にアップグレードされ、3.1 と [3.2](#openapi-32) の仕様は記述されたまま読み込まれます。アダプターは解析済みの仕様ではなく、リファレンスを記述したプレーンな設定です。そのため Blume は事前に検証を行い、生成されるサイトにインライン化できます。`reference` を省略する（または空にする）と、リファレンスは一切レンダリングされません。イベント駆動型 API や GraphQL API をドキュメント化する場合は、[AsyncAPI](/docs/references/asyncapi) と [GraphQL](/docs/references/graphql) を参照してください。
 
+フレームワークが生成した仕様からリファレンスをデプロイするまでの手順については、[FastAPI](/guides/fastapi-documentation-website)、[Django REST Framework](/guides/django-rest-framework-api-documentation)、[NestJS](/guides/nestjs-api-documentation-website)、[Spring Boot](/guides/spring-boot-api-documentation)、[Hono](/guides/hono-zod-api-documentation)、[Fastify](/guides/fastify-api-documentation)、[Elysia](/guides/elysia-api-documentation)、[oRPC](/guides/orpc-openapi-documentation) の各ガイドを参照してください。[OpenAPI 仕様から API ドキュメントを生成する](/guides/openapi-documentation-website)では、任意の仕様ファイルを出発点として説明しています。
+
 リファレンスを追加しても、ヘッダーのタブは自動では追加されません。表示するには、[ナビゲーションタブ](/docs/content/navigation#tabs)をリファレンスのルートに向けてください。これにより、ネイティブレンダラーのオペレーションサイドバーのスコープも設定されます。
 
 ```ts blume.config.ts
@@ -140,6 +142,8 @@ paths:
             $ref: ./code_samples/go/list_plants.go
 ```
 
+[生成された API ドキュメントに SDK の例を追加する](/guides/openapi-sdk-code-samples)では、TypeScript と Python の SDK を例にサンプルの追加手順を説明しています。SDK のリリースによって動かなくなったサンプルを検出するチェックも紹介しています。
+
 ## Try it プレイグラウンド [#try-it-playground]
 
 ネイティブにレンダリングされたオペレーションページには、デフォルトでインタラクティブな **Try it** パネルが付属します。Blume はオペレーション自体からフォームを生成します。パス、クエリ、ヘッダーの各パラメーターに入力欄が用意され、リクエストボディのスキーマからボディエディターが構築され、すべてに仕様の例があらかじめ入力されます。値は仕様の記述どおりの形式で送信されます。配列やオブジェクトのパラメーターは `style` と `explode` に従い（クエリでは `tags=dog&tags=cat`、パスでは `1,2`、`deepObject` では `filter[color]=red`）、`application/x-www-form-urlencoded` または `multipart/form-data` のボディは JSON ではなくフォームフィールドとして送信されます。サーバーピッカーにはオペレーションのサーバー（オペレーション自身の `servers`、なければパスの `servers`、それもなければ仕様の `servers` で、各 `{variable}` には `default` の値が使われます）が一覧表示され、それ以外のベース URL を入力できる自由入力欄もあります。認証の入力欄はオペレーションの[解決されたセキュリティ](#authorization)に対応します。ベアラートークン、API キー、Basic 認証の資格情報に対応し、OAuth2 はトークンを貼り付ける欄として表示されます（アクセストークンはご自身で用意してください。Blume は OAuth2 フローを実行しません）。
@@ -175,6 +179,8 @@ reference: [
 
 組み込みプロキシは、仕様の `servers`（ドキュメント、パス、オペレーションのいずれのレベルでも可。変数にはデフォルト値が使われます）で宣言されたオリジンにのみリクエストを転送します（リダイレクト先も同様です）。そのため、公開されたドキュメントのデプロイメントを悪用して、同じネットワーク上の他のホストにリクエストを送ることはできません。パネルに入力した **Custom base URL** は、仕様に記載されたサーバーとは見なされません。プロキシが有効な場合、そこへのリクエストは 403 で拒否されます。プロキシが転送するのは、パネル自身が設定したヘッダー（入力された資格情報とヘッダーパラメーター、およびボディの `Content-Type`）のみです。そのため、Cookie、ブラウザがドキュメントサイト向けに付与する資格情報（パスワードで保護されたプレビューでの HTTP Basic 認証など）、ホストが追加するヘッダー（`X-Forwarded-For`、`CF-*`、`X-Vercel-*`）が API に届くことはありません。プロキシが読み込むリクエストボディは 4 MB までです（それより大きい場合は `413` が返されます）。また、中継するすべてのレスポンスには `Content-Security-Policy: sandbox`、`X-Content-Type-Options: nosniff`、`Cross-Origin-Resource-Policy: same-origin` が付与され、HTML や SVG の場合はさらに `Content-Disposition: attachment` が付与されます。これにより、入力内容をそのまま返す API のエラーページがあっても、ドキュメントのオリジン上でスクリプトが実行されることはありません。また、読者が呼び出せる他のすべてのサーバールートと同様に、プロキシにも読者ごとの[レート制限](/docs/configuration/rate-limiting)が適用されます。
 
+Try it のリクエストがブロックされる場合は、[API ドキュメントのプレイグラウンドで CORS エラーを解決する](/guides/api-documentation-cors-errors)を参照してください。このガイドでは、問題を再現し、ブラウザが送信するプリフライトリクエストを確認したうえで、API 側の CORS ポリシーまたは組み込みプロキシを使って解決する方法を説明しています。
+
 ## 複数の仕様 [#multiple-specs]
 
 1 つのアダプターから複数の仕様を公開するには、`sources` を使います。各ソースは独自の概要ルートとオペレーションページを持ち、アダプターの表示オプションを共有します。各ソースには `label`（サイドバーではグループ名として記述どおりに表示され、ルートの導出にも使われます）を指定するか、明示的な `route` を設定してください。
@@ -191,6 +197,8 @@ reference: [
 ```
 
 `spec` は単一エントリの `sources` の省略形です。そのため、`sources` を使うのは仕様が複数ある場合だけで十分です。2 つの仕様で異なる表示オプション（たとえば異なるコードサンプルのセット）が必要な場合は、代わりに 2 つの `openapi()` アダプターを、それぞれ独自の `route` を指定して列挙してください。ネイティブページと並べて埋め込む [Scalar](/docs/references/scalar) リファレンスは、リスト内の独立した `scalar()` アダプターとして扱います。ソースはリストの順序で解決され、2 つのソースが同じルートに解決された場合は最初のものが優先されます（除外されたソースについてはビルド時に警告が表示されます）。
+
+[複数の OpenAPI 仕様を 1 つのドキュメントサイトにまとめる](/guides/multiple-openapi-specs-documentation)では、この方法で API ポータルを構築し、各サービスの仕様をそれぞれ独自のルートとタブに配置しています。
 
 ### ソースごとのインデックス設定 [#per-source-indexing]
 
@@ -260,6 +268,8 @@ actions:
 
 オーバーレイは、Blume が OpenAPI 3.1 にアップグレードする前の、記述されたままの仕様に適用されます。そのため、オーバーレイは仕様を記述したバージョンを対象にしてください。仕様から生成されるすべてのもの（オペレーションページ、サイドバー、検索、`llms.txt`、MCP サーバー）に結果が反映されます。`sources` を使う場合は、各ソースに独自の `overlays` を指定してください。適用できないオーバーレイがあると、読み込めない仕様の場合と同様にリファレンスがエラーになります。そのため、壊れたオーバーレイが原因で、隠すはずだった内容が公開されることはありません。
 
+[公開 API ドキュメントから内部エンドポイントを削除する](/guides/openapi-overlays-public-docs)では、ビルドのたびに、生成された仕様から内部オペレーションを取り除くオーバーレイの作成手順を説明しています。
+
 ## 認可 [#authorization]
 
 [セキュリティ要件](https://spec.openapis.org/oas/v3.1.0#security-requirement-object)を宣言したオペレーションでは、パラメーターの上に **Authorization** セクションがレンダリングされます。また、生成されたコードサンプルでは、スキームに応じたプレースホルダーの資格情報（`Authorization: Bearer YOUR_TOKEN`、API キーのヘッダー、またはクエリキー）が送信されます。設定は必要ありません。Blume は仕様から `security` を読み取るため、リファレンスは常に API が実際に要求する内容と一致します。
@@ -296,6 +306,8 @@ webhooks:
 
 Webhook ページも本物のページです。検索、`llms.txt`、MCP サーバーに含まれます。また、その Markdown ではこれが API から送信されるリクエストであることがエージェントに伝えられるため、エージェントがそれを呼び出そうとすることはありません。
 
+[OpenAPI 3.1 で Webhook のドキュメントを作成する](/guides/openapi-webhook-documentation)では、Webhook ページに署名ヘッダーと受信確認のレスポンスを追加し、さらに実際に動作する Node.js の受信側実装を含む受信ガイドを作成します。
+
 ## 仕様の警告 [#spec-warnings]
 
 Blume は、OpenAPI スキーマに照らした仕様の検証は行いません。検証には、CI で [Spectral](https://github.com/stoplightio/spectral) や [oasdiff](https://github.com/oasdiff/oasdiff) などのリンターを実行してください。ただし、`blume dev`、`blume build`、`blume check` では、そのままでは何の兆候もなく誤ってレンダリングされてしまうミスや、仕様のうち除外される部分について警告が表示されます。各警告には対象の仕様が示され、リファレンスの残りの部分は通常どおりビルドされます。
@@ -309,6 +321,8 @@ Blume は、OpenAPI スキーマに照らした仕様の検証は行いません
 | `BLUME_OPENAPI_CODE_SAMPLE_REF` | `x-codeSamples` エントリの `source` が、Blume が読み込めない `$ref` か、ドキュメント内を指す `$ref` になっています。そのため、その[サンプル](#your-own-samples)は除外されます。 |
 | `BLUME_OPENAPI_X_WEBHOOKS` | 3.1 以降の仕様で、Webhook が 3.0 向けのツールが読み取る拡張である `x-webhooks` の下に記述されており、`webhooks` がありません。そのため、Webhook は 1 つもレンダリングされません。フィールド名を `webhooks` に変更してください。 |
 | `BLUME_OPENAPI_REF_PATH_ITEM` | パスまたは Webhook が、`components.pathItems` の下にあるものなどの共有パスアイテムへの `$ref` になっています。Blume はこれを解決しないため、そのオペレーションはリファレンスに含まれません。パスアイテムを `paths` または `webhooks` の下にインラインで記述してください。スキーマ、パラメーター、レスポンスは `$ref` のままでかまいません。 |
+
+[CI で API ドキュメントをバックエンドの変更と同期させる](/guides/openapi-documentation-ci)では、これらのチェックを GitHub Actions で実行します。バックエンドから仕様をエクスポートし、仕様が古い場合、無効な場合、または破壊的変更を含む場合は失敗させたうえで、その仕様からリファレンスを再ビルドします。
 
 ## 代わりに Scalar を埋め込む [#embedding-scalar-instead]
 
