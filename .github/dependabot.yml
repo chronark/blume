@@ -19,3 +19,8 @@ updates:
       # TypeScript 7 has no JS API, which Blume's tooling depends on.
       - dependency-name: "typescript"
         versions: [">= 7"]
+      # Move together, by hand, once @astrojs/react's oxc-transform-react peer
+      # accepts the newer oxc: plugin-react is pinned so npm can't hoist a copy
+      # whose oxc peer disagrees with @astrojs/react's (see astro-peers.test.ts).
+      - dependency-name: "@vitejs/plugin-react"
+      - dependency-name: "oxc-transform-react"
