@@ -1380,10 +1380,13 @@ const localeRedirect = localeTargets
       }
       @media (prefers-reduced-motion: reduce) {
         /* html prefix outranks the library's rules regardless of sheet
-           order; its transition declarations carry !important. */
+           order; its transition declarations carry !important. Near-instant,
+           never `none`: medium-zoom only finishes opening and closing on the
+           image's `transitionend`, so with no transition a zoomed image
+           ignores Escape, clicks, and scrolls forever. */
         html .medium-zoom-image,
         html .medium-zoom-overlay {
-          transition: none !important;
+          transition-duration: 1ms !important;
         }
       }
     </style>

@@ -34,6 +34,27 @@ test.describe("navigation", () => {
     });
     expect(cursor).toBe("zoom-in");
   });
+
+  test("reduced motion keeps the image-zoom transition", async ({ page }) => {
+    // medium-zoom finishes opening and closing on the image's
+    // `transitionend`; a reduced-motion `transition: none` never fires it, so
+    // a zoomed image could never close again (issue #323).
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.goto("/docs");
+    const transition = await page.evaluate(() => {
+      const image = document.createElement("img");
+      image.className = "medium-zoom-image";
+      document.body.append(image);
+      const style = getComputedStyle(image);
+      return {
+        duration: style.transitionDuration,
+        property: style.transitionProperty,
+      };
+    });
+    expect(transition.property).toBe("transform");
+    expect(transition.duration).not.toBe("0s");
+    expect(transition.duration).not.toBe("0.3s");
+  });
 });
 
 test.describe("agent discovery", () => {
