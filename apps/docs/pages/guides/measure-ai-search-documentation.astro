@@ -14,6 +14,9 @@
 // run adds no second listener). Not yet run end to end on a deployed site.
 // Review pass: re-checked GA4's key-event steps and AI Assistant channel rule,
 // and Bing's AI Performance wording (surfaces, sampled grounding queries).
+// 2026-10-05: added Search Console's Generative AI performance report (rolled
+// out to every site 2026-08-31), checked against its help page and an export
+// of the report for useblume.dev.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -26,9 +29,10 @@ import { guideById } from "../_guides/guides.ts";
     tools. Bing Webmaster Tools counts how often Copilot and Bing's AI answers
     cite your pages. Your analytics shows readers who clicked through from an
     assistant, and ChatGPT tags its links with{" "}
-    <code>utm_source=chatgpt.com</code>. Google counts clicks from AI Overviews
-    and AI Mode inside Search Console's ordinary Web totals, with no separate AI
-    number. None of them proves anyone adopted your product.
+    <code>utm_source=chatgpt.com</code>. Search Console counts how often AI
+    Overviews and AI Mode showed a link to your pages, but their clicks stay
+    inside its ordinary Web totals. None of them proves anyone adopted your
+    product.
   </p>
   <p>
     By the end, your Blume site sends page views and a few chosen reader
@@ -62,6 +66,12 @@ import { guideById } from "../_guides/guides.ts";
         <td>An AI answer listed your page as a source</td>
         <td>Bing Webmaster Tools, AI Performance report</td>
         <td>Whether anyone clicked</td>
+      </tr>
+      <tr>
+        <td>AI impressions</td>
+        <td>Google's AI Overviews or AI Mode showed a link to your page</td>
+        <td>Search Console, Generative AI performance report</td>
+        <td>Whether anyone clicked, or what they searched for</td>
       </tr>
       <tr>
         <td>Search clicks</td>
@@ -237,12 +247,21 @@ export default defineConfig({
   </p>
   <h3>Search Console</h3>
   <p>
-    Google reports AI Overviews and AI Mode inside the Performance report's Web
-    search type, together with the rest of Search. A click on a link in either
-    counts as a click, and every link in an AI Overview shares that overview's
-    single position. Google documents no filter for AI features, so treat the
-    Web totals as all of Google Search, AI included. The Pages tab gives you
-    clicks per page.
+    Google reports AI Overviews and AI Mode in two places. The Performance
+    report's Web search type counts them together with the rest of Search: a
+    click on a link in either counts as a click, and every link in an AI
+    Overview shares that overview's single position. Treat the Web totals as
+    all of Google Search, AI included. The Pages tab gives you clicks per page.
+  </p>
+  <p>
+    The <strong>Generative AI performance report</strong>, listed with the
+    other performance reports, takes the AI features' share of that Web data
+    and counts impressions only: how many times a link to your site was shown in
+    AI Overviews or AI Mode, with two of your links in the same answer counting
+    once. It has Pages, Countries, Devices, and Dates tabs, no queries, and no
+    clicks, and it leaves out experiments in Search Labs. Keep its impressions
+    in their own column. Dividing Web clicks by them gives no click-through
+    rate, since those clicks include ordinary results.
   </p>
   <h3>Bing Webmaster Tools</h3>
   <p>
@@ -257,8 +276,9 @@ export default defineConfig({
   </p>
   <h3>Line them up by page</h3>
   <p>
-    Put citations from Bing, clicks from Search Console, and AI-referred
-    sessions and key events from GA4 side by side for each page. Read the pairs,
+    Put citations from Bing, AI impressions and clicks from Search Console,
+    and AI-referred sessions and key events from GA4 side by side for each
+    page. Read the pairs,
     not the totals:
   </p>
   <ul>
@@ -287,6 +307,8 @@ export default defineConfig({
 2026-10-01,2026-09-01 to 2026-09-30,Bing AI Performance,Total citations,site,,
 2026-10-01,2026-09-01 to 2026-09-30,Bing AI Performance,Average cited pages,site,,
 2026-10-01,2026-09-01 to 2026-09-30,Bing AI Performance,Citations,/quickstart,,
+2026-10-01,2026-09-01 to 2026-09-30,Search Console Generative AI,Impressions,site,,
+2026-10-01,2026-09-01 to 2026-09-30,Search Console Generative AI,Impressions,/quickstart,,
 2026-10-01,2026-09-01 to 2026-09-30,Search Console Web,Clicks,site,,includes AI Overviews and AI Mode
 2026-10-01,2026-09-01 to 2026-09-30,Search Console Web,Clicks,/quickstart,,
 2026-10-01,2026-09-01 to 2026-09-30,GA4,Sessions,Session source chatgpt.com,,

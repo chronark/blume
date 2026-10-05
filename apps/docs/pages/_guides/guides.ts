@@ -2014,7 +2014,7 @@ export const guides: Guide[] = [
     image: { src: "/guides/measure-ai-search-documentation.webp" },
     meta: {
       description:
-        "Measure AI search traffic to your docs: ChatGPT referrals in analytics, Bing's AI citation report, Search Console clicks, and a dated GEO baseline.",
+        "Measure AI search traffic to your docs: ChatGPT referrals in analytics, Bing's AI citations, Google's AI impressions, and a dated GEO baseline.",
       title: "How to measure AI search traffic to your documentation",
     },
     nextStep: {
@@ -2035,6 +2035,7 @@ export const guides: Guide[] = [
       "Track AI citations, assistant referrals, and the reader actions that follow as separate numbers, with a dated baseline you compare every month.",
     title: "Measure AI search referrals and citations for your docs",
     topic: "seo",
+    updated: "2026-10-05",
   },
   {
     author: "hayden",
