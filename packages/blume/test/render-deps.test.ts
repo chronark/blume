@@ -74,6 +74,21 @@ const conflictFixture = async () => {
   return { hoisted, importer, nested, outDir, pkgDir };
 };
 
+/**
+ * An isolated-linker store holding Blume beside its deps, and a server output
+ * outside it, so every link into the output adds the rest of the store.
+ */
+const isolatedFixture = async () => {
+  const store = join(root, "node_modules", ".store", "blume@1", "node_modules");
+  const pkgDir = join(store, "blume");
+  await mkdir(pkgDir, { recursive: true });
+  const astro = await fakePackage(store, "astro");
+  await fakePackage(store, "@astrojs/mdx");
+  const outDir = join(root, "project", "dist", "server");
+  await mkdir(outDir, { recursive: true });
+  return { astro, outDir, pkgDir, store };
+};
+
 /** A plugin context that answers `this.resolve` with `resolved`. */
 const context = (
   name: string,
@@ -220,20 +235,8 @@ describe("linkRenderDeps", () => {
   });
 
   it("adds the rest of Blume's store under an isolated linker", async () => {
-    const store = join(
-      root,
-      "node_modules",
-      ".store",
-      "blume@1",
-      "node_modules"
-    );
-    const pkgDir = join(store, "blume");
-    await mkdir(pkgDir, { recursive: true });
-    const astro = await fakePackage(store, "astro");
-    await fakePackage(store, "@astrojs/mdx");
+    const { astro, outDir, pkgDir, store } = await isolatedFixture();
     await mkdir(join(store, ".bin"), { recursive: true });
-    const outDir = join(root, "project", "dist", "server");
-    await mkdir(outDir, { recursive: true });
     const zod = await fakePackage(join(root, "elsewhere"), "zod");
 
     await linkRenderDeps(outDir, new Map([["zod", zod]]), pkgDir);
@@ -377,6 +380,25 @@ describe("prerenderDepsPlugin", () => {
       {
         dir: outDir,
       }
+    );
+    expect(existsSync(join(outDir, "node_modules"))).toBe(false);
+  });
+
+  it("gives a bundle with no external imports no node_modules", async () => {
+    const { astro, outDir, pkgDir } = await isolatedFixture();
+    const plugin = prerenderDepsPlugin(pkgDir);
+    // The Cloudflare adapter bundles the Worker whole, so every package
+    // import resolves to a file and none stays external.
+    const { ctx } = context("ssr", { id: join(astro, "index.mjs") });
+    await plugin.resolveId.handler.call(
+      ctx,
+      "astro",
+      join(pkgDir, "src", "x.ts"),
+      {}
+    );
+    await plugin.writeBundle.call(
+      { environment: { name: "ssr" } },
+      { dir: outDir }
     );
     expect(existsSync(join(outDir, "node_modules"))).toBe(false);
   });

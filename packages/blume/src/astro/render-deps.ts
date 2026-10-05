@@ -369,11 +369,16 @@ export const prerenderDepsPlugin = (
       if (!dir || !serverSide) {
         return;
       }
-      await linkRenderDeps(
-        dir,
-        imported.get(environment ?? "") ?? new Map<string, string>(),
-        pkgDir
-      );
+      const packages = imported.get(environment ?? "");
+      // A bundle that leaves no package import external loads nothing from
+      // `node_modules` at runtime, so it gets none. The Cloudflare adapter
+      // bundles the Worker whole, and a copy of its output that follows the
+      // links (a CI artifact) would otherwise upload every one of Blume's
+      // dependencies as a Worker module.
+      if (environment !== undefined && !packages?.size) {
+        return;
+      }
+      await linkRenderDeps(dir, packages ?? new Map<string, string>(), pkgDir);
     },
   };
 };
