@@ -500,7 +500,7 @@ export const faq: { answer: string; question: string }[] = [
   },
   {
     answer:
-      "Your model provider's token price. Each answer sends the most relevant pages of your docs to the model, which comes to about $1.90 per 1,000 answers on `openai/gpt-6-luna`. A larger model costs more per answer, and you choose which one. Rate limiting is on by default, at 30 questions per reader every 10 minutes, so a script can't run up the bill.",
+      "Your model provider's token price. Each answer sends the most relevant pages of your docs to the model, which comes to about $1.90 per 1,000 answers on `openai/gpt-6-luna`. A larger model costs more per answer, and you choose which one. Rate limiting is on by default, at 30 questions per reader every 10 minutes, which stops one script from running up the bill. It limits each address, not your total spend, so add the assistant's bot check to stop a script that spreads its requests across many addresses.",
     question: "What does the assistant cost to run?",
   },
   {
