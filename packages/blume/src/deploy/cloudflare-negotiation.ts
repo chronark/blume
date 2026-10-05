@@ -40,8 +40,9 @@
  * Cloudflare does not apply `_headers` to worker-first routes, so the wrapper
  * also re-stamps what the static layer would otherwise add on the routes it
  * takes over: the homepage agent-discovery `Link` header, the Markdown
- * `charset=utf-8`, and the sandbox on the SVGs a content source downloaded
- * (see `deploy/headers.ts`). The raw `.md`/`.mdx` URLs are
+ * `charset=utf-8`, the sandbox on the SVGs a content source downloaded (see
+ * `deploy/headers.ts`), and `X-Powered-By` unless `poweredBy` is `false`. The
+ * raw `.md`/`.mdx` URLs are
  * exempted from worker-first routing with negative rules, keeping their
  * `_headers` treatment and their zero-Worker serving path.
  *
@@ -85,6 +86,7 @@ import {
   OPENAPI_PATH,
 } from "../ai/api/paths.ts";
 import { normalizeBasePath, normalizePath } from "../core/base-path.ts";
+import { POWERED_BY_HEADERS } from "../core/powered-by.ts";
 import { compileRedirects, isPatternPath } from "../core/redirect-patterns.ts";
 import { CONTENT_ASSETS_ROOT, SVG_ASSET_HEADERS } from "./headers.ts";
 import type { NotFoundVariants } from "./vercel-negotiation.ts";
@@ -244,6 +246,8 @@ export interface NegotiationWorkerOptions {
   base?: string;
   /** Homepage agent-discovery `Link` header (see `ai/link-headers.ts`). */
   homeLinkHeader?: string | null;
+  /** Whether responses identify Blume with `X-Powered-By`. Defaults to `true`. */
+  poweredBy?: boolean;
   /** Estimated token count of the homepage Markdown mirror. */
   homeTokens?: number;
   /** Configured redirects the wrapper answers with their exact status. */
@@ -277,6 +281,9 @@ export const buildNegotiationWorker = (
   const binding = JSON.stringify(options.assetsBinding);
   const prefix = JSON.stringify(encodeURI(normalizeBasePath(options.base)));
   const homeLinkHeader = JSON.stringify(options.homeLinkHeader ?? null);
+  const poweredBy = JSON.stringify(
+    options.poweredBy === false ? {} : POWERED_BY_HEADERS
+  );
   const homeTokens = JSON.stringify(
     options.homeTokens === undefined ? null : String(options.homeTokens)
   );
@@ -331,6 +338,7 @@ const PATTERN_REDIRECTS = ${patternRedirects}.map(
 );
 const NOT_FOUND = ${notFound};
 const SVG_ASSET_HEADERS = ${JSON.stringify(SVG_ASSET_HEADERS)};
+const POWERED_BY = ${poweredBy};
 
 // An SVG a content source downloaded: a document that could run script as the
 // docs site if opened directly, so it goes out sandboxed. Matched on the
@@ -542,11 +550,29 @@ const isHomePath = (pathname) => {
   return rest === "" || rest === "/";
 };
 
+// Blume's X-Powered-By, on every answer the wrapper gives unless the
+// response already names its own (the project's middleware, say).
+const identify = (headers) => {
+  for (const [name, value] of Object.entries(POWERED_BY)) {
+    if (!headers.has(name)) {
+      headers.set(name, value);
+    }
+  }
+};
+
 const withHeaders = (response, apply) => {
   const patched = new Response(response.body, response);
   apply(patched.headers);
+  identify(patched.headers);
   return patched;
 };
+
+// A response that already carries the header (Blume's runtime middleware sets
+// it on every page Astro renders) goes out as it is.
+const withPoweredBy = (response) =>
+  Object.keys(POWERED_BY).every((name) => response.headers.has(name))
+    ? response
+    : withHeaders(response, () => {});
 
 export default {
   async fetch(request, env, context) {
@@ -556,7 +582,10 @@ export default {
     const redirect = redirectFor(url.pathname);
     if (redirect !== null) {
       return new Response(null, {
-        headers: { location: redirectLocation(redirect[0], url.search) },
+        headers: {
+          ...POWERED_BY,
+          location: redirectLocation(redirect[0], url.search),
+        },
         status: redirect[1],
       });
     }
@@ -568,7 +597,7 @@ export default {
       });
     }
     if (request.method !== "GET" && request.method !== "HEAD") {
-      return server.fetch(request, env, context);
+      return withPoweredBy(await server.fetch(request, env, context));
     }
     const assets = env[ASSETS_BINDING];
     // The request goes through untouched, so a conditional revalidation
@@ -577,7 +606,7 @@ export default {
     if (assets !== undefined && isPageJson(url.pathname)) {
       const asset = await assets.fetch(request);
       if (asset.status !== 404) {
-        return asset;
+        return withPoweredBy(asset);
       }
     }
     const variant = markdownVariantUrl(url.pathname + url.search);
@@ -608,10 +637,10 @@ export default {
     const response = await server.fetch(request, env, context);
     const twin = await notFoundTwin(request, url, response, assets);
     if (twin !== null) {
-      return twin;
+      return withPoweredBy(twin);
     }
     if (variant === null && !(home && HOME_LINK_HEADER !== null)) {
-      return response;
+      return withPoweredBy(response);
     }
     return withHeaders(response, (headers) => {
       if (variant !== null) {

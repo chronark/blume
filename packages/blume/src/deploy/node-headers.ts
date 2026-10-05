@@ -14,6 +14,7 @@ import {
   SIGNATURES_DIRECTORY_TYPE,
 } from "../ai/web-bot-auth.ts";
 import { normalizeBasePath, normalizePath } from "../core/base-path.ts";
+import { POWERED_BY_HEADERS } from "../core/powered-by.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { compileRedirects, isPatternPath } from "../core/redirect-patterns.ts";
 import type { CompiledRedirect } from "../core/redirect-patterns.ts";
@@ -159,6 +160,8 @@ export const nodePatternRedirects = (
 export interface NodeEntryOptions {
   /** `deployment.base`, normalized (`""` at the root). */
   base?: string;
+  /** Whether responses identify Blume with `X-Powered-By`. Defaults to `true`. */
+  poweredBy?: boolean;
   /** The configured redirects, from {@link nodeRedirects}. */
   redirects?: NodeRedirects;
   /** The configured pattern redirects, from {@link nodePatternRedirects}. */
@@ -169,7 +172,12 @@ export interface NodeEntryOptions {
  * The entry that replaces Astro's: it answers a configured redirect with its
  * exact status, and otherwise stamps the rules' headers on the response and
  * hands the request to Astro's handler. `send` leaves a Content-Type that is
- * already set alone, so the registered media type wins.
+ * already set alone, so the registered media type wins. Unless `poweredBy` is
+ * `false`, every answer also names Blume in `X-Powered-By` — the redirects,
+ * and the prerendered pages and files the static handler serves, which
+ * Blume's runtime middleware never sees. A middleware-mode entry leaves that
+ * header to the middleware: Astro hands a request it has no route for back to
+ * the host app through `next()`, and that response is the host's own.
  *
  * A rule matches the file the static handler will serve, not the raw URL:
  * Astro strips the base when it leads the path and serves the rest from the
@@ -194,10 +202,11 @@ export const nodeEntryWrapper = (
 // This wrapper answers the configured redirects with their exact status and
 // sets the headers the standalone server's static handler can't (the media
 // types and CORS headers of the .well-known discovery files, the sandbox on
-// downloaded SVGs), then hands every other request to Astro.
+// downloaded SVGs, X-Powered-By), then hands every other request to Astro.
 import { posix } from "node:path";
 
 const BASE = ${JSON.stringify(options.base ?? "")};
+const POWERED_BY = ${JSON.stringify(options.poweredBy === false ? {} : POWERED_BY_HEADERS)};
 const RULES = new Map(${JSON.stringify(exactRules(rules))});
 const PATTERNS = ${JSON.stringify(patternRules(rules))};
 const REDIRECTS = ${JSON.stringify(options.redirects ?? {})};
@@ -221,20 +230,20 @@ const servedPath = (req) => {
       : path;
   return BASE + (rest || "/");
 };
-const applyHeaders = (req, res) => {
+const applyHeaders = (req, res, identify) => {
   const path = servedPath(req);
   const lower = path.toLowerCase();
-  const headers =
-    RULES.get(path) ??
-    PATTERNS.find(
-      ([prefix, suffix]) =>
-        lower.startsWith(prefix.toLowerCase()) &&
-        lower.endsWith(suffix.toLowerCase())
-    )?.[2];
-  if (headers) {
-    for (const [name, value] of Object.entries(headers)) {
-      res.setHeader(name, value);
-    }
+  const headers = {
+    ...(identify ? POWERED_BY : {}),
+    ...(RULES.get(path) ??
+      PATTERNS.find(
+        ([prefix, suffix]) =>
+          lower.startsWith(prefix.toLowerCase()) &&
+          lower.endsWith(suffix.toLowerCase())
+      )?.[2]),
+  };
+  for (const [name, value] of Object.entries(headers)) {
+    res.setHeader(name, value);
   }
 };
 // A pattern redirect's Location: its template, each $n filled with that
@@ -268,7 +277,7 @@ const answerRedirect = (req, res) => {
     return false;
   }
   const [location, status] = redirect;
-  res.writeHead(status, { location });
+  res.writeHead(status, { ...POWERED_BY, location });
   res.end();
   return true;
 };
@@ -285,7 +294,7 @@ export const handler = (req, res, ...rest) => {
   if (answerRedirect(req, res)) {
     return;
   }
-  applyHeaders(req, res);
+  applyHeaders(req, res, options.mode !== "middleware");
   return astro.handler(req, res, ...rest);
 };
 export const startServer = () => {
@@ -301,7 +310,7 @@ export const startServer = () => {
       if (answerRedirect(req, res)) {
         return;
       }
-      applyHeaders(req, res);
+      applyHeaders(req, res, true);
       for (const listener of astroListeners) {
         listener.call(httpServer, req, res);
       }
@@ -315,9 +324,10 @@ if (options.mode === "standalone" && previous !== "disabled") {
 `;
 
 /**
- * Put the wrapper in front of a Node server build's entry. A build with no
- * rule (no API catalog, AI catalog, MCP server, signatures directory, or
- * downloaded content assets) and no redirect leaves Astro's entry alone.
+ * Put the wrapper in front of a Node server build's entry. A build with
+ * `poweredBy` off, no rule (no API catalog, AI catalog, MCP server,
+ * signatures directory, or downloaded content assets), and no redirect leaves
+ * Astro's entry alone.
  */
 export const wrapNodeEntry = async (
   project: BlumeProject,
@@ -341,6 +351,7 @@ export const wrapNodeEntry = async (
   const redirects = nodeRedirects(project);
   const patternRedirects = nodePatternRedirects(project);
   if (
+    !project.config.poweredBy &&
     rules.length === 0 &&
     Object.keys(redirects).length === 0 &&
     patternRedirects.length === 0
@@ -365,6 +376,7 @@ export const wrapNodeEntry = async (
     nodeEntryWrapper(rules, {
       base: normalizeBasePath(project.config.deployment.options.base),
       patternRedirects,
+      poweredBy: project.config.poweredBy,
       redirects,
     }),
     "utf-8"
