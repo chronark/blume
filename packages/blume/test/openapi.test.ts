@@ -1044,26 +1044,52 @@ describe("parse.parseSpec remote hardening", () => {
   });
 });
 
-describe("render-mdx", () => {
-  const specData = (over: Partial<ApiSpecData> = {}): ApiSpecData =>
-    // SAFETY: render-mdx never reads `kind` — the only ApiSpecData field these
-    // defaults omit.
-    ({
-      codeSamples: [],
-      description: "",
-      document: SPEC_3_1,
-      expandSchemas: false,
-      label: "API",
-      operations: {},
-      playground: { enabled: true, proxy: false },
-      route: "/api",
-      slug: "api",
-      tags: [],
-      title: "API",
-      version: "1",
-      ...over,
-    }) as ApiSpecData;
+const specData = (over: Partial<ApiSpecData> = {}): ApiSpecData =>
+  // SAFETY: render-mdx never reads `kind` — the only ApiSpecData field these
+  // defaults omit.
+  ({
+    codeSamples: [],
+    description: "",
+    document: SPEC_3_1,
+    expandSchemas: false,
+    label: "API",
+    operations: {},
+    playground: { enabled: true, proxy: false },
+    route: "/api",
+    slug: "api",
+    tags: [],
+    title: "API",
+    version: "1",
+    ...over,
+  }) as ApiSpecData;
 
+const describeOperation = (
+  description: string,
+  seoDescriptionSuffix = true
+): RenderedPageData["seo"] =>
+  operationMdx(
+    specData({ title: "Example API" }),
+    {
+      deprecated: false,
+      description,
+      key: "op",
+      method: "delete",
+      operationId: "op",
+      path: "/pets/bulk",
+      route: "/api/pets/op",
+      summary: "Bulk delete pets",
+      tag: "pet",
+      tagSlug: "pet",
+    },
+    {
+      includeInLlms: true,
+      includeInSearch: true,
+      noindex: false,
+      seoDescriptionSuffix,
+    }
+  ).data.seo;
+
+describe("render-mdx", () => {
   it("renders an operation page with searchable frontmatter and a component body", () => {
     const { operations } = extractOperations(SPEC_3_1, "/api");
     const addPet = operations.find((op) => op.key === "add-pet");
@@ -1519,32 +1545,6 @@ describe("render-mdx", () => {
   });
 
   describe("a first paragraph that ends in a colon", () => {
-    const describeOperation = (
-      description: string,
-      seoDescriptionSuffix = true
-    ): RenderedPageData["seo"] =>
-      operationMdx(
-        specData({ title: "Example API" }),
-        {
-          deprecated: false,
-          description,
-          key: "op",
-          method: "delete",
-          operationId: "op",
-          path: "/pets/bulk",
-          route: "/api/pets/op",
-          summary: "Bulk delete pets",
-          tag: "pet",
-          tagSlug: "pet",
-        },
-        {
-          includeInLlms: true,
-          includeInSearch: true,
-          noindex: false,
-          seoDescriptionSuffix,
-        }
-      ).data.seo;
-
     it("is followed by the items of the list it introduces", () => {
       expect(
         describeOperation(
@@ -2545,6 +2545,12 @@ describe("security", () => {
     tls: { type: "mutualTLS" },
   };
 
+  const resolved = (key: keyof typeof SCHEMES) => ({
+    key,
+    scheme: SCHEMES[key],
+    scopes: [],
+  });
+
   it("prefers the operation's security and treats [] as public", () => {
     const root = [{ bearerAuth: [] }];
     expect(effectiveSecurity(undefined, root)).toStrictEqual(root);
@@ -2615,11 +2621,6 @@ describe("security", () => {
   });
 
   it("labels schemes and locates their credential", () => {
-    const resolved = (key: keyof typeof SCHEMES) => ({
-      key,
-      scheme: SCHEMES[key],
-      scopes: [],
-    });
     expect(schemeLabel(resolved("bearerAuth"))).toBe("Bearer token (JWT)");
     expect(schemeLabel(resolved("basicAuth"))).toBe("Basic auth");
     expect(schemeLabel(resolved("apiHeader"))).toBe("API key");
