@@ -42,3 +42,5 @@ A private repo's token is read from the `GITHUB_TOKEN` environment variable — 
 Remote pages are rendered with full MDX-plus-component fidelity: their bodies are materialized into a hidden staging directory and rendered through Astro alongside your local docs, so callouts, tabs, and every other Blume component keep working.
 
 Like every remote source, fetched pages are cached for offline builds and refreshed with `blume sync` — see [Caching and offline builds](/docs/content/sources#caching-and-offline-builds).
+
+[Build one docs portal from multiple GitHub repositories](/guides/documentation-multiple-repositories) uses it to pull each repository's docs folder into one site, pinned to a release that moves only when you change it.

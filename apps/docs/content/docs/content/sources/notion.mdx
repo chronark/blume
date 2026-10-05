@@ -31,6 +31,8 @@ The `Status` property is a publish gate by default. A page whose Status (a statu
 
 **Notion image and video URLs are signed and expire**, so the adapter downloads them at build time into the site's assets and rewrites the references — a CMS asset never rots a static build. Only a file the server reports as an image or video is saved (or, when the response doesn't say, one whose URL names an image or video extension); anything else keeps its original URL with a build warning, so nothing but media is ever served from your site's origin. API calls are paced through a small request pool (3 at a time, matching Notion's per-integration rate limit) so databases with hundreds of pages import without tripping `429` responses; set `concurrency` on the source to tune it.
 
+[Turn a Notion database into a docs site](/guides/notion-documentation-website) walks through it end to end, with a Status property that decides what goes live. [Combine Markdown and Notion in one documentation site](/guides/markdown-notion-documentation) gives Notion editors a section of their own beside the Markdown in Git.
+
 ## Writing MDX in Notion
 
 Notion has no block for most Blume components. To use one in a Notion page (a `<CardGroup>` of `<Card>`s, say), type its MDX as text and set `mdx: true`: the source then reads the text of paragraphs, headings, list items, quotes, and callouts as MDX, so components, `{expressions}`, and Markdown typed in Notion render alongside Notion's own bold, italic, links, and inline code. Code blocks, toggle titles, image and video captions, and properties stay plain text.

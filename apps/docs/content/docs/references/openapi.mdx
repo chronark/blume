@@ -20,6 +20,8 @@ export default defineConfig({
 
 That mounts the reference at `/reference` (an overview page) with each operation at `/reference/<tag>/<operation>`. The `spec` is either an `http(s)` URL or a path to a local file in your project. Blume parses it with [Scalar's OpenAPI parser](https://github.com/scalar/scalar) — Swagger 2.0 and OpenAPI 3.0 specs are upgraded to 3.1 automatically, and 3.1 and [3.2](#openapi-32) specs are read as written. An adapter is a plain description of the reference — not a parsed spec — so Blume can validate it up front and inline it into the generated site; leaving `reference` out (or empty) renders no reference at all. Documenting an event-driven or GraphQL API instead? See [AsyncAPI](/docs/references/asyncapi) and [GraphQL](/docs/references/graphql).
 
+To go from your framework's generated spec to a deployed reference, follow the guide for [FastAPI](/guides/fastapi-documentation-website), [Django REST Framework](/guides/django-rest-framework-api-documentation), [NestJS](/guides/nestjs-api-documentation-website), [Spring Boot](/guides/spring-boot-api-documentation), [Hono](/guides/hono-zod-api-documentation), [Fastify](/guides/fastify-api-documentation), [Elysia](/guides/elysia-api-documentation), or [oRPC](/guides/orpc-openapi-documentation). [Generate API docs from an OpenAPI spec](/guides/openapi-documentation-website) starts from any spec file.
+
 The reference doesn't add a header tab on its own. To surface it, point a [navigation tab](/docs/content/navigation#tabs) at its route — this also scopes the operations sidebar for the native renderer:
 
 ```ts blume.config.ts
@@ -139,6 +141,8 @@ paths:
             $ref: ./code_samples/go/list_plants.go
 ```
 
+[Add SDK examples to generated API documentation](/guides/openapi-sdk-code-samples) walks through samples for a TypeScript and a Python SDK, with a check that catches samples an SDK release broke.
+
 ## Try it playground
 
 Operation pages rendered natively ship an interactive **Try it** panel by default. Blume generates the form from the operation itself: an input per path, query, and header parameter, a body editor built from the request-body schema, everything prefilled from the spec's examples. Values go on the wire the way the spec describes them: array and object parameters follow their `style` and `explode` (`tags=dog&tags=cat` in a query, `1,2` in a path, `filter[color]=red` for `deepObject`), and an `application/x-www-form-urlencoded` or `multipart/form-data` body is sent as form fields rather than JSON. A server picker lists the operation's servers (its own `servers`, else its path's, else the spec's, with each `{variable}` at its `default`), with a free-text field for any other base URL, and auth inputs match the operation's [resolved security](#authorization) — bearer token, API key, and basic credentials, with OAuth2 as a token paste field (bring an access token; Blume doesn't run the flow).
@@ -174,6 +178,8 @@ reference: [
 
 The built-in proxy only forwards requests to the origins your specs declare in `servers` (at the document, path, or operation level, with variables at their defaults) — including across redirects — so a public docs deployment can't be aimed at other hosts on its network. A **Custom base URL** typed into the panel isn't a documented server: with the proxy enabled, requests to it are refused with a 403. It forwards only the headers the panel sets itself — the credentials and header parameters filled in, and the body's `Content-Type` — so cookies, credentials the browser attaches for the docs site (HTTP Basic auth on a password-protected preview, say), and headers your host adds (`X-Forwarded-For`, `CF-*`, `X-Vercel-*`) never reach the API. It reads a request body only up to 4 MB (anything larger gets a `413`), and every response it relays carries `Content-Security-Policy: sandbox`, `X-Content-Type-Options: nosniff`, and `Cross-Origin-Resource-Policy: same-origin` — plus `Content-Disposition: attachment` for HTML or SVG — so an API error page that echoes its input can't run script on the docs origin. The proxy is also [rate limited](/docs/configuration/rate-limiting) per reader, like every server route a reader can call.
 
+When a Try it request is blocked, [Fix CORS errors in an API documentation playground](/guides/api-documentation-cors-errors) reproduces it, reads the preflight the browser sends, and fixes it with a CORS policy on your API or the built-in proxy.
+
 ## Multiple specs
 
 Use `sources` to publish more than one spec from one adapter. Each source gets its own overview route and operation pages, and shares the adapter's display options. Give each a `label`, which names its group in the sidebar as written and derives its route, or set an explicit `route`:
@@ -190,6 +196,8 @@ reference: [
 ```
 
 `spec` is shorthand for a single-entry `sources`, so you only reach for `sources` when you have more than one. When two specs need different display options — a different code-sample set, say — list two `openapi()` adapters instead, each with its own `route`. An embedded [Scalar](/docs/references/scalar) reference beside native pages is its own `scalar()` adapter in the list. Sources are resolved in list order, and when two resolve to the same route the first one wins (the build warns about the one it dropped).
+
+[Combine multiple OpenAPI specifications in one docs site](/guides/multiple-openapi-specs-documentation) builds an API portal this way, with each service's spec on its own route and tab.
 
 ### Per-source indexing
 
@@ -259,6 +267,8 @@ Each action's `target` is a [JSONPath](https://www.rfc-editor.org/rfc/rfc9535) e
 
 Overlays apply to the spec as written, before Blume upgrades it to OpenAPI 3.1, so an overlay targets the version you wrote the spec in. Everything built from the spec sees the result: the operation pages, the sidebar, search, `llms.txt`, and the MCP server. With `sources`, give each source its own `overlays`. An overlay that doesn't apply fails the reference the way an unreadable spec does, so a broken overlay can't publish what it was meant to hide.
 
+[Remove internal endpoints from public API docs](/guides/openapi-overlays-public-docs) walks through an overlay that strips internal operations from a generated spec on every build.
+
 ## Authorization
 
 Operations that declare [security requirements](https://spec.openapis.org/oas/v3.1.0#security-requirement-object) render an **Authorization** section above their parameters, and the generated code samples send a placeholder credential (`Authorization: Bearer YOUR_TOKEN`, an API-key header, or a query key — whatever the scheme calls for). There's nothing to configure: Blume reads `security` from the spec, so the reference always matches what the API actually enforces.
@@ -295,6 +305,8 @@ An operation's [`callbacks`](https://spec.openapis.org/oas/v3.1.0#callback-objec
 
 Webhook pages are real pages: they're in search, `llms.txt`, and the MCP server, and their Markdown tells agents it's a request the API sends, so an agent won't try to call it.
 
+[Write webhook documentation with OpenAPI 3.1](/guides/openapi-webhook-documentation) adds signature headers and acknowledgments to the webhook pages, plus a receiving guide with a working Node.js receiver.
+
 ## Spec warnings
 
 Blume doesn't validate a spec against the OpenAPI schema: run a linter such as [Spectral](https://github.com/stoplightio/spectral) or [oasdiff](https://github.com/oasdiff/oasdiff) in CI for that. It does warn, in `blume dev`, `blume build`, and `blume check`, about mistakes that would otherwise render wrong without any sign, and about parts of a spec it leaves out. Each warning names the spec, and the rest of the reference still builds:
@@ -308,6 +320,8 @@ Blume doesn't validate a spec against the OpenAPI schema: run a linter such as [
 | `BLUME_OPENAPI_CODE_SAMPLE_REF` | An `x-codeSamples` entry's `source` is a `$ref` Blume can't read, or one that points inside a document, so that [sample](#your-own-samples) is left out. |
 | `BLUME_OPENAPI_X_WEBHOOKS` | A 3.1 or later spec keeps its webhooks under `x-webhooks`, the extension 3.0 tools read, and has no `webhooks`, so none of them render. Rename the field to `webhooks`. |
 | `BLUME_OPENAPI_REF_PATH_ITEM` | A path or webhook is a `$ref` to a shared path item, such as one under `components.pathItems`. Blume doesn't resolve these, so its operations are missing from the reference. Inline the path item under `paths` or `webhooks`; its schemas, parameters, and responses can stay `$ref`s. |
+
+[Keep API documentation in sync with backend changes in CI](/guides/openapi-documentation-ci) runs those checks in GitHub Actions: it exports the spec from the backend, fails when the spec is stale, invalid, or breaking, and rebuilds the reference from it.
 
 ## Embedding Scalar instead
 

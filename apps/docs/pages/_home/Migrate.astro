@@ -2,11 +2,13 @@
 // "Migrate with an agent." — one interactive demo: the headline reads
 // "Migrate from [Fumadocs]" where the bracketed brand is a dropdown trigger
 // (logo + name + chevron). Picking another source swaps the trigger, the body
-// copy, and the `blume migrate <source>` command in step one. With no JS the
+// copy, the link to that source's migration guide, and the
+// `blume migrate <source>` command in step one. With no JS the
 // initial source's panels (Fumadocs unless `initial` says otherwise) stay
 // visible. The copy buttons reuse the page-level delegated
 // `data-blume-copy-install` handler.
 import Icon from "blume/components/Icon.astro";
+import { guideById } from "../_guides/guides.ts";
 import CommandText from "./CommandText.astro";
 import {
   migrateCommand,
@@ -14,6 +16,7 @@ import {
   sources,
   withUniqueIds,
 } from "./migrate-sources.ts";
+import TextLink from "./TextLink.astro";
 import Tray from "./Tray.astro";
 
 interface Props {
@@ -23,6 +26,10 @@ interface Props {
 
 const { initial = "fumadocs" } = Astro.props;
 const active = sourceById(initial);
+// Each source's walkthrough under /guides; guideById throws at build time if
+// a source ever lacks one.
+const guideHref = (id: string): string =>
+  `/guides/${guideById(`migrate-from-${id}`).id}`;
 
 // The brand menu is a disclosure: the trigger's `aria-expanded` shows or hides
 // a group of plain buttons, and the current source's button carries
@@ -145,6 +152,19 @@ const migrateScript = `(()=>{if(window.__blumeMigrate){return;}window.__blumeMig
           >
             {source.body}
           </p>
+        ))
+      }
+      {
+        sources.map((source) => (
+          <div
+            class="mt-4 hidden data-[active=true]:block"
+            data-active={source.id === active.id ? "true" : "false"}
+            data-migrate-panel={source.id}
+          >
+            <TextLink href={guideHref(source.id)}>
+              Read the {source.name} migration guide
+            </TextLink>
+          </div>
         ))
       }
     </div>

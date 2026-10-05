@@ -22,6 +22,8 @@ navigation: {
 }
 ```
 
+[Document Kafka events with AsyncAPI](/guides/asyncapi-kafka-documentation) walks through it for Kafka topics, with producer and consumer code beside the reference.
+
 ## Spec versions
 
 AsyncAPI **2.x specs are normalized to 3.x automatically** with the official AsyncAPI converter, so `publish`/`subscribe` channels map onto `send`/`receive` operation pages with stable URLs — later upgrading the spec file itself through the converter moves nothing. The converter is an optional peer dependency, so a site with a 1.x or 2.x spec installs it (`npm install @asyncapi/converter`); without it the build fails with that install command. A 3.x spec needs nothing extra. Operations group by tag; untagged operations group under their channel address.

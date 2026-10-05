@@ -30,3 +30,5 @@ export default defineConfig({
 ```
 
 The API token comes from the `STRAPI_API_TOKEN` environment variable, sent as a bearer token. Entries are fetched with `populate=*` so images carry their URLs (set `populate` to narrow it), and a relative upload path (`/uploads/x.png`) in a Blocks field resolves against `url`. A Markdown field passes through as written, so a relative path there stays relative to your docs site and breaks: use absolute image URLs in Markdown fields, as Strapi's Markdown editor inserts them. Only published entries are imported — `--preview` requests drafts (`status=draft` on Strapi 5, `publicationState=preview` on Strapi 4) and stages each document that has never been published with `draft: true`; a published document previews its latest draft.
+
+[Use Strapi to manage a documentation website](/guides/strapi-documentation-website) walks through it end to end: editors publishing in Strapi, a static site rebuilt on every publish, and drafts kept off production.

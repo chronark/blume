@@ -22,15 +22,15 @@ Swap `fumadocs` for your framework, and `--codex` for `--claude` to use Claude C
 
 Name the framework you're migrating from, or leave it out and Blume detects it from the project's own files. When you name one and the project looks like another, Blume warns and continues with the one you named:
 
-| Source | Detected from |
-| --- | --- |
-| `mintlify` | `docs.json` or `mint.json` |
-| `fumadocs` | `source.config.ts`, or `fumadocs-core`, `fumadocs-ui`, or `fumadocs-mdx` in `package.json` |
-| `docusaurus` | `docusaurus.config.*` |
-| `starlight` | `@astrojs/starlight` in `package.json` |
-| `nextra` | `nextra` in `package.json` |
+| Source | Detected from | Guide |
+| --- | --- | --- |
+| `mintlify` | `docs.json` or `mint.json` | [Migrate from Mintlify](/guides/migrate-from-mintlify) |
+| `fumadocs` | `source.config.ts`, or `fumadocs-core`, `fumadocs-ui`, or `fumadocs-mdx` in `package.json` | [Migrate from Fumadocs](/guides/migrate-from-fumadocs) |
+| `docusaurus` | `docusaurus.config.*` | [Migrate from Docusaurus](/guides/migrate-from-docusaurus) |
+| `starlight` | `@astrojs/starlight` in `package.json` | [Migrate from Starlight](/guides/migrate-from-starlight) |
+| `nextra` | `nextra` in `package.json` | [Migrate from Nextra](/guides/migrate-from-nextra) |
 
-Each source has its own mapping reference in the playbook. A site built with anything else still migrates: run the command without a source, and the agent inventories the repo first, then works from the playbook's general rules.
+Each source has its own mapping reference in the playbook. A site built with anything else still migrates: run the command without a source, and the agent inventories the repo first, then works from the playbook's general rules. The [MkDocs Material guide](/guides/migrate-from-mkdocs-material) walks through a migration that way.
 
 ## What the agent does
 

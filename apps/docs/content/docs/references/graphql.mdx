@@ -38,6 +38,8 @@ navigation: {
 }
 ```
 
+[Generate GraphQL docs from your schema](/guides/graphql-documentation-website) walks through it from a schema to a deployed site, with a Try it panel that queries a sandbox.
+
 ## Generated examples
 
 Every operation page carries a complete, valid example operation — one variable per argument, typed off the schema, with a bounded-depth selection set over the return type — plus matching example variables and an example response that mirrors the same selection. A variable whose argument declares a default starts at that default, and the selection leaves deprecated fields out. Code samples show the exact HTTP request (a JSON `POST` of `{ query, variables }`) in each configured language. The same [languages](/docs/references/openapi#code-samples-and-schemas) as `openapi()` are available, and `codeSamples: false` shows none:
