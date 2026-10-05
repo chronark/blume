@@ -44,7 +44,7 @@ export default defineConfig({
 
 ## 生成音声 [#generated-voices]
 
-`provider` を渡すと、ビルド時にニューラル音声モデルで音声を生成します。プロバイダーには、アシスタントと同じ [`gateway()`](/docs/configuration/assistant#adapters) アダプターを使い、音声モデルを指定します：
+`provider` を渡すと、ビルド時にニューラル音声モデルで音声を生成します。プロバイダーには、アシスタントの[アダプター](/docs/configuration/assistant#adapters)のいずれかを使い、音声モデルを指定します。Vercel AI Gateway の音声モデルを使う場合は `gateway()` を、OpenAI 独自の音声モデルや自分で運用している音声サーバーを使う場合は [`openai()`](#openai-and-self-hosted-voices) を使用します。
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -60,13 +60,15 @@ export default defineConfig({
 });
 ```
 
-`blume build` は、ビルドされた各ページをプレーヤーとまったく同じ方法で読み取り、文ごとに分割します。そして、[Vercel AI Gateway](https://vercel.com/docs/ai-gateway) を通じて文ごとに 1 つのクリップを生成します。クリップとページごとの小さなマニフェストは、静的ファイルとして `/blume-narration/` 以下に出力されます。そのため、繰り返し再生しても費用はかからず、サーバー上で処理が実行されることもありません。
+`blume build` は、ビルドされた各ページをプレーヤーとまったく同じ方法で読み取り、文ごとに分割します。そして、プロバイダー（この例では [Vercel AI Gateway](https://vercel.com/docs/ai-gateway)）を通じて文ごとに 1 つのクリップを生成します。クリップとページごとの小さなマニフェストは、静的ファイルとして `/blume-narration/` 以下に出力されます。そのため、繰り返し再生しても費用はかからず、サーバー上で処理が実行されることもありません。
 
 ビルドは生成を始める前に、必要な新しいクリップの数とその合計文字数をログに出力します。そのため、コストを事前に確認できます：
 
 ```txt
 Generating narration: 214 new clip(s), 15,880 characters, with openai/tts-1-hd
 ```
+
+`gateway()` には次のオプションがあります：
 
 | オプション | デフォルト | 説明 |
 | --- | --- | --- |
@@ -77,21 +79,56 @@ Generating narration: 214 new clip(s), 15,880 characters, with openai/tts-1-hd
 | `headers` |  | すべてのリクエストに付加される静的ヘッダーです。 |
 | `providerOptions` |  | AI SDK の `generateSpeech` にそのまま渡されます。Blume にオプションが用意されていないモデル設定に使います。 |
 
+### OpenAI とセルフホストの音声 [#openai-and-self-hosted-voices]
+
+`openai()` は、代わりに OpenAI の音声 API でクリップを生成します。`OPENAI_API_KEY` を使って OpenAI 独自のモデルを利用できるほか、`baseUrl` を指定すれば、同じ `POST /audio/speech` エンドポイントを提供する任意のサーバーも利用できます。たとえば [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI)、[Speaches](https://speaches.ai)、音声モデルを備えた [LiteLLM](https://docs.litellm.ai) プロキシなどです。ビルドからホスト型サービスにアクセスできないサイトでも、この方法で生成音声を使えます：
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { openai } from "blume/ai";
+
+export default defineConfig({
+  narration: {
+    provider: openai({
+      baseUrl: "http://localhost:8880/v1",
+      model: "kokoro",
+      voice: "af_heart",
+    }),
+  },
+});
+```
+
+LiteLLM プロキシのようにキーを必要とするサーバーには、`apiKeyEnv` で指定したキーが送信されます（`openai({ baseUrl, apiKeyEnv: "LITELLM_API_KEY", model })`）。`apiKeyEnv` を指定しない場合、`baseUrl` のサーバーはキーなしで呼び出されます。そのため、`OPENAI_API_KEY` が別のサーバーに送られることはありません。MP3 以外のレスポンス（サーバーの前段にあるプロキシが返すサインインページや、要求された形式を無視するサーバーが返す WAV など）は、キャッシュされずに失敗したクリップとして扱われます。
+
+`baseUrl` の有無にかかわらず、`openai()` は AI SDK の OpenAI プロバイダーを通じて音声を生成します。そのため、プロジェクトに `@ai-sdk/openai` を追加してください（`npm install @ai-sdk/openai`）。このパッケージがない場合、`blume build` は Vite の実行前に停止し、不足しているパッケージ名を表示します。
+
+| オプション | デフォルト | 説明 |
+| --- | --- | --- |
+| `model` |  | 必須です。音声モデルを指定します。OpenAI では `gpt-4o-mini-tts`、`tts-1`、`tts-1-hd` を、それ以外ではサーバーが提供するモデルの ID を指定します。 |
+| `baseUrl` |  | サーバーの OpenAI 互換のベース URL です（`/v1` を含みます）。指定しない場合、クリップは OpenAI から取得されます。ただし `OPENAI_BASE_URL` が設定されている場合は、OpenAI 公式の SDK と同様に、そのサーバーから取得されます。 |
+| `voice` | `alloy` | モデルの音声です。 |
+| `instructions` |  | 指示に対応したモデル（`gpt-4o-mini-tts`）で、音声の話し方を指定します。 |
+| `apiKeyEnv` | `baseUrl` がない場合は `OPENAI_API_KEY` | キーを格納する環境変数です。キーはベアラートークンとして送信されます。`baseUrl` を指定した場合は、ここで指定したキーだけが送信されるため、`OPENAI_API_KEY` が別のサーバーに届くことはありません。何も指定しなければ、リクエストはベアラートークンなしで送信されます（`headers` で設定した `Authorization` は引き続き送信されます）。 |
+| `headers` |  | すべてのリクエストに付加される静的ヘッダーです。 |
+| `providerOptions` |  | AI SDK の `generateSpeech` にそのまま渡されます。OpenAI の音声 API は、ここから `speed` を読み取ります：`{ openai: { speed: 1.1 } }`。 |
+
+OpenAI の音声 API は言語の指定を受け付けないため、`openai()` はページの言語を送信しません。また、複数の言語に登場する同じ文は 1 回だけ生成されます。OpenAI のモデルはテキストから言語を判別しますが、多くのセルフホストのサーバーでは音声によって言語が決まります。そのため、コンテンツの言語を話せる音声を選んでください。
+
 ### キャッシュ [#caching]
 
-クリップは `node_modules/.cache/blume/narration` にキャッシュされます。キャッシュのキーは、音声の内容を決める要素（文、言語、モデル、音声、指示）です。再ビルド時に費用が発生するのは変更された文だけです。また、複数のページに共通する文は 1 回だけ生成されます。Vercel と Netlify はビルドキャッシュから `node_modules` を復元するため、デプロイ時には変更された部分だけが再生成されます。その他の CI では、実行間でこのディレクトリをキャッシュしてください。
+クリップは `node_modules/.cache/blume/narration` にキャッシュされます。キャッシュのキーは、音声の内容を決める要素です。具体的には、文、その言語（言語を送信する `gateway()` の場合）、モデル、音声、指示、`providerOptions`、そして `openai()` の場合は呼び出し先のサーバーです。`baseUrl` を別のサーバーに向けると、モデルと音声が同じでも、すべてのクリップが再生成されます。再ビルド時に費用が発生するのは変更された文だけです。また、複数のページに共通する文は 1 回だけ生成されます。Vercel と Netlify はビルドキャッシュから `node_modules` を復元するため、デプロイ時には変更された部分だけが再生成されます。その他の CI では、実行間でこのディレクトリをキャッシュしてください。
 
 ### フォールバック [#fallbacks]
 
 生成音声は、クリップが存在しない場合にブラウザの音声にフォールバックします：
 
 - `blume dev` の場合。`blume dev` は音声を生成しません。生成音声をローカルで確認するには、`blume build` と `blume preview` を実行してください。
-- ビルド時にキーが設定されていない場合。ビルドは警告を出し、生成をスキップします。
-- 生成に失敗した場合。AI SDK がすでにリトライしているため、ビルドは最初に失敗したクリップで停止します。それまでにキャッシュされたクリップはすべて保持されます。
+- ビルド時にキーが設定されていない場合。ビルドは警告を出し、新しいクリップを生成しません。ただし、すべてのクリップがキャッシュ済みのページでは、引き続きそのクリップが使われます。`baseUrl` を指定し `apiKeyEnv` を指定していない `openai()` はキーを送信しないため、そのまま生成を続けます。
+- 生成に失敗した場合（ビルドからサーバーにアクセスできない場合を含みます）。AI SDK がすでにリトライしているため、生成は最初に失敗したクリップで停止します。ビルドは警告を出して続行し、キャッシュ済みのクリップはすべて保持されます。
 
 ## 言語 [#languages]
 
-ナレーションは、各ページをそのコンテンツの言語で読み上げます。そのため、[国際化](/docs/content/i18n)されたサイトでは、ロケールごとにその言語の音声で読み上げられます。音声の合図とプレーヤーのラベルは、すべての組み込み UI 言語に翻訳されています。ロケールごとに上書きする場合は、[`i18n.ui`](/docs/content/i18n#translated-ui) の `narration` で指定してください。
+ナレーションは、各ページをそのコンテンツの言語で読み上げます。そのため、[国際化](/docs/content/i18n)されたサイトでは、ロケールごとにその言語の音声で読み上げられます。`openai()` の場合、これはモデルと音声によって異なります。詳しくは [OpenAI とセルフホストの音声](#openai-and-self-hosted-voices)を参照してください。音声の合図とプレーヤーのラベルは、すべての組み込み UI 言語に翻訳されています。ロケールごとに上書きする場合は、[`i18n.ui`](/docs/content/i18n#translated-ui) の `narration` で指定してください。
 
 ## ページごとに無効にする [#turning-it-off-for-a-page]
 

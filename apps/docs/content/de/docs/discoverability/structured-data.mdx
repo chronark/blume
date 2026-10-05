@@ -1,7 +1,7 @@
 ---
 title: Strukturierte Daten
 description: >-
-  Das schema.org-JSON-LD, das jede Seite mitbringt – WebSite-, Artikel- und Breadcrumb-Knoten – plus die optionalen Organization- und SoftwareApplication-Blöcke, die Suchmaschinen und Agents verraten, wer du bist.
+  Das schema.org-JSON-LD, das jede Seite mitbringt – WebSite-, Seiten- und Breadcrumb-Knoten – plus die optionalen Organization- und SoftwareApplication-Blöcke, die Suchmaschinen und Agents verraten, wer du bist.
 ---
 
 Blume gibt in jedem `<head>` einer Seite [schema.org](https://schema.org)-JSON-LD aus, damit Suchmaschinen deine Inhalte verstehen. Standardmäßig aktiviert:
@@ -15,10 +15,12 @@ seo: {
 Jede Seite enthält:
 
 - einen **WebSite**-Knoten für die Identität der Website,
-- die Seite als **Artikel** – `BlogPosting` für Blogbeiträge, `TechArticle` für Changelog und Dokumentation – mit Beschreibung und Veröffentlichungsdatum,
-- eine **BreadcrumbList**, die aus dem Navigationspfad aufgebaut wird.
+- die Seite selbst mit Beschreibung, Sprache und Veröffentlichungsdatum: eine **WebPage** auf der Startseite und überall sonst einen **Artikel** – `BlogPosting` für Blogbeiträge, `TechArticle` für Changelog und Dokumentation,
+- bei einem Artikel eine **BreadcrumbList**, die aus dem Navigationspfad aufgebaut wird.
 
-URLs sind absolut, wenn [`deployment.site`](/docs/deployment) gesetzt ist. Seiten, die mit [`seo.noindex`](/docs/discoverability/metadata#per-page-overrides) markiert sind, werden übersprungen. Wenn [`lastModified`](/docs/configuration#last-modified) aktiv ist, wird das Datum jeder Seite zusätzlich als `dateModified` ausgegeben.
+Die Startseite ist die Wurzel der Navigation, deshalb sind auch die Startseite jeder Sprache (`/fr`) und die Wurzel eines [`basePath`](/docs/deployment#mount-the-docs-under-a-path) WebPages.
+
+URLs sind absolut, wenn [`deployment.site`](/docs/deployment) gesetzt ist. Ohne diese Einstellung sind sie routenrelativ, und der WebSite-Knoten, der einen absoluten Identifier braucht, entfällt. Seiten, die mit [`seo.noindex`](/docs/discoverability/metadata#per-page-overrides) markiert sind, werden übersprungen. Wenn [`lastModified`](/docs/configuration#last-modified) aktiv ist, wird das Datum jeder Seite zusätzlich als `dateModified` ausgegeben, und das sichtbare „Zuletzt aktualisiert“-Datum wird als `<time datetime>` ausgezeichnet, damit Suchmaschinen genau dieses Datum lesen und nicht irgendein anderes Datum auf der Seite.
 
 ## Identität der Website [#site-identity]
 
@@ -43,10 +45,10 @@ seo: {
 }
 ```
 
-`organization` fügt jeder Seite einen **Organization**-Knoten hinzu – die WebSite- und Artikel-Knoten verweisen als `publisher` darauf – mit E-Mail und Telefonnummer als `ContactPoint` (`contactType` ist standardmäßig `"customer support"`) und der Adresse als `PostalAddress`, den beiden Feldern, nach denen Prüfungen zur Unternehmensverifizierung suchen. `name` und `url` übernehmen standardmäßig die Werte der Website; ein root-relatives `logo` wird wie jede Seiten-URL absolut gemacht.
+`organization` fügt jeder Seite einen **Organization**-Knoten hinzu – die WebSite- und Seiten-Knoten verweisen als `publisher` darauf – mit E-Mail und Telefonnummer als `ContactPoint` (`contactType` ist standardmäßig `"customer support"`) und der Adresse als `PostalAddress`, den beiden Feldern, nach denen Prüfungen zur Unternehmensverifizierung suchen. `name` und `url` übernehmen standardmäßig die Werte der Website; ein root-relatives `logo` wird wie jede Seiten-URL absolut gemacht.
 
 `software` fügt der Startseite einen **SoftwareApplication**-Knoten hinzu: Name und Beschreibung des Produkts (standardmäßig die der Website), `applicationCategory` (Standard `"DeveloperApplication"`), Betriebssystem, Lizenz, ein `Offer`, wenn `price` gesetzt ist, sowie die Registry- oder Repository-URLs in `sameAs`. Übergib `software: true`, um alle Standardwerte zu übernehmen. Die Organisation wird, sofern konfiguriert, als deren `publisher` angegeben.
 
 ## Eigene Seiten [#custom-pages]
 
-Eine eigene [`.astro`-Seite](/docs/advanced/custom-pages), die über `PageLayout` gerendert wird, gibt denselben `WebSite`-Graphen aus, damit eine Marketing-Startseite nicht die eine URL ohne strukturierte Daten ist. Übergib `structuredDataEnabled={config.structuredData}`, um sie mit dieser Einstellung synchron zu halten, oder `structuredDataEnabled={false}`, um sie nur für diese Seite abzuschalten.
+Eine eigene [`.astro`-Seite](/docs/advanced/custom-pages), die über `PageLayout` gerendert wird, gibt denselben Graphen aus, damit eine Marketing-Startseite nicht die eine URL ohne strukturierte Daten ist. Eine eigene Seite hat keine Inhaltsdatei, aus der sich ein Datum ablesen ließe, also übergib `lastModified`, um ihr ein `dateModified` zu geben. Übergib `structuredDataEnabled={config.structuredData}`, um sie mit dieser Einstellung synchron zu halten, oder `structuredDataEnabled={false}`, um sie nur für diese Seite abzuschalten.

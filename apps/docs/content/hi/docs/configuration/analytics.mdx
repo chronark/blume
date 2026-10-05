@@ -40,6 +40,7 @@ export default defineConfig({
 | `amplitude()` | [Amplitude](#amplitude) | `key` |
 | `clarity()` | [Microsoft Clarity](#microsoft-clarity) | `id` |
 | `clearbit()` | [Clearbit](#clearbit) | `key` |
+| `clics()` | [Clics](#clics) | `projectId` |
 | `cloudflare()` | [Cloudflare Web Analytics](#cloudflare-web-analytics) | `token` |
 | `databuddy()` | [Databuddy](#databuddy) | `clientId` |
 | `fathom()` | [Fathom](#fathom) | `site` |
@@ -149,6 +150,20 @@ analytics: [
 ```
 
 `domain`, `data-domain` बन जाता है और `host` तय करता है कि `/js/script.js` कहाँ से लोड हो। कोई भी अन्य विकल्प टैग पर अपना अलग `data-` एट्रिब्यूट बन जाता है (`api: "/api/event"` → `data-api`)। जिन स्क्रिप्ट वेरिएंट्स का अतिरिक्त व्यवहार फ़ाइलनाम में ही निहित होता है (`script.outbound-links.js`, …), वे एक अलग टैग हैं; उन्हें [`script()`](#custom-scripts) से लोड करें।
+
+## Clics
+
+[Clics डैशबोर्ड](https://platform.clics.dev) में Configure → Tracking से मिली **प्रोजेक्ट ID** `clics()` को दें। Blume आवश्यक `data-project-id` एट्रिब्यूट के साथ [Clics ब्राउज़र ट्रैकर](https://docs.clics.dev/installation-guides) जोड़ता है।
+
+```ts blume.config.ts lineNumbers
+import { clics } from "blume/analytics";
+
+analytics: [clics({ projectId: "YOUR_PROJECT_ID" })],
+```
+
+ट्रैकर पेज लोड और क्लाइंट-साइड नेविगेशन, Blume के क्लाइंट राउटर सहित, स्वचालित रूप से गिनता है, इसलिए दूसरा पेजव्यू हुक न जोड़ें। यह डिफ़ॉल्ट रूप से आउटबाउंड लिंक्स को भी ट्रैक करता है। उन इवेंट्स को बंद करने के लिए `disableOutboundLinks: true` सेट करें। localhost पर प्रीव्यू किए जा रहे प्रोडक्शन बिल्ड के लिए `allowLocalhost: true` सेट करें; सामान्य `blume dev` एनालिटिक्स लोड नहीं करता।
+
+Blume के [कस्टम इवेंट्स](#custom-events) Clics तक नहीं पहुँचते: इसके ब्राउज़र ट्रैकर में कोई ग्लोबल इवेंट फ़ंक्शन नहीं है जिसे उन्हें फ़ॉरवर्ड किया जा सके। अपने स्वयं के इवेंट्स भेजने के लिए, अपने क्लाइंट कोड में `@clicsdev/tracker` से [`track()` हेल्पर](https://docs.clics.dev/custom-events) को कॉल करें।
 
 ## Fathom
 
@@ -388,6 +403,9 @@ analytics: [
 | `amplitude()` | अन्य कुछ भी | `autocapture: true`, `fetchRemoteConfig: true` | `amplitude.init` विकल्पों में ज्यों का त्यों मर्ज किया जाता है। |
 | `clarity()` | `id` | — | Clarity प्रोजेक्ट ID। आवश्यक। |
 | `clearbit()` | `key` | — | Clearbit पब्लिशेबल API की। आवश्यक। |
+| `clics()` | `projectId` | — | सार्वजनिक Clics प्रोजेक्ट ID। आवश्यक। |
+| `clics()` | `allowLocalhost` | `false` | प्रोडक्शन बिल्ड के लोकल प्रीव्यू के लिए `data-allow-localhost` उत्सर्जित करता है। |
+| `clics()` | `disableOutboundLinks` | `false` | आउटबाउंड-लिंक ट्रैकिंग रोकने के लिए `data-disable-outbound-links` उत्सर्जित करता है। |
 | `cloudflare()` | `token` | — | Cloudflare Web Analytics साइट टोकन (मैनुअल सेटअप)। आवश्यक। |
 | `cloudflare()` | अन्य कुछ भी | — | बीकन के `data-cf-beacon` JSON में ज्यों का त्यों फ़ॉरवर्ड किया जाता है। |
 | `databuddy()` | `clientId` | — | Databuddy क्लाइंट ID। आवश्यक। |
@@ -432,4 +450,4 @@ analytics: [
 
 ## कस्टम इवेंट्स [#custom-events]
 
-Blume का पेज फ़ीडबैक (`feedback`, और [लिखित फ़ीडबैक](/docs/configuration#written-feedback) चालू होने पर `feedback_comment`), [सर्च](/docs/configuration/search#search-analytics) (`search`, `search_select`), [असिस्टेंट](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`), और [नैरेशन](/docs/configuration/narration#analytics) प्लेयर (`narration_play`, `narration_complete`) हर उस कॉन्फ़िगर किए गए एडैप्टर के ज़रिए कस्टम इवेंट्स भेजते हैं जिसके पास क्लाइंट API है — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (`window.dataLayer` पर `{ event }` पुश के रूप में), Plausible, Databuddy, Fathom, OneDollarStats (हर प्रॉपर्टी मान को स्ट्रिंग के रूप में), Pirsch, Clarity, Hotjar, और Vercel। Fathom, Clarity, और Hotjar केवल इवेंट का नाम लेते हैं, इसलिए वे हर इवेंट को उसकी प्रॉपर्टीज़ के बिना गिनते हैं। Cloudflare और Clearbit के पास कोई इवेंट API नहीं है। हर इवेंट `window` पर `blume:track` CustomEvent के रूप में भी फ़ायर होता है, जिसके `detail` में `{ event, props }` होता है, इसलिए कोई `script()` एडैप्टर उसे कहीं और भी फ़ॉरवर्ड कर सकता है। असिस्टेंट कभी भी किसी प्रश्न का टेक्स्ट किसी प्रोवाइडर को नहीं भेजता, और सर्च अपनी क्वेरीज़ को ठीक वैसे ही भेजता है जैसे वे टाइप की गई हैं, जब तक कि आप [`search.analytics.queries`](/docs/configuration/search#search-analytics) को `false` पर सेट न करें, जिससे इसके बजाय हर क्वेरी की लंबाई भेजी जाती है; दोनों ही स्थितियों में टेक्स्ट फिर भी `blume:track` इवेंट तक पहुँचता है, ताकि आपके द्वारा लिखा गया कोई लिसनर उसे फ़ॉरवर्ड कर सके। अपनी बिल्ट साइट को डिप्लॉय करने के लिए, [Deployment](/docs/deployment) देखें।
+Blume का पेज फ़ीडबैक (`feedback`, और [लिखित फ़ीडबैक](/docs/configuration#written-feedback) चालू होने पर `feedback_comment`), [सर्च](/docs/configuration/search#search-analytics) (`search`, `search_select`), [असिस्टेंट](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`), और [नैरेशन](/docs/configuration/narration#analytics) प्लेयर (`narration_play`, `narration_complete`) हर उस कॉन्फ़िगर किए गए एडैप्टर के ज़रिए कस्टम इवेंट्स भेजते हैं जिसके पास क्लाइंट API है — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (`window.dataLayer` पर `{ event }` पुश के रूप में), Plausible, Databuddy, Fathom, OneDollarStats (हर प्रॉपर्टी मान को स्ट्रिंग के रूप में), Pirsch, Clarity, Hotjar, और Vercel। Fathom, Clarity, और Hotjar केवल इवेंट का नाम लेते हैं, इसलिए वे हर इवेंट को उसकी प्रॉपर्टीज़ के बिना गिनते हैं। Cloudflare और Clearbit के पास कोई इवेंट API नहीं है, और Clics के पास कोई ग्लोबल इवेंट API नहीं है जिसे Blume कॉल कर सके। हर इवेंट `window` पर `blume:track` CustomEvent के रूप में भी फ़ायर होता है, जिसके `detail` में `{ event, props }` होता है, इसलिए कोई `script()` एडैप्टर उसे कहीं और भी फ़ॉरवर्ड कर सकता है। असिस्टेंट कभी भी किसी प्रश्न का टेक्स्ट किसी प्रोवाइडर को नहीं भेजता, और सर्च अपनी क्वेरीज़ को ठीक वैसे ही भेजता है जैसे वे टाइप की गई हैं, जब तक कि आप [`search.analytics.queries`](/docs/configuration/search#search-analytics) को `false` पर सेट न करें, जिससे इसके बजाय हर क्वेरी की लंबाई भेजी जाती है; दोनों ही स्थितियों में टेक्स्ट फिर भी `blume:track` इवेंट तक पहुँचता है, ताकि आपके द्वारा लिखा गया कोई लिसनर उसे फ़ॉरवर्ड कर सके। अपनी बिल्ट साइट को डिप्लॉय करने के लिए, [Deployment](/docs/deployment) देखें।

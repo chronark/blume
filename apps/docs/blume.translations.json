@@ -7,16 +7,16 @@
       "pt": "f2fb92bf3f4b532f"
     },
     "content/docs/02-deployment.mdx": {
-      "de": "d3801b9cdc6532ca",
-      "hi": "d3801b9cdc6532ca",
-      "ja": "d3801b9cdc6532ca",
-      "pt": "d3801b9cdc6532ca"
+      "de": "87d2e591fdee82ef",
+      "hi": "87d2e591fdee82ef",
+      "ja": "87d2e591fdee82ef",
+      "pt": "87d2e591fdee82ef"
     },
     "content/docs/03-upgrading.mdx": {
-      "de": "8c7a59fb43f67f52",
-      "hi": "8c7a59fb43f67f52",
-      "ja": "8c7a59fb43f67f52",
-      "pt": "8c7a59fb43f67f52"
+      "de": "8bbb2fc94418b08b",
+      "hi": "8bbb2fc94418b08b",
+      "ja": "8bbb2fc94418b08b",
+      "pt": "8bbb2fc94418b08b"
     },
     "content/docs/04-migrating.mdx": {
       "de": "00a37a3091b4c1dc",
@@ -25,10 +25,10 @@
       "pt": "00a37a3091b4c1dc"
     },
     "content/docs/08-faq.mdx": {
-      "de": "b645466515566e97",
-      "hi": "b645466515566e97",
-      "ja": "b645466515566e97",
-      "pt": "b645466515566e97"
+      "de": "aaf04827be186444",
+      "hi": "aaf04827be186444",
+      "ja": "aaf04827be186444",
+      "pt": "aaf04827be186444"
     },
     "content/docs/_snippets/include-demo.mdx": {
       "de": "8f2be520a2024119",
@@ -43,16 +43,16 @@
       "pt": "286839d1a8d09987"
     },
     "content/docs/advanced/changelog.mdx": {
-      "de": "8963f06639ed1251",
-      "hi": "8963f06639ed1251",
-      "ja": "8963f06639ed1251",
-      "pt": "8963f06639ed1251"
+      "de": "196e2606a80dce24",
+      "hi": "196e2606a80dce24",
+      "ja": "196e2606a80dce24",
+      "pt": "196e2606a80dce24"
     },
     "content/docs/advanced/custom-pages.mdx": {
-      "de": "925f2fe324fdca38",
-      "hi": "925f2fe324fdca38",
-      "ja": "925f2fe324fdca38",
-      "pt": "925f2fe324fdca38"
+      "de": "d868cd3ac08acd6f",
+      "hi": "d868cd3ac08acd6f",
+      "ja": "d868cd3ac08acd6f",
+      "pt": "d868cd3ac08acd6f"
     },
     "content/docs/advanced/meta.ts": {
       "de": "0117b60783ac158d",
@@ -73,10 +73,10 @@
       "pt": "70a2a41a972c2190"
     },
     "content/docs/cli/doctor.mdx": {
-      "de": "ffc016c608630557",
-      "hi": "ffc016c608630557",
-      "ja": "ffc016c608630557",
-      "pt": "ffc016c608630557"
+      "de": "d01a2d2bc6861dcb",
+      "hi": "d01a2d2bc6861dcb",
+      "ja": "d01a2d2bc6861dcb",
+      "pt": "d01a2d2bc6861dcb"
     },
     "content/docs/cli/evals.mdx": {
       "de": "ac194a5c2acd1f8d",
@@ -115,10 +115,10 @@
       "pt": "45c8668a0aed93c6"
     },
     "content/docs/configuration/analytics.mdx": {
-      "de": "2d6f6faf9df2110d",
-      "hi": "2d6f6faf9df2110d",
-      "ja": "2d6f6faf9df2110d",
-      "pt": "2d6f6faf9df2110d"
+      "de": "ff5d41458e3eefb5",
+      "hi": "ff5d41458e3eefb5",
+      "ja": "ff5d41458e3eefb5",
+      "pt": "ff5d41458e3eefb5"
     },
     "content/docs/configuration/assistant.mdx": {
       "de": "5931c2143c494319",
@@ -145,10 +145,10 @@
       "pt": "f33e2b6fb4e90124"
     },
     "content/docs/configuration/index.mdx": {
-      "de": "397abd827be16873",
-      "hi": "397abd827be16873",
-      "ja": "397abd827be16873",
-      "pt": "397abd827be16873"
+      "de": "b8b7ea8aed7385c7",
+      "hi": "b8b7ea8aed7385c7",
+      "ja": "b8b7ea8aed7385c7",
+      "pt": "b8b7ea8aed7385c7"
     },
     "content/docs/configuration/meta.ts": {
       "de": "b3ac4345e70be8bd",
@@ -157,10 +157,10 @@
       "pt": "b3ac4345e70be8bd"
     },
     "content/docs/configuration/narration.mdx": {
-      "de": "7ea646d65b9e284a",
-      "hi": "7ea646d65b9e284a",
-      "ja": "7ea646d65b9e284a",
-      "pt": "7ea646d65b9e284a"
+      "de": "a0b8cbcfe546682d",
+      "hi": "a0b8cbcfe546682d",
+      "ja": "a0b8cbcfe546682d",
+      "pt": "a0b8cbcfe546682d"
     },
     "content/docs/configuration/rate-limiting.mdx": {
       "de": "c33dc864c4a18ae3",
@@ -229,10 +229,10 @@
       "pt": "e3d27992808a1bbe"
     },
     "content/docs/content/navigation.mdx": {
-      "de": "851194058666d2f1",
-      "hi": "851194058666d2f1",
-      "ja": "851194058666d2f1",
-      "pt": "851194058666d2f1"
+      "de": "0fcddd3f29a290a7",
+      "hi": "0fcddd3f29a290a7",
+      "ja": "0fcddd3f29a290a7",
+      "pt": "0fcddd3f29a290a7"
     },
     "content/docs/content/sources/contentful.mdx": {
       "de": "a2a9365f8b5bc798",
@@ -265,10 +265,10 @@
       "pt": "2a3845167c74bc8d"
     },
     "content/docs/content/sources/notion.mdx": {
-      "de": "07fbde7295ada371",
-      "hi": "07fbde7295ada371",
-      "ja": "07fbde7295ada371",
-      "pt": "07fbde7295ada371"
+      "de": "bcde69d2d73ddde4",
+      "hi": "bcde69d2d73ddde4",
+      "ja": "bcde69d2d73ddde4",
+      "pt": "bcde69d2d73ddde4"
     },
     "content/docs/content/sources/obsidian.mdx": {
       "de": "bd99d1f8d9b1763e",
@@ -385,10 +385,10 @@
       "pt": "330f02504e86f099"
     },
     "content/docs/discoverability/structured-data.mdx": {
-      "de": "ee0406662657e0ab",
-      "hi": "ee0406662657e0ab",
-      "ja": "ee0406662657e0ab",
-      "pt": "ee0406662657e0ab"
+      "de": "978f490cddc2ca68",
+      "hi": "978f490cddc2ca68",
+      "ja": "978f490cddc2ca68",
+      "pt": "978f490cddc2ca68"
     },
     "content/docs/index.mdx": {
       "de": "181a734d7050b4fd",

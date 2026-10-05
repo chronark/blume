@@ -83,6 +83,22 @@ deployment: {
 
 हर पेज बेस के अंतर्गत अपना स्वयं का पथ बनाए रखता है, उस कंटेंट फ़ोल्डर में भी जिसका नाम बेस के नाम जैसा ही हो: `base: "/docs"` के साथ, `docs/setup.md` को `/docs/docs/setup` पर परोसा जाता है, और उसका कैनोनिकल URL, साइडबार लिंक, और `llms.txt` एंट्री वहीं की ओर इंगित करते हैं। आपके द्वारा लिखा गया जो रूट-सापेक्ष लिंक पहले से ही बेस से शुरू होता है, उसे बेस सहित माना जाता है और जैसा लिखा गया है वैसा ही छोड़ दिया जाता है, इसलिए उस पेज को लिंक करने के लिए एक सापेक्ष लिंक (`./docs/setup`) या उसके पूरे पथ (`/docs/docs/setup`) का उपयोग करें।
 
+### प्रति डिप्लॉय एक अलग बेस [#a-different-base-per-deploy]
+
+`blume.config.ts` एक मॉड्यूल है, इसलिए `base` एक परिवेश चर से आ सकता है। इससे CI कॉन्फ़िग को संपादित किए बिना हर पुल अनुरोध का प्रीव्यू उसके अपने पथ के अंतर्गत बिल्ड कर सकता है:
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  base: process.env.DOCS_BASE,
+}
+```
+
+```bash
+DOCS_BASE=/pr-1234 blume build
+```
+
+`DOCS_BASE` सेट न होने पर, साइट रूट पर बिल्ड होती है, इसलिए प्रोडक्शन को किसी अतिरिक्त चीज़ की आवश्यकता नहीं होती।
+
 ## डॉक्स को किसी पथ के अंतर्गत माउंट करें [#mount-the-docs-under-a-path]
 
 `basePath` हर जनरेट किए गए रूट को एक सेगमेंट (`/docs/getting-started`) के अंतर्गत माउंट करता है जबकि साइडबार को अछूता छोड़ देता है — शीर्ष स्तर आपके सेक्शन हैं, कोई रैपर समूह नहीं। इसका उपयोग तब करें जब डॉक्स `/docs/*` पर रहें लेकिन साइट रूट आपका ही बना रहे (जैसे Docusaurus का `routeBasePath` या Fumadocs का `baseUrl`)।
@@ -215,6 +231,18 @@ redirects: [
 
 जहाँ होस्ट इसे पढ़ता है, वहाँ एक बिल्ड एक `_headers` फ़ाइल भी उत्पन्न करता है जो रॉ AI-तैयार एंडपॉइंट्स — `/<route>.md`, `/<route>.mdx`, और `.txt` फ़ाइलों (`llms.txt`, `llms-full.txt`) — पर `charset=utf-8` निर्धारित करती है। वे प्रतिक्रियाएँ वैध UTF-8 होती हैं, लेकिन कई स्टैटिक होस्ट उन्हें **बिना** किसी charset के `text/markdown` / `text/plain` के रूप में परोसते हैं, और तब ब्राउज़र Windows-1252 पर वापस चले जाते हैं — इसलिए गैर-ASCII डॉक्स (जापानी, उच्चारण-चिह्न वाली लैटिन, …) रॉ URL सीधे खोलने पर मोजिबाके के रूप में दिखते हैं। HTML पेज इससे अप्रभावित रहते हैं क्योंकि उनमें `<meta charset>` होता है। Netlify स्टैटिक डिप्लॉय पर `_headers` पढ़ता है और Cloudflare (Pages, और Workers स्टैटिक एसेट्स) स्टैटिक और सर्वर दोनों बिल्ड पर, इसलिए उन एडाप्टर और बिना नाम वाले स्टैटिक होस्ट को यह फ़ाइल मिलती है; Vercel (जिसके हेडर रूटिंग कॉन्फ़िग के साथ जाते हैं) और Node (जिसका सर्वर इस फ़ाइल को अनदेखा करता है) को नहीं मिलती। एक Netlify सर्वर बिल्ड इसके बजाय यही नियम अपने Frameworks API कॉन्फ़िग (`.netlify/v1/config.json`) के `headers` में लिखता है। एक स्टैटिक Vercel बिल्ड इसके बजाय यही नियम `dist/vercel.json` में लिखता है, जिसे एक Git-कनेक्टेड प्रोजेक्ट नहीं पढ़ता ([रीडायरेक्ट](#redirects) देखें)। `public/` में आपके द्वारा शिप की गई `_headers` फ़ाइल अछूती छोड़ दी जाती है।
 
+## Powered-by हेडर [#powered-by-header]
+
+Blume एक `X-Powered-By: Blume` प्रतिक्रिया हेडर में अपना नाम देता है, ताकि HTTP इंस्पेक्टर और टेक्नोलॉजी डिटेक्टर बता सकें कि साइट किससे बनी है। इसे हटाने के लिए `poweredBy` को `false` पर सेट करें:
+
+```ts blume.config.ts
+poweredBy: false,
+```
+
+`blume dev` इसे हर प्रतिक्रिया पर भेजता है। एक सर्वर बिल्ड इसे वहाँ से भेजता है जहाँ से होस्ट अपने हेडर लेता है: `node()` सर्वर और `cloudflare()` Worker इसे स्वयं सेट करते हैं, एक `vercel()` बिल्ड इसे अपने रूटिंग कॉन्फ़िग में ले जाता है, और एक `netlify()` बिल्ड अपने Frameworks API कॉन्फ़िग के हेडर नियमों में, जिसमें Blume का मिडलवेयर इसे मांग पर रेंडर किए गए पेजों में जोड़ता है। एक स्टैटिक बिल्ड इसे [कंटेंट प्रकारों](#content-types) के बगल में `_headers` और `dist/vercel.json` में सूचीबद्ध करता है, इसलिए यह उन्हीं होस्ट्स तक पहुँचता है जहाँ तक ये फ़ाइलें पहुँचती हैं: Git-कनेक्टेड Vercel प्रोजेक्ट तक नहीं, और ऐसे होस्ट तक भी नहीं जो कोई कस्टम हेडर नहीं भेजता, जैसे GitHub Pages।
+
+एक [इजेक्ट किए गए](/docs/configuration/customization#eject) ऐप में, यह स्विच `astro.config.mjs` में `blumeIntegration()` का `poweredBy` विकल्प है। उसका बिल्ड सर्वर-रेंडर किए गए पेजों पर और `_headers` से हेडर भेजता है; सर्वर-एंट्री रैपर और रूटिंग कॉन्फ़िग, जो इसे अन्य जगहों पर ले जाते हैं, `blume build` के चरण हैं।
+
 ## परिवेश चर [#environment-variables]
 
 जब किसी सुविधा को एक सीक्रेट की आवश्यकता होती है, तो Blume `blume dev`/`build` पर चेतावनी देता है यदि वह गायब है — ताकि समस्या पहले अनुरोध के बजाय पहले ही सामने आ जाए:
@@ -226,7 +254,7 @@ redirects: [
 | [असिस्टेंट बॉट सुरक्षा](/docs/configuration/assistant#bot-protection) | `TURNSTILE_SECRET_KEY` (`turnstile()`), `HCAPTCHA_SECRET_KEY` (`hcaptcha()`) |
 | [दर सीमित करना](/docs/configuration/rate-limiting) (`upstash()`) | `UPSTASH_REDIS_REST_URL` और `UPSTASH_REDIS_REST_TOKEN` |
 | Mixedbread खोज | `MIXEDBREAD_API_KEY` |
-| [नैरेशन](/docs/configuration/narration) (जनरेट की गई आवाज़ें) | `AI_GATEWAY_API_KEY` (या Vercel OIDC), या आपके द्वारा `gateway()` को पास किया गया `apiKeyEnv` |
+| [नैरेशन](/docs/configuration/narration) (जनरेट की गई आवाज़ें) | `gateway()` के लिए `AI_GATEWAY_API_KEY` (या Vercel OIDC), `openai()` के लिए `OPENAI_API_KEY` (`baseUrl` के साथ कोई नहीं, जब तक कि आप किसी का नाम न दें), या आपके द्वारा दोनों में से किसी को भी पास किया गया `apiKeyEnv` |
 | [कंटेंट स्रोत](/docs/content/sources) | `NOTION_TOKEN` (`notion()`), `SANITY_TOKEN` (`sanity()`), `CONTENTFUL_ACCESS_TOKEN` (`contentful()`, साथ ही `--preview` के लिए `CONTENTFUL_PREVIEW_TOKEN`, जिसके बिना यह विफल हो जाता है), `PAYLOAD_API_KEY` (`payload()`), `STRAPI_API_TOKEN` (`strapi()`), `GITHUB_TOKEN` (`githubReleases()`, और GitHub से पढ़ने वाला `mdxRemote()`) |
 
 स्थानीय डेव के लिए इन्हें `.env.local` में और प्रोडक्शन के लिए अपने होस्ट के परिवेश में सेट करें। एक कंटेंट स्रोत `blume dev` और `blume build` के दौरान फ़ेच करते समय अपना टोकन पढ़ता है, और नैरेशन `blume build` के दौरान अपनी कुंजी पढ़ता है, इसलिए इन्हें वहाँ सेट करें जहाँ आपकी साइट बिल्ड होती है। खोज-इंडेक्स सिंक के लिए बिल्ड-समय के सीक्रेट्स (`ALGOLIA_ADMIN_API_KEY`, `ORAMA_PRIVATE_API_KEY`, `TYPESENSE_ADMIN_API_KEY`) की जाँच स्वयं सिंक चरण करता है: जब इनमें से कोई सेट न हो, तो बिल्ड चेतावनी देता है और सिंक को छोड़ देता है, और जब यह सेट हो, तो एक विफल सिंक [बिल्ड को विफल कर देता है](/docs/configuration/search#adapters)। [GitHub info](/docs/content/components#github-info) कार्ड भी, जब `GITHUB_TOKEN` सेट हो, GitHub की API दर सीमा बढ़ाने के लिए उसे भेजता है।

@@ -40,6 +40,7 @@ Todo identificador abaixo — uma chave de projeto, um ID de medição, um token
 | `amplitude()` | [Amplitude](#amplitude) | `key` |
 | `clarity()` | [Microsoft Clarity](#microsoft-clarity) | `id` |
 | `clearbit()` | [Clearbit](#clearbit) | `key` |
+| `clics()` | [Clics](#clics) | `projectId` |
 | `cloudflare()` | [Cloudflare Web Analytics](#cloudflare-web-analytics) | `token` |
 | `databuddy()` | [Databuddy](#databuddy) | `clientId` |
 | `fathom()` | [Fathom](#fathom) | `site` |
@@ -149,6 +150,20 @@ analytics: [
 ```
 
 `domain` vira `data-domain` e `host` define de onde o `/js/script.js` é carregado. Qualquer outra opção vira um atributo `data-` próprio na tag (`api: "/api/event"` → `data-api`). Variantes do script com comportamento extra embutido no nome do arquivo (`script.outbound-links.js`, …) são uma tag diferente; carregue-as com [`script()`](#custom-scripts).
+
+## Clics
+
+Informe o **ID do projeto**, que fica em Configure → Tracking no [painel do Clics](https://platform.clics.dev), ao `clics()`. O Blume adiciona o [rastreador de navegador do Clics](https://docs.clics.dev/installation-guides) com o atributo obrigatório `data-project-id`.
+
+```ts blume.config.ts lineNumbers
+import { clics } from "blume/analytics";
+
+analytics: [clics({ projectId: "YOUR_PROJECT_ID" })],
+```
+
+O rastreador conta automaticamente os carregamentos de página e as navegações do lado do cliente, incluindo as do roteador do cliente do Blume, então não adicione um segundo hook de visualização de página. Ele também rastreia links externos por padrão. Defina `disableOutboundLinks: true` para desativar esses eventos. Para um build de produção visualizado no localhost, defina `allowLocalhost: true`; o `blume dev` comum não carrega análises.
+
+Os [eventos personalizados](#custom-events) do Blume não chegam ao Clics: o rastreador de navegador dele não tem uma função global de eventos para onde repassá-los. Para enviar os seus próprios eventos, chame o [helper `track()`](https://docs.clics.dev/custom-events) do `@clicsdev/tracker` no seu próprio código do lado do cliente.
 
 ## Fathom
 
@@ -388,6 +403,9 @@ analytics: [
 | `amplitude()` | qualquer outra | `autocapture: true`, `fetchRemoteConfig: true` | Mesclada nas opções do `amplitude.init` sem alterações. |
 | `clarity()` | `id` | — | ID do projeto no Clarity. Obrigatória. |
 | `clearbit()` | `key` | — | Chave de API publicável do Clearbit. Obrigatória. |
+| `clics()` | `projectId` | — | ID público do projeto no Clics. Obrigatória. |
+| `clics()` | `allowLocalhost` | `false` | Emite `data-allow-localhost` para visualizações locais de um build de produção. |
+| `clics()` | `disableOutboundLinks` | `false` | Emite `data-disable-outbound-links` para interromper o rastreamento de links externos. |
 | `cloudflare()` | `token` | — | Token do site no Cloudflare Web Analytics (configuração manual). Obrigatória. |
 | `cloudflare()` | qualquer outra | — | Repassada no JSON `data-cf-beacon` do beacon sem alterações. |
 | `databuddy()` | `clientId` | — | ID do cliente no Databuddy. Obrigatória. |
@@ -432,4 +450,4 @@ analytics: [
 
 ## Eventos personalizados [#custom-events]
 
-O feedback de página do Blume (`feedback`, e `feedback_comment` quando o [feedback escrito](/docs/configuration#written-feedback) está ativado), a [busca](/docs/configuration/search#search-analytics) (`search`, `search_select`), o [assistente](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`) e o player de [narração](/docs/configuration/narration#analytics) (`narration_play`, `narration_complete`) enviam eventos personalizados por meio de todo adaptador configurado que tenha uma API no cliente — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (como um push de `{ event }` no `window.dataLayer`), Plausible, Databuddy, Fathom, OneDollarStats (com cada valor de propriedade como string), Pirsch, Clarity, Hotjar e Vercel. O Fathom, o Clarity e o Hotjar recebem só o nome do evento, então contam cada evento sem as propriedades dele. A Cloudflare e o Clearbit não têm API de eventos. Todo evento também é disparado como um CustomEvent `blume:track` no `window`, com `{ event, props }` em `detail`, para que um adaptador `script()` possa repassá-lo para qualquer outro lugar. O assistente nunca envia o texto de uma pergunta a um provedor, e a busca envia as consultas exatamente como foram digitadas, a menos que você defina [`search.analytics.queries`](/docs/configuration/search#search-analytics) como `false`, o que faz ela enviar o tamanho de cada consulta no lugar do texto; de qualquer forma, o texto continua chegando ao evento `blume:track`, para que um listener escrito por você o repasse. Para fazer o deploy do seu site já construído, veja [Deploy](/docs/deployment).
+O feedback de página do Blume (`feedback`, e `feedback_comment` quando o [feedback escrito](/docs/configuration#written-feedback) está ativado), a [busca](/docs/configuration/search#search-analytics) (`search`, `search_select`), o [assistente](/docs/configuration/assistant#analytics) (`ask`, `ask_answer`, `ask_error`) e o player de [narração](/docs/configuration/narration#analytics) (`narration_play`, `narration_complete`) enviam eventos personalizados por meio de todo adaptador configurado que tenha uma API no cliente — PostHog, Mixpanel, Heap, Segment, Hightouch, Amplitude, LogRocket, Adobe, Google Analytics, Google Tag Manager (como um push de `{ event }` no `window.dataLayer`), Plausible, Databuddy, Fathom, OneDollarStats (com cada valor de propriedade como string), Pirsch, Clarity, Hotjar e Vercel. O Fathom, o Clarity e o Hotjar recebem só o nome do evento, então contam cada evento sem as propriedades dele. A Cloudflare e o Clearbit não têm API de eventos, e o Clics não tem uma API global que o Blume possa chamar. Todo evento também é disparado como um CustomEvent `blume:track` no `window`, com `{ event, props }` em `detail`, para que um adaptador `script()` possa repassá-lo para qualquer outro lugar. O assistente nunca envia o texto de uma pergunta a um provedor, e a busca envia as consultas exatamente como foram digitadas, a menos que você defina [`search.analytics.queries`](/docs/configuration/search#search-analytics) como `false`, o que faz ela enviar o tamanho de cada consulta no lugar do texto; de qualquer forma, o texto continua chegando ao evento `blume:track`, para que um listener escrito por você o repasse. Para fazer o deploy do seu site já construído, veja [Deploy](/docs/deployment).

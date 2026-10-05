@@ -45,7 +45,7 @@ Dafür musst du nichts tun und es kostet nichts. Wie es klingt, hängt aber vom 
 
 ## Generierte Stimmen [#generated-voices]
 
-Übergib einen `provider`, um beim Build Audio mit einem neuronalen Sprachsynthesemodell zu erzeugen. Der Provider ist derselbe [`gateway()`](/docs/configuration/assistant#adapters)-Adapter, den auch der Assistent verwendet, nur mit einem Sprachsynthesemodell:
+Übergib einen `provider`, um beim Build Audio mit einem neuronalen Sprachsynthesemodell zu erzeugen. Der Provider ist einer der [Adapter](/docs/configuration/assistant#adapters) des Assistenten, nur mit einem Sprachsynthesemodell: `gateway()` für die Sprachsynthesemodelle im Vercel AI Gateway oder [`openai()`](#openai-and-self-hosted-voices) für die eigenen Sprachsynthesemodelle von OpenAI oder einen Sprachserver, den du selbst betreibst.
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -61,13 +61,15 @@ export default defineConfig({
 });
 ```
 
-`blume build` liest jede gebaute Seite genau so, wie der Player sie vorlesen wird, und teilt sie in Sätze auf. Dann erzeugt es über das [Vercel AI Gateway](https://vercel.com/docs/ai-gateway) einen Clip pro Satz. Die Clips und ein kleines Manifest pro Seite landen als statische Dateien unter `/blume-narration/` in deinem Build. Erneutes Abspielen kostet also nichts, und auf keinem Server läuft etwas.
+`blume build` liest jede gebaute Seite genau so, wie der Player sie vorlesen wird, und teilt sie in Sätze auf. Dann erzeugt es über den Provider, hier das [Vercel AI Gateway](https://vercel.com/docs/ai-gateway), einen Clip pro Satz. Die Clips und ein kleines Manifest pro Seite landen als statische Dateien unter `/blume-narration/` in deinem Build. Erneutes Abspielen kostet also nichts, und auf keinem Server läuft etwas.
 
 Bevor etwas generiert wird, gibt der Build aus, wie viele neue Clips er braucht und wie viele Zeichen sie umfassen. So siehst du die Kosten schon vorher:
 
 ```txt
 Generating narration: 214 new clip(s), 15,880 characters, with openai/tts-1-hd
 ```
+
+`gateway()` nimmt diese Optionen an:
 
 | Option | Standard | Beschreibung |
 | --- | --- | --- |
@@ -78,21 +80,56 @@ Generating narration: 214 new clip(s), 15,880 characters, with openai/tts-1-hd
 | `headers` |  | Statische Header, die mit jeder Anfrage gesendet werden. |
 | `providerOptions` |  | Wird unverändert an `generateSpeech` aus dem AI SDK weitergegeben, für Modelleinstellungen, die Blume nicht selbst kennt. |
 
+### OpenAI und selbst gehostete Stimmen [#openai-and-self-hosted-voices]
+
+`openai()` erzeugt die Clips stattdessen mit der Speech-API von OpenAI: mit den eigenen Modellen von OpenAI und deinem `OPENAI_API_KEY` oder, mit einer `baseUrl`, mit jedem Server, der denselben `POST /audio/speech`-Endpunkt bereitstellt, etwa [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI), [Speaches](https://speaches.ai) oder ein [LiteLLM](https://docs.litellm.ai)-Proxy mit einem Sprachsynthesemodell. So bekommt auch eine Site generierte Stimmen, deren Build keinen gehosteten Dienst erreichen kann:
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { openai } from "blume/ai";
+
+export default defineConfig({
+  narration: {
+    provider: openai({
+      baseUrl: "http://localhost:8880/v1",
+      model: "kokoro",
+      voice: "af_heart",
+    }),
+  },
+});
+```
+
+Ein Server, der einen Schlüssel erwartet, etwa ein LiteLLM-Proxy, bekommt den, den du in `apiKeyEnv` angibst (`openai({ baseUrl, apiKeyEnv: "LITELLM_API_KEY", model })`). Ohne `apiKeyEnv` wird ein Server mit `baseUrl` ohne Schlüssel aufgerufen, damit dein `OPENAI_API_KEY` nie an einen anderen Server geht. Eine Antwort, die kein MP3 ist, etwa eine Anmeldeseite von einem Proxy vor dem Server oder WAV von einem Server, der das angeforderte Format ignoriert, zählt als fehlgeschlagener Clip und wird nicht gecacht.
+
+`openai()` nutzt mit oder ohne `baseUrl` den OpenAI-Provider des AI SDK. Füge deshalb `@ai-sdk/openai` zu deinem Projekt hinzu (`npm install @ai-sdk/openai`). Fehlt das Paket, bricht `blume build` ab, bevor Vite startet, und nennt das Paket.
+
+| Option | Standard | Beschreibung |
+| --- | --- | --- |
+| `model` |  | Erforderlich. Ein Sprachsynthesemodell: `gpt-4o-mini-tts`, `tts-1` oder `tts-1-hd` bei OpenAI oder die ID, die dein Server bereitstellt. |
+| `baseUrl` |  | Die OpenAI-kompatible Basis-URL des Servers, einschließlich `/v1`. Ohne sie kommen die Clips von OpenAI oder, falls `OPENAI_BASE_URL` gesetzt ist, von dem dort angegebenen Server, wie bei den SDKs von OpenAI selbst. |
+| `voice` | `alloy` | Die Stimme des Modells. |
+| `instructions` |  | Wie die Stimme klingen soll, bei Modellen, die Anweisungen annehmen (`gpt-4o-mini-tts`). |
+| `apiKeyEnv` | `OPENAI_API_KEY` ohne `baseUrl` | Die Umgebungsvariable mit dem Schlüssel, der als Bearer-Token gesendet wird. Mit einer `baseUrl` wird nur ein Schlüssel gesendet, den du hier angibst, damit dein `OPENAI_API_KEY` nie einen anderen Server erreicht. Gibst du keinen an, gehen die Anfragen ohne Bearer-Token raus (ein `Authorization`-Header, den du in `headers` setzt, wird trotzdem gesendet). |
+| `headers` |  | Statische Header, die mit jeder Anfrage gesendet werden. |
+| `providerOptions` |  | Wird unverändert an `generateSpeech` aus dem AI SDK weitergegeben. Die Speech-API von OpenAI liest daraus `speed`: `{ openai: { speed: 1.1 } }`. |
+
+Die Speech-API von OpenAI nimmt keine Sprache an. Deshalb sendet `openai()` die Sprache der Seite nicht mit, und ein Satz, der in mehreren Sprachen vorkommt, wird nur einmal generiert. Die Modelle von OpenAI erkennen die Sprache am Text, viele selbst gehostete Server richten sich aber nach der Stimme. Wähle also eine, die die Sprache deiner Inhalte spricht.
+
 ### Caching
 
-Clips werden in `node_modules/.cache/blume/narration` gecacht. Der Cache-Schlüssel besteht aus allem, was ihren Klang bestimmt: dem Satz, seiner Sprache, dem Modell, der Stimme und den Anweisungen. Bei einem neuen Build zahlst du nur für geänderte Sätze, und ein Satz, der auf vielen Seiten steht, wird nur einmal generiert. Vercel und Netlify stellen `node_modules` aus ihrem Build-Cache wieder her, deshalb wird dort bei einem Deployment nur neu generiert, was sich geändert hat. Bei anderen CI-Systemen cachest du das Verzeichnis zwischen den Läufen selbst.
+Clips werden in `node_modules/.cache/blume/narration` gecacht. Der Cache-Schlüssel besteht aus allem, was ihren Klang bestimmt: dem Satz, seiner Sprache (bei `gateway()`, das sie mitsendet), dem Modell, der Stimme, den Anweisungen, den `providerOptions` und bei `openai()` dem aufgerufenen Server. Zeigt `baseUrl` auf einen anderen Server, wird jeder Clip neu generiert, auch bei gleichem Modell und gleicher Stimme. Bei einem neuen Build zahlst du nur für geänderte Sätze, und ein Satz, der auf vielen Seiten steht, wird nur einmal generiert. Vercel und Netlify stellen `node_modules` aus ihrem Build-Cache wieder her, deshalb wird dort bei einem Deployment nur neu generiert, was sich geändert hat. Bei anderen CI-Systemen cachest du das Verzeichnis zwischen den Läufen selbst.
 
 ### Fallbacks
 
 Wo es keine Clips gibt, greifen generierte Stimmen auf Browserstimmen zurück:
 
 - In `blume dev`, weil dort nie Audio generiert wird. Führe `blume build` und `blume preview` aus, um die generierte Stimme lokal zu hören.
-- Wenn der Schlüssel beim Build nicht gesetzt ist. Der Build gibt dann eine Warnung aus und überspringt die Generierung.
-- Wenn die Generierung fehlschlägt. Der Build bricht beim ersten fehlgeschlagenen Clip ab, weil das AI SDK ihn schon erneut versucht hat, und behält alle bereits gecachten Clips.
+- Wenn der Schlüssel beim Build nicht gesetzt ist. Der Build gibt dann eine Warnung aus und generiert nichts Neues, aber Seiten, deren Clips alle im Cache liegen, bekommen sie trotzdem. `openai()` mit einer `baseUrl` und ohne `apiKeyEnv` sendet keinen Schlüssel und generiert deshalb trotzdem.
+- Wenn die Generierung fehlschlägt, auch weil der Build einen Server nicht erreicht. Die Generierung bricht beim ersten fehlgeschlagenen Clip ab, weil das AI SDK ihn schon erneut versucht hat. Der Build läuft dann mit einer Warnung weiter und behält alle bereits gecachten Clips.
 
 ## Sprachen [#languages]
 
-Jede Seite wird in ihrer Inhaltssprache vorgelesen. Auf einer [internationalisierten](/docs/content/i18n) Site bekommt so jede Locale ihre eigene Stimme. Die gesprochenen Hinweise und die Beschriftungen des Players sind in alle integrierten UI-Sprachen übersetzt. Du kannst sie pro Locale unter `narration` in [`i18n.ui`](/docs/content/i18n#translated-ui) überschreiben.
+Jede Seite wird in ihrer Inhaltssprache vorgelesen. Auf einer [internationalisierten](/docs/content/i18n) Site bekommt so jede Locale ihre eigene Stimme. Bei `openai()` hängt das vom Modell und von der Stimme ab, siehe [OpenAI und selbst gehostete Stimmen](#openai-and-self-hosted-voices). Die gesprochenen Hinweise und die Beschriftungen des Players sind in alle integrierten UI-Sprachen übersetzt. Du kannst sie pro Locale unter `narration` in [`i18n.ui`](/docs/content/i18n#translated-ui) überschreiben.
 
 ## Für eine Seite ausschalten [#turning-it-off-for-a-page]
 

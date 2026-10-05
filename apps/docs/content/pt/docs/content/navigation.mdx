@@ -65,7 +65,7 @@ navigation: {
 
 - **`flat`** (padrão) — um cabeçalho não recolhível com suas páginas listadas abaixo. Páginas que não pertencem a nenhum grupo sempre aparecem primeiro, acima das seções de grupo, para que não sejam confundidas com filhos de um grupo.
 - **`group`** — um bloco recolhível `<details>` por grupo. Os grupos começam recolhidos por padrão; um grupo que contém a página atual sempre começa aberto, de modo que apenas a seção em que você está fica expandida. Defina `collapsed: false` no [meta de pasta](/docs/content/meta) para forçar um grupo a ficar aberto independentemente disso.
-- **`page`** — cada grupo é uma única linha que, ao ser clicada, desliza a barra lateral para um subpainel mostrando apenas os itens daquele grupo, com uma seta de voltar no topo. O painel reconhece a rota, então cair diretamente em uma página dentro do grupo abre direto nela.
+- **`page`** — cada grupo é uma única linha cujo chevron desliza a barra lateral para um subpainel mostrando apenas os itens daquele grupo, com uma seta de voltar no topo. Um grupo com uma página de índice liga o nome da linha a essa página, e um grupo sem ela faz o painel deslizar a partir de qualquer ponto da linha. O painel reconhece a rota, então cair diretamente em uma página dentro do grupo abre direto nela. Depois de usar a seta de voltar, a linha da seção em que você está continua destacada.
 
 :::tip
 O modo `page` mantém seções profundas organizadas — use-o quando os grupos tiverem muitos filhos e você preferir navegar dentro deles a rolar por eles.
@@ -101,7 +101,7 @@ O modo efetivo de um grupo gerado é resolvido da maior prioridade para a menor:
 3. O `navigation.sidebar.display` global
 4. O padrão do Blume (`flat`)
 
-O `display` de um grupo se aplica somente àquele grupo — subgrupos aninhados resolvem seu próprio valor pela mesma cadeia. Um grupo em modo `page` com uma página de índice ainda navega para o seu subpainel: a página de índice aparece como o primeiro item do painel, e cair na URL dela abre o painel diretamente.
+O `display` de um grupo se aplica somente àquele grupo — subgrupos aninhados resolvem seu próprio valor pela mesma cadeia. Um grupo em modo `page` com uma página de índice liga o nome da sua linha a essa página, então clicar no nome abre a página de destino com o subpainel já aberto, enquanto o chevron ao lado faz o painel deslizar sem sair da página atual. O título do painel leva de volta à página de destino, e a página de índice aparece como o primeiro item do painel, a menos que esteja [oculta](#hidden-pages). Um grupo em modo `page` sem página de índice não tem o que abrir, então a linha inteira faz o painel deslizar.
 
 `sidebar.display` não significa nada em nenhum outro lugar — em uma página que não seja de índice, na própria página `index` da raiz do conteúdo (a raiz não é um grupo; use `navigation.sidebar.display`) ou em qualquer página quando uma [barra lateral explícita](#explicit-sidebar) estiver configurada (seus itens são donos do modo de cada grupo) — então o Blume emite um aviso `BLUME_SIDEBAR_DISPLAY_IGNORED` em vez de descartá-lo silenciosamente. `collapsed` continua específico do modo `group`; ele fica inerte quando um grupo resolve para `flat` ou `page`.
 
@@ -305,6 +305,8 @@ navigation: {
 ```
 
 Assim como os rótulos das abas, um `label` aqui pode ser um mapa de código de idioma para texto em um site [multilíngue](/docs/content/i18n#per-locale-navigation).
+
+Uma ação é apenas um link, então um changelog vinculado dessa forma continua listando as suas entradas na barra lateral. Vincule-o com uma [aba](#tabs) para [mantê-las fora](/docs/advanced/changelog#keep-entries-out-of-the-sidebar).
 
 `cta` é singular de propósito — um cabeçalho de documentação tem espaço para exatamente uma coisa que se pede ao leitor que faça, e uma fileira de botões não pede nada. Links secundários pertencem a `actions`, ou a [`featured`](#featured-links) se devem ficar junto à barra lateral.
 

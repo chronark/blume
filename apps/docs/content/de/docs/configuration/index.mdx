@@ -379,7 +379,7 @@ Ist die Funktion aktiviert, wird das Datum außerdem als schema.org-`dateModifie
 
 ## Datumsformat [#date-format]
 
-Sowohl der Stempel „Zuletzt aktualisiert“ als auch die Zeitleiste des [Changelogs](/docs/advanced/changelog) rendern ihre Daten über dasselbe `dateFormat`, damit sie sich gleich lesen. Daten werden immer in der Sprache der Website gerendert; `dateFormat` steuert die _Form_. Standardmäßig wird die lange Form verwendet (`21. Juli 2026`, `2026年7月21日`):
+Sowohl der Stempel „Zuletzt aktualisiert“ als auch die Zeitleiste des [Changelogs](/docs/advanced/changelog) rendern ihre Daten über dasselbe `dateFormat`, damit sie sich gleich lesen. Daten werden immer in der Sprache der Website gerendert; `dateFormat` steuert die _Form_. Standardmäßig wird die lange Form verwendet (`July 21, 2026`, `2026年7月21日`):
 
 ```ts blume.config.ts
 dateFormat: { dateStyle: "long" },
@@ -497,6 +497,7 @@ Zu jeder dieser Optionen gibt es eine eigene Anleitung. Das Konfigurationsfeld i
 | `seo` | Metadaten, OG-Bilder, Feeds, strukturierte Daten, Sitemap, robots | [SEO und GEO](/docs/discoverability) |
 | `deployment` | Ein Host-Adapter aus `blume/deploy` oder `{ site, base }` für einen statischen Build | [Deployment](/docs/deployment) |
 | `redirects` | Permanente und temporäre Weiterleitungen | [Deployment](/docs/deployment#redirects) |
+| `poweredBy` | Der Response-Header `X-Powered-By: Blume` (Standard `true`) | [Deployment](/docs/deployment#powered-by-header) |
 | `integrations` | Astro-Integrationen, die nach Blumes eingebauten angehängt werden | [Anpassung](/docs/configuration/customization#astro-integrations) |
 | `basePath` | Ein Pfad, unter dem jede generierte Route eingehängt wird (z. B. `/docs`), unsichtbar für die Seitenleiste | [Deployment](/docs/deployment#mount-the-docs-under-a-path) |
 | `i18n` | Sprachen, die Standardsprache und übersetzte UI-Zeichenketten | [Internationalisierung](/docs/content/i18n) |

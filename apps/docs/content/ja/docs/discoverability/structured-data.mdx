@@ -1,7 +1,7 @@
 ---
 title: 構造化データ
 description: >-
-  すべてのページに含まれる schema.org JSON-LD — WebSite、記事、パンくずリストのノード — に加えて、検索エンジンやエージェントにあなたが何者かを伝えるオプションの Organization および SoftwareApplication ブロックについて説明します。
+  すべてのページに含まれる schema.org JSON-LD — WebSite、ページ、パンくずリストのノード — に加えて、検索エンジンやエージェントにあなたが何者かを伝えるオプションの Organization および SoftwareApplication ブロックについて説明します。
 ---
 
 Blume は、検索エンジンがコンテンツを理解できるように、すべてのページの `<head>` に [schema.org](https://schema.org) JSON-LD を出力します。デフォルトで有効です:
@@ -15,10 +15,12 @@ seo: {
 各ページには次のものが含まれます:
 
 - サイトのアイデンティティを示す **WebSite** ノード
-- **記事** としてのページ — ブログ記事には `BlogPosting`、変更履歴とドキュメントには `TechArticle` — と、その説明および公開日
-- ナビゲーションの経路から構築される **BreadcrumbList**
+- ページ自体とその説明、言語、公開日 — ホームページでは **WebPage**、それ以外のすべてのページでは **記事** (ブログ記事には `BlogPosting`、変更履歴とドキュメントには `TechArticle`)
+- 記事では、ナビゲーションの経路から構築される **BreadcrumbList**
 
-[`deployment.site`](/docs/deployment) が設定されている場合、URL は絶対 URL になります。[`seo.noindex`](/docs/discoverability/metadata#per-page-overrides) が指定されたページはスキップされます。[`lastModified`](/docs/configuration#last-modified) が有効な場合、各ページの日付は `dateModified` としても出力されます。
+ホームページはナビゲーションのルートであるため、各ロケールのホーム (`/fr`) や [`basePath`](/docs/deployment#mount-the-docs-under-a-path) のルートも WebPage になります。
+
+[`deployment.site`](/docs/deployment) が設定されている場合、URL は絶対 URL になります。設定されていない場合はルート相対 URL となり、絶対識別子を必要とする WebSite ノードは省略されます。[`seo.noindex`](/docs/discoverability/metadata#per-page-overrides) が指定されたページはスキップされます。[`lastModified`](/docs/configuration#last-modified) が有効な場合、各ページの日付は `dateModified` としても出力されます。また、表示される「最終更新日」は `<time datetime>` としてマークアップされるため、検索エンジンはページ上の他の日付ではなくその日付を読み取ります。
 
 ## サイトのアイデンティティ [#site-identity]
 
@@ -43,10 +45,10 @@ seo: {
 }
 ```
 
-`organization` は、すべてのページに **Organization** ノードを追加します — WebSite ノードと記事ノードはこれを `publisher` として参照します — メールアドレスと電話番号は `ContactPoint` として (`contactType` のデフォルトは `"customer support"`)、住所は `PostalAddress` として出力され、この 2 つのフィールドはビジネス検証のチェックで参照されます。`name` と `url` はサイトの値がデフォルトになります。ルート相対の `logo` は、他のページ URL と同様に絶対 URL 化されます。
+`organization` は、すべてのページに **Organization** ノードを追加します — WebSite ノードとページノードはこれを `publisher` として参照します — メールアドレスと電話番号は `ContactPoint` として (`contactType` のデフォルトは `"customer support"`)、住所は `PostalAddress` として出力され、この 2 つのフィールドはビジネス検証のチェックで参照されます。`name` と `url` はサイトの値がデフォルトになります。ルート相対の `logo` は、他のページ URL と同様に絶対 URL 化されます。
 
 `software` は、ホームページに **SoftwareApplication** ノードを追加します: 製品の名前と説明 (デフォルトはサイトの値)、`applicationCategory` (デフォルトは `"DeveloperApplication"`)、オペレーティングシステム、ライセンス、`price` が設定されている場合は `Offer`、そして `sameAs` にレジストリまたはリポジトリの URL が含まれます。すべてデフォルト値を使用するには `software: true` を指定してください。organization が設定されている場合は、その `publisher` として参照されます。
 
 ## カスタムページ [#custom-pages]
 
-`PageLayout` を通してレンダリングされるカスタム [`.astro` ページ](/docs/advanced/custom-pages) も同じ `WebSite` グラフを出力するため、マーケティング用のホームページだけが構造化データを持たない URL になることはありません。この設定と同期させるには `structuredDataEnabled={config.structuredData}` を渡し、そのページだけ無効にするには `structuredDataEnabled={false}` を渡してください。
+`PageLayout` を通してレンダリングされるカスタム [`.astro` ページ](/docs/advanced/custom-pages) も同じグラフを出力するため、マーケティング用のホームページだけが構造化データを持たない URL になることはありません。カスタムページには日付の基となるコンテンツファイルがないため、`dateModified` を付与するには `lastModified` を渡してください。この設定と同期させるには `structuredDataEnabled={config.structuredData}` を渡し、そのページだけ無効にするには `structuredDataEnabled={false}` を渡してください。

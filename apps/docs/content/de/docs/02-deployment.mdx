@@ -83,6 +83,22 @@ deployment: {
 
 Jede Seite behält ihren eigenen Pfad unter der Basis, selbst in einem Inhaltsordner, der denselben Namen wie die Basis trägt: Mit `base: "/docs"` wird `docs/setup.md` unter `/docs/docs/setup` ausgeliefert, und ihre kanonische URL, ihr Seitenleisten-Link und ihr `llms.txt`-Eintrag verweisen dorthin. Ein wurzelrelativer Link, den du schreibst und der bereits mit der Basis beginnt, gilt als Link, der die Basis schon enthält, und bleibt unverändert — verlinke diese Seite also mit einem relativen Link (`./docs/setup`) oder ihrem vollständigen Pfad (`/docs/docs/setup`).
 
+### Eine eigene Basis pro Deployment [#a-different-base-per-deploy]
+
+`blume.config.ts` ist ein Modul, daher kann `base` aus einer Umgebungsvariable stammen. So kann die CI die Vorschau jedes Pull Requests unter einem eigenen Pfad bauen, ohne die Konfiguration zu bearbeiten:
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  base: process.env.DOCS_BASE,
+}
+```
+
+```bash
+DOCS_BASE=/pr-1234 blume build
+```
+
+Ist `DOCS_BASE` nicht gesetzt, wird die Site an der Wurzel gebaut, die Produktion braucht also nichts weiter.
+
 ## Die Dokumentation unter einem Pfad einhängen [#mount-the-docs-under-a-path]
 
 `basePath` hängt jede generierte Route unter ein Segment (`/docs/getting-started`), lässt die Seitenleiste dabei aber unverändert — die oberste Ebene sind deine Abschnitte, keine umschließende Gruppe. Verwende es, wenn die Dokumentation unter `/docs/*` liegt, die Site-Wurzel aber dir gehört (wie `routeBasePath` bei Docusaurus oder `baseUrl` bei Fumadocs).
@@ -215,6 +231,18 @@ Ein Muster darf nicht zugleich auf eine Seite passen: Hosts sind sich uneinig, w
 
 Wo der Host eine solche Datei liest, erzeugt ein Build außerdem eine `_headers`-Datei, die `charset=utf-8` an die rohen, KI-tauglichen Endpunkte heftet — `/<route>.md`, `/<route>.mdx` und die `.txt`-Dateien (`llms.txt`, `llms-full.txt`). Diese Antworten sind gültiges UTF-8, doch viele statische Hosts liefern sie als `text/markdown` / `text/plain` **ohne** Charset aus, und Browser fallen dann auf Windows-1252 zurück — sodass Dokumentation mit Nicht-ASCII-Zeichen (Japanisch, akzentuiertes Latein, …) beim direkten Öffnen der Roh-URL als Zeichensalat dargestellt wird. HTML-Seiten sind davon nicht betroffen, da sie `<meta charset>` mitführen. Netlify liest `_headers` bei einem statischen Deployment und Cloudflare (Pages sowie statische Assets von Workers) sowohl bei statischen als auch bei Server-Builds, daher erhalten diese Adapter und ein nicht angegebener statischer Host die Datei; Vercel (dessen Header über die Routing-Konfiguration laufen) und Node (dessen Server die Datei ignoriert) nicht. Ein Netlify-Server-Build schreibt dieselben Regeln stattdessen in die `headers` seiner Frameworks-API-Konfiguration (`.netlify/v1/config.json`). Ein statischer Vercel-Build schreibt dieselben Regeln stattdessen in `dist/vercel.json`, die ein mit Git verbundenes Projekt nicht liest (siehe [Weiterleitungen](#redirects)). Eine `_headers`-Datei, die du in `public/` mitlieferst, bleibt unangetastet.
 
+## Powered-by-Header
+
+Blume nennt sich selbst in einem `X-Powered-By: Blume`-Antwort-Header, damit HTTP-Inspektoren und Technologie-Detektoren erkennen können, womit die Site gebaut wurde. Setze `poweredBy` auf `false`, um ihn wegzulassen:
+
+```ts blume.config.ts
+poweredBy: false,
+```
+
+`blume dev` sendet ihn bei jeder Antwort. Ein Server-Build sendet ihn dort, woher der Host seine Header bezieht: Der `node()`-Server und der `cloudflare()`-Worker setzen ihn selbst, ein `vercel()`-Build führt ihn in seiner Routing-Konfiguration mit und ein `netlify()`-Build in den Header-Regeln seiner Frameworks-API-Konfiguration, wobei die Middleware von Blume ihn den bei Bedarf gerenderten Seiten hinzufügt. Ein statischer Build führt ihn in `_headers` und `dist/vercel.json` neben den [Inhaltstypen](#content-types) auf und erreicht damit die Hosts, die diese Dateien erreichen: kein mit Git verbundenes Vercel-Projekt und keinen Host, der keine eigenen Header sendet, etwa GitHub Pages.
+
+In einer [per Eject herausgelösten](/docs/configuration/customization#eject) App ist der Schalter die Option `poweredBy` von `blumeIntegration()` in `astro.config.mjs`. Deren Build sendet den Header auf serverseitig gerenderten Seiten und über `_headers`; der Wrapper für den Server-Einstiegspunkt und die Routing-Konfigurationen, die ihn anderswo mitführen, sind Schritte von `blume build`.
+
 ## Umgebungsvariablen [#environment-variables]
 
 Wenn eine Funktion ein Secret benötigt, warnt Blume bei `blume dev`/`build`, falls es fehlt — so tritt das Problem früh zutage statt erst bei der ersten Anfrage:
@@ -226,7 +254,7 @@ Wenn eine Funktion ein Secret benötigt, warnt Blume bei `blume dev`/`build`, fa
 | [Bot-Schutz des Assistenten](/docs/configuration/assistant#bot-protection) | `TURNSTILE_SECRET_KEY` (`turnstile()`), `HCAPTCHA_SECRET_KEY` (`hcaptcha()`) |
 | [Ratenbegrenzung](/docs/configuration/rate-limiting) (`upstash()`) | `UPSTASH_REDIS_REST_URL` und `UPSTASH_REDIS_REST_TOKEN` |
 | Mixedbread-Suche | `MIXEDBREAD_API_KEY` |
-| [Sprachausgabe](/docs/configuration/narration) (generierte Stimmen) | `AI_GATEWAY_API_KEY` (oder Vercel OIDC) oder das `apiKeyEnv`, das du `gateway()` übergeben hast |
+| [Sprachausgabe](/docs/configuration/narration) (generierte Stimmen) | `AI_GATEWAY_API_KEY` (oder Vercel OIDC) für `gateway()`, `OPENAI_API_KEY` für `openai()` (bei einer `baseUrl` keine, es sei denn, du gibst eine an) oder das `apiKeyEnv`, das du einem der beiden übergeben hast |
 | [Inhaltsquellen](/docs/content/sources) | `NOTION_TOKEN` (`notion()`), `SANITY_TOKEN` (`sanity()`), `CONTENTFUL_ACCESS_TOKEN` (`contentful()`, dazu `CONTENTFUL_PREVIEW_TOKEN` für `--preview`, das ohne ihn fehlschlägt), `PAYLOAD_API_KEY` (`payload()`), `STRAPI_API_TOKEN` (`strapi()`), `GITHUB_TOKEN` (`githubReleases()` sowie `mdxRemote()` beim Lesen aus GitHub) |
 
 Setze sie in `.env.local` für die lokale Entwicklung und in der Umgebung deines Hosts für die Produktion. Eine Inhaltsquelle liest ihr Token beim Abrufen, also während `blume dev` und `blume build`, und die Sprachausgabe liest ihren Schlüssel während `blume build`, setze diese daher dort, wo deine Site gebaut wird. Build-Zeit-Secrets für die Synchronisierung des Suchindex (`ALGOLIA_ADMIN_API_KEY`, `ORAMA_PRIVATE_API_KEY`, `TYPESENSE_ADMIN_API_KEY`) prüft der Sync-Schritt selbst: Ist eines nicht gesetzt, warnt der Build und überspringt die Synchronisierung; ist es gesetzt, [lässt eine fehlgeschlagene Synchronisierung den Build fehlschlagen](/docs/configuration/search#adapters). Die [GitHub-Info](/docs/content/components#github-info)-Karte sendet außerdem `GITHUB_TOKEN`, sofern gesetzt, um die API-Ratenbegrenzung von GitHub anzuheben.

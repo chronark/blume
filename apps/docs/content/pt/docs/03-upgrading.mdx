@@ -89,7 +89,7 @@ export default defineConfig({
 - `netlify()`, `cloudflare()` e `node()` funcionam do mesmo jeito. Escolher um adaptador de host muda a saída para servidor. Passe `output: "static"` para manter um build estático com os arquivos de plataforma desse host.
 - Uma configuração que só define `site` ou `base` continua igual: `deployment: { site, base }` ainda é a forma estática.
 - `redirects` interpretam segmentos `:name` e um `*` no final como padrões, com a mesma correspondência em todos os hosts (veja [Redirects com padrões](/docs/deployment#pattern-redirects)). O Blume 1 nunca teve suporte a padrões e os repassava para cada host do jeito que estavam escritos, então confira todo `from` ou `to` que tenha um.
-- As flags `--adapter`, `--output` e `--base` do `blume build` foram removidas. Se você passar alguma delas, o build para com um erro que indica a configuração de `deployment` que a substitui. Defina o adaptador no `blume.config.ts` e declare-o explicitamente: a saída de servidor não é mais inferida a partir do ambiente da plataforma.
+- As flags `--adapter`, `--output` e `--base` do `blume build` foram removidas. Se você passar alguma delas, o build para com um erro que indica a configuração de `deployment` que a substitui. Defina o adaptador no `blume.config.ts` e declare-o explicitamente: a saída de servidor não é mais inferida a partir do ambiente da plataforma. Uma etapa de CI que passava um `--base` diferente em cada deploy pode, em vez disso, [ler o valor de uma variável de ambiente](/docs/deployment#a-different-base-per-deploy) na configuração.
 
 Veja [Deploy](/docs/deployment) para as opções de cada adaptador.
 
@@ -134,6 +134,7 @@ export default defineConfig({
 - `mdx-remote`, `sanity`, `notion` e `obsidian` viram `mdxRemote()`, `sanity()`, `notion()` e `obsidian()`. Todos os outros campos vão para dentro da chamada sem mudança. `{ type: "custom", source }` vira `custom(source)`.
 - `content.root`, `content.include` e `content.exclude` continuam sendo o atalho para uma única pasta, mas não podem mais ficar junto com `sources`. Mova esses campos para a entrada `filesystem()`.
 - As páginas de release do `githubReleases()` agora saem em um único idioma. Com isso, um site com vários locales não copia mais essas páginas para a URL de cada um dos outros locales (`/de/changelog/…`). Se outros sites apontam para essas cópias, adicione [redirects](/docs/deployment#redirects) para as páginas do locale padrão.
+- O texto digitado no Notion agora aparece do jeito que foi escrito: um componente, um `{` ou um caractere de Markdown numa página do `notion()` aparece como foi digitado, em vez de ser lido como MDX. Se as suas páginas do Notion têm componentes ou Markdown digitados como texto, defina [`mdx: true`](/docs/content/sources/notion#writing-mdx-in-notion) na fonte.
 
 ## Referências de API [#api-references]
 

@@ -89,7 +89,7 @@ export default defineConfig({
 - `netlify()`、`cloudflare()`、`node()` も同じように使います。ホストアダプターを指定すると、サーバー出力に切り替わります。静的ビルドのまま、そのホスト向けのプラットフォームファイルも出力したい場合は、`output: "static"` を渡します。
 - `site` または `base` だけを設定している場合は、変更不要です。`deployment: { site, base }` は今後も静的ビルドの書き方です。
 - `redirects` は `:name` セグメントと末尾の `*` をパターンとして解釈し、どのホストでも同じ方法でマッチさせるようになりました（[パターンリダイレクト](/docs/deployment#pattern-redirects) を参照）。Blume 1 はパターンをサポートしておらず、記述どおりに各ホストへ渡していたため、パターンを含む `from` や `to` があれば確認してください。
-- `blume build` の `--adapter`、`--output`、`--base` フラグは廃止されました。いずれかを渡すとビルドはエラーで停止し、代わりに使う `deployment` の設定が表示されます。アダプターは `blume.config.ts` で明示的に指定してください。サーバー出力をプラットフォームの環境から推測する動作はなくなりました。
+- `blume build` の `--adapter`、`--output`、`--base` フラグは廃止されました。いずれかを渡すとビルドはエラーで停止し、代わりに使う `deployment` の設定が表示されます。アダプターは `blume.config.ts` で明示的に指定してください。サーバー出力をプラットフォームの環境から推測する動作はなくなりました。デプロイごとに異なる `--base` を渡していた CI のステップでは、代わりに設定内で [環境変数から読み込む](/docs/deployment#a-different-base-per-deploy) ことができます。
 
 各アダプターのオプションについては、[デプロイ](/docs/deployment) を参照してください。
 
@@ -134,6 +134,7 @@ export default defineConfig({
 - `mdx-remote`、`sanity`、`notion`、`obsidian` は、それぞれ `mdxRemote()`、`sanity()`、`notion()`、`obsidian()` になります。その他のフィールドは、そのまま呼び出しの引数に移します。`{ type: "custom", source }` は `custom(source)` になります。
 - `content.root`、`content.include`、`content.exclude` は、フォルダーが 1 つだけの場合の省略形として引き続き使えます。ただし、`sources` と一緒には使えなくなりました。併用している場合は、`filesystem()` エントリーに移してください。
 - `githubReleases()` のリリースページは、1 つの言語でのみ公開されるようになりました。そのため多言語サイトでも、他のロケールの URL（`/de/changelog/…`）にはコピーされません。外部サイトがそれらのコピーにリンクしている場合は、デフォルトロケールのページへの [リダイレクト](/docs/deployment#redirects) を追加してください。
+- Notion で入力したテキストは、入力したとおりに表示されるようになりました。`notion()` のページ内のコンポーネント、`{`、Markdown の文字は、MDX として解釈されず、入力どおりに表示されます。Notion のページにテキストとして入力したコンポーネントや Markdown がある場合は、ソースに [`mdx: true`](/docs/content/sources/notion#writing-mdx-in-notion) を設定してください。
 
 ## API リファレンス [#api-references]
 

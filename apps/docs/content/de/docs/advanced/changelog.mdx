@@ -76,8 +76,6 @@ Beide akzeptieren auch eine Zuordnung von Locale-Code zu Text, wie ein [Label ei
 
 Die Seite erscheint nur, wenn die Route `/changelog` nicht bereits belegt ist. Um sie durch dein eigenes Design zu ersetzen, füge unter `pages/changelog.astro` eine [benutzerdefinierte Seite](/docs/advanced/custom-pages) hinzu – sie übernimmt, und Blume generiert die Standard-Übersicht nicht mehr. Die `<Update>`-Komponente, aus der die bisherige Timeline aufgebaut war, steht weiterhin für eine von Hand verfasste Seite zur Verfügung, die Release Notes inline zeigen soll. Sie gehört nicht zu den MDX-Komponenten, importiere sie also direkt in der `.astro`-Seite: `import Update from "blume/components/content/Update.astro";`.
 
-Ein Header-[Tab](/docs/content/navigation#tabs), der auf `/changelog` zeigt, öffnet diese Übersicht – ein `href` ist nicht nötig.
-
 ## Aus GitHub Releases [#from-github-releases]
 
 Statt Einträge von Hand zu verfassen, richte die eingebaute [`githubReleases()`-Quelle](/docs/content/sources/github-releases) auf ein Repository, und jedes Release wird zu einem Eintrag mit `type: changelog` – dieselbe Timeline und derselbe Feed, direkt gespeist aus den Releases, die du ohnehin veröffentlichst. Blumes eigenes [Changelog](/changelog) ist so aufgebaut:
@@ -98,6 +96,25 @@ content: {
 ```
 
 Der Name des Releases wird zum Titel, sein Tag zu `changelog.version`, und sein Veröffentlichungsdatum sortiert die Timeline. Jede Release-Seite erhält außerdem eine eindeutige Meta-Description, die aus ihren Notes zusammengefasst wird – Markdown entfernt, Abschnittsüberschriften und Changeset-Commit-Hash-Präfixe verworfen, gekürzt auf die Länge des Such-Snippets, die [`blume audit`](/docs/cli/audit) prüft – statt auf die Site-Beschreibung zurückzufallen. Ein privates Repository authentifiziert sich über die Umgebungsvariable `GITHUB_TOKEN`. Alle Optionen findest du unter [GitHub Releases](/docs/content/sources/github-releases).
+
+## Einträge aus der Seitenleiste heraushalten [#keep-entries-out-of-the-sidebar]
+
+Changelog-Einträge sind gewöhnliche Seiten, daher listet die generierte Seitenleiste sie wie jede andere auf: Ein `changelog/`-Ordner oder eine `githubReleases()`-Quelle mit `prefix: "changelog"` wird zu einer Changelog-Gruppe, den neuesten Eintrag zuerst, die mit jedem Release wächst. Auch die Vorherige/Nächste-Links laufen durch sie hindurch, sodass die letzte Dokumentationsseite zum neuesten Release führen kann.
+
+Um die Einträge aus der Seitenleiste der Dokumentation herauszuhalten, verlinke das Changelog mit einem Header-[Tab](/docs/content/navigation#tabs) statt mit einer [Header-Aktion](/docs/content/navigation#header-actions):
+
+```ts blume.config.ts
+navigation: {
+  tabs: [
+    { label: "Docs", path: "/" },
+    { label: "Changelog", path: "/changelog" },
+  ],
+}
+```
+
+Der Tab `/changelog` öffnet die Übersicht, ohne dass ein `href` nötig ist, und übernimmt den Abschnitt `changelog/`: Seiten außerhalb davon listen die Releases nicht mehr auf, und ihre Vorherige/Nächste-Links bleiben innerhalb der Dokumentation. Die eigene Seite eines Eintrags zeigt die Release-Liste als Seitenleiste. Die Übersicht, der [RSS-Feed](#the-rss-feed), `llms.txt`, die Sitemap und die Suche listen weiterhin jeden Eintrag. Der `path` des Tabs muss dem Ordner oder `prefix` entsprechen, unter dem die Einträge liegen. Der Tab `Docs` unter `/` ist optional; er gibt Lesern einen Tab, zu dem sie zurückkehren können.
+
+Wenn du `sidebar.hidden` bei den Einträgen setzt, erreichst du das nicht: Damit verschwinden sie überall, auch aus der Übersicht und dem Feed.
 
 ## Der RSS-Feed [#the-rss-feed]
 

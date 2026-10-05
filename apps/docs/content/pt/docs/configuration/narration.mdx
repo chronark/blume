@@ -45,7 +45,7 @@ Isso não exige nada de você e não custa nada, mas a qualidade do som depende 
 
 ## Vozes geradas [#generated-voices]
 
-Passe um `provider` para gerar áudio com um modelo neural de fala em tempo de build. O provider é o mesmo adaptador [`gateway()`](/docs/configuration/assistant#adapters) que o assistente usa, apontado para um modelo de fala:
+Passe um `provider` para gerar áudio com um modelo neural de fala em tempo de build. O provider é um dos [adaptadores](/docs/configuration/assistant#adapters) do assistente, apontado para um modelo de fala: `gateway()` para os modelos de fala do Vercel AI Gateway ou [`openai()`](#openai-and-self-hosted-voices) para os próprios modelos de fala da OpenAI ou para um servidor de fala que você mesmo roda.
 
 ```ts blume.config.ts lineNumbers
 import { defineConfig } from "blume";
@@ -61,13 +61,15 @@ export default defineConfig({
 });
 ```
 
-O `blume build` lê cada página gerada exatamente como o player vai ler, divide o texto em frases e gera um clipe por frase pelo [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). Os clipes e um pequeno manifest por página são gravados no seu build como arquivos estáticos em `/blume-narration/`. Assim, ouvir de novo não custa nada e nada roda em um servidor.
+O `blume build` lê cada página gerada exatamente como o player vai ler, divide o texto em frases e gera um clipe por frase pelo provider, aqui o [Vercel AI Gateway](https://vercel.com/docs/ai-gateway). Os clipes e um pequeno manifest por página são gravados no seu build como arquivos estáticos em `/blume-narration/`. Assim, ouvir de novo não custa nada e nada roda em um servidor.
 
 Antes de gerar qualquer coisa, o build mostra no log quantos clipes novos precisa criar e quantos caracteres eles somam, para que você veja o custo logo de início:
 
 ```txt
 Generating narration: 214 new clip(s), 15,880 characters, with openai/tts-1-hd
 ```
+
+O `gateway()` aceita:
 
 | Opção | Padrão | Descrição |
 | --- | --- | --- |
@@ -78,21 +80,56 @@ Generating narration: 214 new clip(s), 15,880 characters, with openai/tts-1-hd
 | `headers` |  | Headers estáticos enviados em todas as requisições. |
 | `providerOptions` |  | Repassado sem alterações para o `generateSpeech` do AI SDK, para configurações do modelo que o Blume não expõe por nome. |
 
+### Vozes da OpenAI e auto-hospedadas [#openai-and-self-hosted-voices]
+
+Já o `openai()` gera os clipes com a API de fala da OpenAI: os próprios modelos da OpenAI com a sua `OPENAI_API_KEY` ou, com um `baseUrl`, qualquer servidor que ofereça o mesmo endpoint `POST /audio/speech`, como o [Kokoro-FastAPI](https://github.com/remsky/Kokoro-FastAPI), o [Speaches](https://speaches.ai) ou um proxy [LiteLLM](https://docs.litellm.ai) com um modelo de fala. Assim, um site cujo build não consegue acessar um serviço hospedado também pode ter vozes geradas:
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { openai } from "blume/ai";
+
+export default defineConfig({
+  narration: {
+    provider: openai({
+      baseUrl: "http://localhost:8880/v1",
+      model: "kokoro",
+      voice: "af_heart",
+    }),
+  },
+});
+```
+
+Um servidor que exige chave, como um proxy LiteLLM, recebe a chave que você indicar em `apiKeyEnv` (`openai({ baseUrl, apiKeyEnv: "LITELLM_API_KEY", model })`). Sem `apiKeyEnv`, o servidor do `baseUrl` é chamado sem chave, então a sua `OPENAI_API_KEY` nunca vai parar em outro servidor. Uma resposta que não seja MP3, como uma página de login de um proxy na frente do servidor ou um WAV de um servidor que ignora o formato pedido, conta como um clipe que falhou, em vez de ir para o cache.
+
+Com ou sem `baseUrl`, ele fala pelo provider da OpenAI do AI SDK, então adicione o `@ai-sdk/openai` ao seu projeto (`npm install @ai-sdk/openai`). Se ele estiver faltando, o `blume build` para antes de o Vite rodar e informa o nome do pacote.
+
+| Opção | Padrão | Descrição |
+| --- | --- | --- |
+| `model` |  | Obrigatório. Um modelo de fala: `gpt-4o-mini-tts`, `tts-1` ou `tts-1-hd` na OpenAI, ou o id que o seu servidor oferece. |
+| `baseUrl` |  | A URL base do servidor compatível com a OpenAI, incluindo o `/v1`. Sem ela, os clipes vêm da OpenAI ou, quando `OPENAI_BASE_URL` está definida, do servidor que ela indica, como acontece nos SDKs da própria OpenAI. |
+| `voice` | `alloy` | A voz do modelo. |
+| `instructions` |  | Como a voz deve soar, para modelos que aceitam instruções (`gpt-4o-mini-tts`). |
+| `apiKeyEnv` | `OPENAI_API_KEY` sem um `baseUrl` | A variável de ambiente que guarda a chave, enviada como bearer token. Com um `baseUrl`, só é enviada uma chave que você indicar aqui, então a sua `OPENAI_API_KEY` nunca chega a outro servidor; se você não indicar nenhuma, as requisições vão sem bearer token (um `Authorization` definido em `headers` continua sendo enviado). |
+| `headers` |  | Headers estáticos enviados em todas as requisições. |
+| `providerOptions` |  | Repassado sem alterações para o `generateSpeech` do AI SDK. A API de fala da OpenAI lê o `speed` daqui: `{ openai: { speed: 1.1 } }`. |
+
+A API de fala da OpenAI não recebe idioma, então o `openai()` não envia o idioma da página, e uma frase que aparece em vários idiomas é gerada uma única vez. Os modelos da OpenAI identificam o idioma pelo próprio texto, mas muitos servidores auto-hospedados se guiam pela voz, então escolha uma que fale o idioma do seu conteúdo.
+
 ### Cache [#caching]
 
-Os clipes ficam em cache em `node_modules/.cache/blume/narration`, identificados pelo que define o som deles: a frase, o idioma, o modelo, a voz e as instruções. Um novo build só paga pelas frases que mudaram, e uma frase que aparece em várias páginas é gerada uma única vez. A Vercel e a Netlify restauram o `node_modules` dos caches de build, então um deploy nelas gera de novo só o que mudou. Em outros serviços de CI, configure o cache desse diretório entre as execuções.
+Os clipes ficam em cache em `node_modules/.cache/blume/narration`, identificados pelo que define o som deles: a frase, o idioma (no `gateway()`, que o envia), o modelo, a voz, as instruções, o `providerOptions` e, no `openai()`, o servidor chamado. Apontar o `baseUrl` para outro servidor gera de novo todos os clipes, mesmo com o mesmo modelo e a mesma voz. Um novo build só paga pelas frases que mudaram, e uma frase que aparece em várias páginas é gerada uma única vez. A Vercel e a Netlify restauram o `node_modules` dos caches de build, então um deploy nelas gera de novo só o que mudou. Em outros serviços de CI, configure o cache desse diretório entre as execuções.
 
 ### Fallbacks
 
 Quando não existem clipes, as vozes geradas são substituídas pelas vozes do navegador:
 
 - No `blume dev`, que nunca gera áudio. Rode `blume build` e `blume preview` para ouvir a voz gerada localmente.
-- Quando a chave não está definida no momento do build. O build mostra um aviso e pula a geração.
-- Quando a geração falha. O build para no primeiro clipe que falhar, já que o AI SDK já fez novas tentativas, e mantém todos os clipes que já estão em cache.
+- Quando a chave não está definida no momento do build. O build mostra um aviso e não gera nada novo, mas as páginas que têm todos os clipes em cache continuam usando esses clipes. O `openai()` com um `baseUrl` e sem `apiKeyEnv` não envia chave, então a geração segue normalmente.
+- Quando a geração falha, inclusive quando o build não consegue acessar o servidor. A geração para no primeiro clipe que falhar, já que o AI SDK já fez novas tentativas, e o build continua com um aviso, mantendo todos os clipes que já estão em cache.
 
 ## Idiomas [#languages]
 
-A narração lê cada página no idioma do conteúdo, então, em um site [internacionalizado](/docs/content/i18n), cada locale é lido com a própria voz. As deixas faladas e os rótulos do player já vêm traduzidos em todos os idiomas de interface incluídos. Para personalizar esses textos em um locale, use a chave `narration` em [`i18n.ui`](/docs/content/i18n#translated-ui).
+A narração lê cada página no idioma do conteúdo, então, em um site [internacionalizado](/docs/content/i18n), cada locale é lido com a própria voz. Com o `openai()`, isso depende do modelo e da voz: veja [Vozes da OpenAI e auto-hospedadas](#openai-and-self-hosted-voices). As deixas faladas e os rótulos do player já vêm traduzidos em todos os idiomas de interface incluídos. Para personalizar esses textos em um locale, use a chave `narration` em [`i18n.ui`](/docs/content/i18n#translated-ui).
 
 ## Desativando em uma página [#turning-it-off-for-a-page]
 

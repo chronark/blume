@@ -83,6 +83,22 @@ deployment: {
 
 ベースと同じ名前のコンテンツフォルダー内にあるページでも、各ページはベース配下で自身のパスを維持します: `base: "/docs"` の場合、`docs/setup.md` は `/docs/docs/setup` で配信され、その canonical URL、サイドバーのリンク、`llms.txt` のエントリーもそこを指します。書いたルート相対のリンクがすでにベースで始まっている場合は、ベースを含むものとみなされ、書いたとおりに残されます。そのため、そのページへは相対リンク（`./docs/setup`）か完全なパス（`/docs/docs/setup`）でリンクしてください。
 
+### デプロイごとに異なるベース [#a-different-base-per-deploy]
+
+`blume.config.ts` はモジュールなので、`base` を環境変数から取得できます。これにより、CI は設定を編集することなく、各プルリクエストのプレビューをそれぞれ独自のパス配下にビルドできます:
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  base: process.env.DOCS_BASE,
+}
+```
+
+```bash
+DOCS_BASE=/pr-1234 blume build
+```
+
+`DOCS_BASE` が未設定の場合、サイトはルートにビルドされるため、本番では追加の設定は必要ありません。
+
 ## ドキュメントをパス配下にマウントする [#mount-the-docs-under-a-path]
 
 `basePath` は生成されるすべてのルートをあるセグメント配下（`/docs/getting-started`）にマウントしますが、サイドバーはそのままです — トップレベルはラッパーグループではなく、あなたのセクションのままです。ドキュメントは `/docs/*` に置きつつ、サイトのルートは自分のものとして残したい場合に使います（Docusaurus の `routeBasePath` や Fumadocs の `baseUrl` のようなものです）。
@@ -215,6 +231,18 @@ redirects: [
 
 ホストが読み取る場合、ビルドでは `_headers` ファイルも出力され、生の AI 対応エンドポイント — `/<route>.md`、`/<route>.mdx`、および `.txt` ファイル（`llms.txt`、`llms-full.txt`）— に `charset=utf-8` を固定します。これらのレスポンスは妥当な UTF-8 ですが、多くの静的ホストは charset **なし**の `text/markdown` / `text/plain` として配信し、ブラウザは Windows-1252 にフォールバックします — その結果、非 ASCII のドキュメント（日本語、アクセント付きラテン文字など）は生の URL を直接開いたときに文字化けします。HTML ページは `<meta charset>` を持つため影響を受けません。Netlify は静的デプロイで、Cloudflare（Pages と Workers の静的アセット）は静的ビルドとサーバービルドの両方で `_headers` を読み取るため、これらのアダプターとホストを指定していない静的ビルドではこのファイルが出力されます。Vercel（ヘッダーはルーティング設定で扱われます）と Node（サーバーがこのファイルを無視します）では出力されません。Netlify のサーバービルドでは、代わりに Frameworks API の設定（`.netlify/v1/config.json`）の `headers` に同じルールを書き込みます。Vercel の静的ビルドでは、代わりに `dist/vercel.json` に同じルールを書き込みますが、Git 連携したプロジェクトはこのファイルを読み取りません（[リダイレクト](#redirects) を参照）。`public/` に配置した `_headers` はそのまま維持されます。
 
+## Powered-by ヘッダー [#powered-by-header]
+
+Blume は `X-Powered-By: Blume` レスポンスヘッダーで自身の名前を示すため、HTTP インスペクターや技術検出ツールはサイトが何でビルドされたかを判別できます。このヘッダーを省くには、`poweredBy` を `false` に設定してください:
+
+```ts blume.config.ts
+poweredBy: false,
+```
+
+`blume dev` はすべてのレスポンスでこのヘッダーを送信します。サーバービルドでは、ホストがヘッダーを取得する場所からこのヘッダーが送信されます: `node()` のサーバーと `cloudflare()` の Worker は自らヘッダーを設定し、`vercel()` のビルドはルーティング設定に、`netlify()` のビルドは Frameworks API の設定のヘッダールールにこのヘッダーを含め、オンデマンドでレンダリングされるページには Blume のミドルウェアがこのヘッダーを追加します。静的ビルドでは [コンテンツタイプ](#content-types) と並べて `_headers` と `dist/vercel.json` に記載されるため、これらのファイルが適用されるホストでのみ送信されます: Git 連携した Vercel プロジェクトや、GitHub Pages のようにカスタムヘッダーを送信しないホストでは送信されません。
+
+[イジェクト](/docs/configuration/customization#eject) したアプリでは、`astro.config.mjs` 内の `blumeIntegration()` の `poweredBy` オプションで切り替えます。そのビルドでは、サーバーレンダリングされたページと `_headers` からヘッダーが送信されます。それ以外の場所でヘッダーを付与するサーバーエントリーのラッパーやルーティング設定は、`blume build` が行うステップです。
+
 ## 環境変数 [#environment-variables]
 
 機能が実行時のシークレットを必要とする場合、それが欠けていると Blume は `blume dev`/`build` の時点で警告します — 最初のリクエスト時ではなく、早い段階で問題が表面化します:
@@ -226,7 +254,7 @@ redirects: [
 | [アシスタントのボット対策](/docs/configuration/assistant#bot-protection) | `TURNSTILE_SECRET_KEY`（`turnstile()`）、`HCAPTCHA_SECRET_KEY`（`hcaptcha()`） |
 | [レート制限](/docs/configuration/rate-limiting)（`upstash()`） | `UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` |
 | Mixedbread 検索 | `MIXEDBREAD_API_KEY` |
-| [ナレーション](/docs/configuration/narration)（生成音声） | `AI_GATEWAY_API_KEY`（または Vercel OIDC）、または `gateway()` に渡した `apiKeyEnv` |
+| [ナレーション](/docs/configuration/narration)（生成音声） | `gateway()` には `AI_GATEWAY_API_KEY`（または Vercel OIDC）、`openai()` には `OPENAI_API_KEY`（`baseUrl` を指定した場合は、変数名を指定しない限り不要）、またはいずれかに渡した `apiKeyEnv` |
 | [コンテンツソース](/docs/content/sources) | `NOTION_TOKEN`（`notion()`）、`SANITY_TOKEN`（`sanity()`）、`CONTENTFUL_ACCESS_TOKEN`（`contentful()`。`--preview` には `CONTENTFUL_PREVIEW_TOKEN` も必要で、ない場合は失敗します）、`PAYLOAD_API_KEY`（`payload()`）、`STRAPI_API_TOKEN`（`strapi()`）、`GITHUB_TOKEN`（`githubReleases()`、および GitHub から読み込む `mdxRemote()`） |
 
 ローカル開発では `.env.local` に、本番ではホストの環境に設定してください。コンテンツソースは `blume dev` と `blume build` の実行中、コンテンツを取得する際にトークンを読み取り、ナレーションは `blume build` の実行中にキーを読み取るため、これらはサイトをビルドする環境に設定してください。検索インデックスの同期に必要なビルド時のシークレット（`ALGOLIA_ADMIN_API_KEY`、`ORAMA_PRIVATE_API_KEY`、`TYPESENSE_ADMIN_API_KEY`）は、同期ステップ自体がチェックします: 未設定の場合、ビルドは警告を出して同期をスキップし、設定されている場合は、同期が失敗すると [ビルドも失敗します](/docs/configuration/search#adapters)。[GitHub info](/docs/content/components#github-info) カードも、`GITHUB_TOKEN` が設定されている場合は GitHub の API レート制限を緩和するためにそれを送信します。

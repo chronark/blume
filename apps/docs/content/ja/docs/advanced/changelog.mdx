@@ -76,8 +76,6 @@ changelog: {
 
 このページは `/changelog` ルートが他に占有されていない場合にのみ表示されます。独自のデザインに置き換えるには、`pages/changelog.astro` に[カスタムページ](/docs/advanced/custom-pages)を追加してください — それが優先され、Blume はデフォルトのインデックスの生成を停止します。以前のタイムラインの構築に使われていた `<Update>` コンポーネントは、リリースノートをインラインで表示したいカスタムページ向けに引き続き提供されています。これは MDX コンポーネントには含まれていないため、`.astro` ページ自体でインポートしてください: `import Update from "blume/components/content/Update.astro";`。
 
-`/changelog` を指すヘッダーの[タブ](/docs/content/navigation#tabs)はこのインデックスを開きます — `href` は不要です。
-
 ## GitHub Releases から [#from-github-releases]
 
 エントリを手作業で書く代わりに、組み込みの [`githubReleases()` ソース](/docs/content/sources/github-releases)をリポジトリに向ければ、すべてのリリースが `type: changelog` エントリになります — 同じタイムラインとフィードが、すでに公開しているリリースから直接供給されます。Blume 自身の[変更履歴](/changelog)もこの方法で構築されています:
@@ -98,6 +96,25 @@ content: {
 ```
 
 リリース名がタイトルになり、そのタグが `changelog.version` になり、公開日でタイムラインがソートされます。各リリースページには、そのノートから要約された固有のメタディスクリプションも付与されます — マークダウンを除去し、セクション見出しと changeset のコミットハッシュ接頭辞を削除し、[`blume audit`](/docs/cli/audit) がチェックする検索スニペットの長さに切り詰めたもので、サイトの説明にフォールバックすることはありません。プライベートリポジトリは `GITHUB_TOKEN` 環境変数で認証します。すべてのオプションについては[GitHub Releases](/docs/content/sources/github-releases)を参照してください。
+
+## エントリをサイドバーから除外する [#keep-entries-out-of-the-sidebar]
+
+変更履歴のエントリは通常のページなので、生成されたサイドバーには他のページと同様に一覧表示されます。`changelog/` フォルダ、または `prefix: "changelog"` を指定した `githubReleases()` ソースは Changelog グループになり、最新のエントリが先頭に並び、リリースのたびに増えていきます。前へ/次へのリンクもこのグループを通るため、ドキュメントの最後のページから最新のリリースへと続くことがあります。
+
+エントリをドキュメントのサイドバーから除外するには、[ヘッダーアクション](/docs/content/navigation#header-actions)ではなくヘッダーの[タブ](/docs/content/navigation#tabs)で変更履歴にリンクしてください:
+
+```ts blume.config.ts
+navigation: {
+  tabs: [
+    { label: "Docs", path: "/" },
+    { label: "Changelog", path: "/changelog" },
+  ],
+}
+```
+
+`/changelog` タブはインデックスを開き（`href` は不要です）、`changelog/` セクションを受け持ちます。このセクション外のページにはリリースが一覧表示されなくなり、それらのページの前へ/次へのリンクはドキュメント内にとどまります。エントリ自身のページでは、リリースの一覧がサイドバーとして表示されます。インデックス、[RSS フィード](#the-rss-feed)、`llms.txt`、サイトマップ、検索には引き続きすべてのエントリが掲載されます。タブの `path` は、エントリが配置されているフォルダまたは `prefix` と一致している必要があります。`/` の `Docs` タブは任意で、読者が戻るためのタブになります。
+
+エントリに `sidebar.hidden` を設定しても同じ効果は得られません。インデックスやフィードを含むすべての場所でエントリが非表示になってしまいます。
 
 ## RSS フィード [#the-rss-feed]
 

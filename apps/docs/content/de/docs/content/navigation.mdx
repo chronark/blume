@@ -65,7 +65,7 @@ navigation: {
 
 - **`flat`** (Standard) – eine nicht einklappbare Überschrift mit den darunter aufgelisteten Seiten. Seiten, die zu keiner Gruppe gehören, stehen immer zuerst, oberhalb der Gruppenabschnitte, damit sie nicht für untergeordnete Einträge einer Gruppe gehalten werden.
 - **`group`** – ein einklappbares `<details>`-Element pro Gruppe. Gruppen sind standardmäßig zunächst eingeklappt; eine Gruppe, welche die aktuelle Seite enthält, ist immer aufgeklappt, sodass nur der Abschnitt geöffnet ist, in dem du dich befindest. Setze `collapsed: false` im [Ordner-Meta](/docs/content/meta), um eine Gruppe unabhängig davon offen zu erzwingen.
-- **`page`** – jede Gruppe ist eine einzelne Zeile, die beim Anklicken die Seitenleiste in ein Unterpanel schiebt, das nur die Einträge dieser Gruppe zeigt, mit einem Zurück-Pfeil oben. Das Panel ist routen-bewusst, sodass beim direkten Aufruf einer Seite innerhalb der Gruppe sofort dorthin geöffnet wird.
+- **`page`** – jede Gruppe ist eine einzelne Zeile, deren Chevron die Seitenleiste in ein Unterpanel schiebt, das nur die Einträge dieser Gruppe zeigt, mit einem Zurück-Pfeil oben. Eine Gruppe mit Index-Seite verlinkt den Namen der Zeile auf diese Seite, und bei einer Gruppe ohne Index-Seite schiebt ein Klick an beliebiger Stelle der Zeile das Panel herein. Das Panel ist routen-bewusst, sodass beim direkten Aufruf einer Seite innerhalb der Gruppe sofort dorthin geöffnet wird. Nachdem du den Zurück-Pfeil benutzt hast, bleibt die Zeile des Abschnitts, in dem du dich befindest, hervorgehoben.
 
 :::tip
 Der `page`-Modus hält tiefe Abschnitte aufgeräumt – greif darauf zurück, wenn Gruppen viele untergeordnete Einträge haben und du lieber in sie hineinnavigieren möchtest, als an ihnen vorbeizuscrollen.
@@ -101,7 +101,7 @@ Der effektive Modus einer generierten Gruppe wird nach absteigender Priorität a
 3. Das globale `navigation.sidebar.display`
 4. Der Blume-Standard (`flat`)
 
-Das `display` einer Gruppe gilt nur für diese Gruppe – verschachtelte Untergruppen lösen ihren eigenen Wert über dieselbe Kette auf. Eine Gruppe im `page`-Modus mit einer Index-Seite navigiert weiterhin in ihr Unterpanel: Die Index-Seite wird als erster Eintrag des Panels aufgeführt, und beim Aufruf ihrer URL öffnet sich das Panel direkt.
+Das `display` einer Gruppe gilt nur für diese Gruppe – verschachtelte Untergruppen lösen ihren eigenen Wert über dieselbe Kette auf. Eine Gruppe im `page`-Modus mit einer Index-Seite verlinkt den Namen ihrer Zeile auf diese Seite, sodass ein Klick auf den Namen die Landing-Page mit bereits geöffnetem Unterpanel öffnet, während der Chevron daneben das Panel hereinschiebt, ohne die aktuelle Seite zu verlassen. Der Titel des Panels verlinkt zurück auf die Landing-Page, und die Index-Seite wird als erster Eintrag des Panels aufgeführt, sofern sie nicht [ausgeblendet](#hidden-pages) ist. Eine Gruppe im `page`-Modus ohne Index-Seite hat nichts zu öffnen, daher schiebt ihre gesamte Zeile das Panel herein.
 
 `sidebar.display` bedeutet an allen anderen Stellen nichts – auf einer Nicht-Index-Seite, auf der eigenen `index`-Seite des Inhalts-Roots (der Root ist keine Gruppe; verwende `navigation.sidebar.display`) oder auf jeder Seite, wenn eine [explizite Seitenleiste](#explicit-sidebar) konfiguriert ist (deren Einträge bestimmen den Modus jeder Gruppe) –, daher meldet Blume eine `BLUME_SIDEBAR_DISPLAY_IGNORED`-Warnung, statt es stillschweigend zu verwerfen. `collapsed` bleibt spezifisch für den `group`-Modus; es ist wirkungslos, wenn eine Gruppe zu `flat` oder `page` aufgelöst wird.
 
@@ -306,6 +306,8 @@ navigation: {
 ```
 
 Wie bei Tab-Beschriftungen kann ein `label` hier auf einer [mehrsprachigen](/docs/content/i18n#per-locale-navigation) Website eine Zuordnung von Sprachcode zu Text sein.
+
+Eine Aktion ist nur ein Link, daher listet ein so verlinktes Changelog seine Einträge weiterhin in der Seitenleiste auf. Verlinke es mit einem [Tab](#tabs), um sie [dort herauszuhalten](/docs/advanced/changelog#keep-entries-out-of-the-sidebar).
 
 `cta` ist mit Absicht Singular – ein Doku-Header hat Platz für genau eine Sache, zu der Lesende aufgefordert werden, und eine Reihe von Buttons fordert zu gar nichts auf. Sekundäre Links gehören in `actions` – oder in [`featured`](#featured-links), wenn sie stattdessen bei der Seitenleiste sitzen sollen.
 

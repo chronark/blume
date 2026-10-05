@@ -1,7 +1,7 @@
 ---
 title: संरचित डेटा
 description: >-
-  प्रत्येक पृष्ठ पर मौजूद schema.org JSON-LD — WebSite, article, और breadcrumb नोड्स — साथ ही वैकल्पिक Organization और SoftwareApplication ब्लॉक जो खोज इंजनों और एजेंटों को बताते हैं कि आप कौन हैं।
+  प्रत्येक पृष्ठ पर मौजूद schema.org JSON-LD — WebSite, पृष्ठ, और breadcrumb नोड्स — साथ ही वैकल्पिक Organization और SoftwareApplication ब्लॉक जो खोज इंजनों और एजेंटों को बताते हैं कि आप कौन हैं।
 ---
 
 Blume प्रत्येक पृष्ठ के `<head>` में [schema.org](https://schema.org) JSON-LD उत्सर्जित करता है ताकि खोज इंजन आपकी सामग्री को समझ सकें। यह डिफ़ॉल्ट रूप से चालू रहता है:
@@ -15,10 +15,12 @@ seo: {
 प्रत्येक पृष्ठ में शामिल होते हैं:
 
 - साइट की पहचान के लिए एक **WebSite** नोड,
-- पृष्ठ स्वयं एक **article** के रूप में — ब्लॉग पोस्ट के लिए `BlogPosting`, चेंजलॉग और दस्तावेज़ों के लिए `TechArticle` — अपने विवरण और प्रकाशन तिथि के साथ,
-- नेविगेशन ट्रेल से निर्मित एक **BreadcrumbList**।
+- पृष्ठ स्वयं, अपने विवरण, भाषा और प्रकाशन तिथि के साथ: मुखपृष्ठ पर एक **WebPage**, और अन्य सभी जगह एक **article** — ब्लॉग पोस्ट के लिए `BlogPosting`, चेंजलॉग और दस्तावेज़ों के लिए `TechArticle`,
+- किसी article पर, नेविगेशन ट्रेल से निर्मित एक **BreadcrumbList**।
 
-जब [`deployment.site`](/docs/deployment) सेट होता है, तो URL निरपेक्ष होते हैं। [`seo.noindex`](/docs/discoverability/metadata#per-page-overrides) से चिह्नित पृष्ठ छोड़ दिए जाते हैं। जब [`lastModified`](/docs/configuration#last-modified) चालू होता है, तो प्रत्येक पृष्ठ की तिथि `dateModified` के रूप में भी उत्सर्जित होती है।
+मुखपृष्ठ नेविगेशन का मूल होता है, इसलिए प्रत्येक लोकेल का मुखपृष्ठ (`/fr`) और किसी [`basePath`](/docs/deployment#mount-the-docs-under-a-path) का मूल भी WebPage होते हैं।
+
+जब [`deployment.site`](/docs/deployment) सेट होता है, तो URL निरपेक्ष होते हैं। इसके बिना वे रूट-सापेक्ष होते हैं, और WebSite नोड, जिसे एक निरपेक्ष पहचानकर्ता की आवश्यकता होती है, छोड़ दिया जाता है। [`seo.noindex`](/docs/discoverability/metadata#per-page-overrides) से चिह्नित पृष्ठ छोड़ दिए जाते हैं। जब [`lastModified`](/docs/configuration#last-modified) चालू होता है, तो प्रत्येक पृष्ठ की तिथि `dateModified` के रूप में भी उत्सर्जित होती है, और दृश्यमान "अंतिम अपडेट" तिथि को एक `<time datetime>` के रूप में मार्कअप किया जाता है, ताकि खोज इंजन पृष्ठ पर मौजूद किसी अन्य तिथि के बजाय वही तिथि पढ़ें।
 
 ## साइट की पहचान [#site-identity]
 
@@ -43,10 +45,10 @@ seo: {
 }
 ```
 
-`organization` प्रत्येक पृष्ठ में एक **Organization** नोड जोड़ता है — WebSite और article नोड्स इसे `publisher` के रूप में उद्धृत करते हैं — जिसमें ईमेल और टेलीफ़ोन एक `ContactPoint` के रूप में (`contactType` का डिफ़ॉल्ट `"customer support"` है) और पता एक `PostalAddress` के रूप में होता है; यही वे दो फ़ील्ड हैं जिन्हें व्यवसाय-सत्यापन जाँचें खोजती हैं। `name` और `url` का डिफ़ॉल्ट साइट के मान होते हैं; रूट-सापेक्ष `logo` को किसी भी पृष्ठ URL की तरह निरपेक्ष बना दिया जाता है।
+`organization` प्रत्येक पृष्ठ में एक **Organization** नोड जोड़ता है — WebSite और पृष्ठ नोड्स इसे `publisher` के रूप में उद्धृत करते हैं — जिसमें ईमेल और टेलीफ़ोन एक `ContactPoint` के रूप में (`contactType` का डिफ़ॉल्ट `"customer support"` है) और पता एक `PostalAddress` के रूप में होता है; यही वे दो फ़ील्ड हैं जिन्हें व्यवसाय-सत्यापन जाँचें खोजती हैं। `name` और `url` का डिफ़ॉल्ट साइट के मान होते हैं; रूट-सापेक्ष `logo` को किसी भी पृष्ठ URL की तरह निरपेक्ष बना दिया जाता है।
 
 `software` मुखपृष्ठ में एक **SoftwareApplication** नोड जोड़ता है: उत्पाद का नाम और विवरण (डिफ़ॉल्ट रूप से साइट के), `applicationCategory` (डिफ़ॉल्ट `"DeveloperApplication"`), ऑपरेटिंग सिस्टम, लाइसेंस, `price` सेट होने पर एक `Offer`, और `sameAs` में रजिस्ट्री या रिपॉज़िटरी URL। सभी डिफ़ॉल्ट अपनाने के लिए `software: true` पास करें। संगठन, यदि कॉन्फ़िगर किया गया हो, तो उसे इसके `publisher` के रूप में उद्धृत किया जाता है।
 
 ## कस्टम पृष्ठ [#custom-pages]
 
-`PageLayout` के माध्यम से रेंडर किया गया कोई कस्टम [`.astro` पृष्ठ](/docs/advanced/custom-pages) वही `WebSite` ग्राफ़ उत्सर्जित करता है, ताकि कोई मार्केटिंग मुखपृष्ठ ऐसा एकमात्र URL न रह जाए जिसमें संरचित डेटा न हो। इस सेटिंग के साथ समन्वयित रखने के लिए `structuredDataEnabled={config.structuredData}` पास करें, या केवल उसी पृष्ठ के लिए इसे बंद करने के लिए `structuredDataEnabled={false}` पास करें।
+`PageLayout` के माध्यम से रेंडर किया गया कोई कस्टम [`.astro` पृष्ठ](/docs/advanced/custom-pages) वही ग्राफ़ उत्सर्जित करता है, ताकि कोई मार्केटिंग मुखपृष्ठ ऐसा एकमात्र URL न रह जाए जिसमें संरचित डेटा न हो। किसी कस्टम पृष्ठ की कोई सामग्री फ़ाइल नहीं होती जिससे उसकी तिथि निर्धारित की जा सके, इसलिए उसे `dateModified` देने के लिए `lastModified` पास करें। इस सेटिंग के साथ समन्वयित रखने के लिए `structuredDataEnabled={config.structuredData}` पास करें, या केवल उसी पृष्ठ के लिए इसे बंद करने के लिए `structuredDataEnabled={false}` पास करें।

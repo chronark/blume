@@ -83,6 +83,22 @@ deployment: {
 
 Cada página mantém seu próprio caminho sob a base, mesmo em uma pasta de conteúdo que tenha o mesmo nome da base: com `base: "/docs"`, `docs/setup.md` é servido em `/docs/docs/setup`, e sua URL canônica, seu link na barra lateral e sua entrada no `llms.txt` apontam para lá. Um link relativo à raiz que você escreve e que já começa com a base é considerado como já incluindo-a e fica como foi escrito, então crie o link para essa página com um link relativo (`./docs/setup`) ou com o caminho completo (`/docs/docs/setup`).
 
+### Uma base diferente para cada implantação [#a-different-base-per-deploy]
+
+O `blume.config.ts` é um módulo, então `base` pode vir de uma variável de ambiente. Isso permite que a CI faça o build da pré-visualização de cada pull request sob o próprio caminho, sem editar a configuração:
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  base: process.env.DOCS_BASE,
+}
+```
+
+```bash
+DOCS_BASE=/pr-1234 blume build
+```
+
+Com `DOCS_BASE` não definida, o build do site é feito na raiz, então a produção não precisa de nada a mais.
+
 ## Monte a documentação sob um caminho [#mount-the-docs-under-a-path]
 
 `basePath` monta todas as rotas geradas sob um segmento (`/docs/getting-started`) sem alterar a barra lateral — o nível superior são suas seções, não um grupo envoltório. Use-o quando a documentação fica em `/docs/*` mas a raiz do site continua sendo sua (como o `routeBasePath` do Docusaurus ou o `baseUrl` do Fumadocs).
@@ -215,6 +231,18 @@ Um padrão não pode corresponder também a uma página: os hosts divergem sobre
 
 Quando o host lê esse arquivo, um build também gera um arquivo `_headers` que fixa `charset=utf-8` nos endpoints brutos prontos para IA — `/<route>.md`, `/<route>.mdx` e os arquivos `.txt` (`llms.txt`, `llms-full.txt`). Essas respostas são UTF-8 válido, mas muitos hosts estáticos as servem como `text/markdown` / `text/plain` **sem** charset, e então os navegadores recorrem ao Windows-1252 — de modo que documentações não-ASCII (japonês, latim acentuado, …) aparecem como mojibake quando a URL bruta é aberta diretamente. As páginas HTML não são afetadas porque carregam `<meta charset>`. A Netlify lê o `_headers` em uma implantação estática, e a Cloudflare (Pages e recursos estáticos de Workers) tanto em builds estáticos quanto de servidor, então esses adaptadores e um host estático não indicado recebem o arquivo; a Vercel (cujos cabeçalhos vão na configuração de roteamento) e o Node (cujo servidor ignora o arquivo) não recebem. Em vez disso, um build de servidor da Netlify grava as mesmas regras nos `headers` da configuração da sua Frameworks API (`.netlify/v1/config.json`). Já um build estático da Vercel grava as mesmas regras em `dist/vercel.json`, que um projeto conectado ao Git não lê (consulte [Redirecionamentos](#redirects)). Um `_headers` que você inclua em `public/` permanece intocado.
 
+## Cabeçalho powered-by [#powered-by-header]
+
+O Blume se identifica em um cabeçalho de resposta `X-Powered-By: Blume`, para que inspetores HTTP e detectores de tecnologia saibam com o que o site foi construído. Defina `poweredBy` como `false` para omiti-lo:
+
+```ts blume.config.ts
+poweredBy: false,
+```
+
+O `blume dev` o envia em todas as respostas. Um build de servidor o envia de onde quer que o host obtenha seus cabeçalhos: o servidor de `node()` e o Worker de `cloudflare()` o definem por conta própria, um build com `vercel()` o leva na configuração de roteamento e um build com `netlify()`, nas regras de cabeçalho da configuração da sua Frameworks API, com o middleware do Blume adicionando-o às páginas renderizadas sob demanda. Um build estático o lista no `_headers` e no `dist/vercel.json`, ao lado dos [tipos de conteúdo](#content-types), então ele chega aos hosts que esses arquivos alcançam: não a um projeto da Vercel conectado ao Git, nem a um host que não envia cabeçalhos personalizados, como o GitHub Pages.
+
+Em uma aplicação [ejetada](/docs/configuration/customization#eject), quem controla isso é a opção `poweredBy` de `blumeIntegration()` no `astro.config.mjs`. O build dela envia o cabeçalho nas páginas renderizadas no servidor e a partir do `_headers`; o wrapper do ponto de entrada do servidor e as configurações de roteamento que o levam aos outros lugares são etapas do `blume build`.
+
 ## Variáveis de ambiente [#environment-variables]
 
 Quando um recurso precisa de um segredo, o Blume avisa no `blume dev`/`build` caso ele esteja faltando — assim o problema aparece cedo, em vez de na primeira requisição:
@@ -226,7 +254,7 @@ Quando um recurso precisa de um segredo, o Blume avisa no `blume dev`/`build` ca
 | [Proteção contra bots do assistente](/docs/configuration/assistant#bot-protection) | `TURNSTILE_SECRET_KEY` (`turnstile()`), `HCAPTCHA_SECRET_KEY` (`hcaptcha()`) |
 | [Limitação de taxa](/docs/configuration/rate-limiting) (`upstash()`) | `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` |
 | Busca Mixedbread | `MIXEDBREAD_API_KEY` |
-| [Narração](/docs/configuration/narration) (vozes geradas) | `AI_GATEWAY_API_KEY` (ou OIDC da Vercel), ou o `apiKeyEnv` que você passou a `gateway()` |
+| [Narração](/docs/configuration/narration) (vozes geradas) | `AI_GATEWAY_API_KEY` (ou OIDC da Vercel) para `gateway()`, `OPENAI_API_KEY` para `openai()` (nenhuma com um `baseUrl`, a menos que você indique uma), ou o `apiKeyEnv` que você passou a qualquer um deles |
 | [Fontes de conteúdo](/docs/content/sources) | `NOTION_TOKEN` (`notion()`), `SANITY_TOKEN` (`sanity()`), `CONTENTFUL_ACCESS_TOKEN` (`contentful()`, além de `CONTENTFUL_PREVIEW_TOKEN` para `--preview`, que falha sem ele), `PAYLOAD_API_KEY` (`payload()`), `STRAPI_API_TOKEN` (`strapi()`), `GITHUB_TOKEN` (`githubReleases()` e `mdxRemote()` lendo do GitHub) |
 
 Defina-as no `.env.local` para o desenvolvimento local e no ambiente do seu host para produção. Uma fonte de conteúdo lê seu token ao buscar o conteúdo, durante o `blume dev` e o `blume build`, e a narração lê sua chave durante o `blume build`, então defina-os onde o build do seu site é feito. Os segredos em tempo de build para a sincronização do índice de busca (`ALGOLIA_ADMIN_API_KEY`, `ORAMA_PRIVATE_API_KEY`, `TYPESENSE_ADMIN_API_KEY`) são verificados pela própria etapa de sincronização: quando um deles não está definido, o build avisa e pula a sincronização, e, quando está definido, uma sincronização com falha [faz o build falhar](/docs/configuration/search#adapters). O card de [informações do GitHub](/docs/content/components#github-info) também envia o `GITHUB_TOKEN`, quando ele está definido, para aumentar o limite de taxa da API do GitHub.

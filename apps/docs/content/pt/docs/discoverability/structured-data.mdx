@@ -1,7 +1,7 @@
 ---
 title: Dados estruturados
 description: >-
-  O JSON-LD do schema.org que toda página carrega — nós WebSite, article e breadcrumb — mais os blocos opcionais Organization e SoftwareApplication que contam aos motores de busca e agentes quem você é.
+  O JSON-LD do schema.org que toda página carrega — nós WebSite, de página e breadcrumb — mais os blocos opcionais Organization e SoftwareApplication que contam aos motores de busca e agentes quem você é.
 ---
 
 O Blume emite JSON-LD do [schema.org](https://schema.org) no `<head>` de todas as páginas para que os motores de busca entendam seu conteúdo. Ativado por padrão:
@@ -15,10 +15,12 @@ seo: {
 Cada página inclui:
 
 - um nó **WebSite** para a identidade do site,
-- a página como um **article** — `BlogPosting` para posts do blog, `TechArticle` para changelog e docs — com sua descrição e data de publicação,
-- uma **BreadcrumbList** construída a partir da trilha de navegação.
+- a própria página, com sua descrição, idioma e data de publicação: uma **WebPage** na página inicial e um **article** em todas as outras — `BlogPosting` para posts do blog, `TechArticle` para changelog e docs,
+- em um article, uma **BreadcrumbList** construída a partir da trilha de navegação.
 
-As URLs são absolutas quando [`deployment.site`](/docs/deployment) está definido. Páginas marcadas com [`seo.noindex`](/docs/discoverability/metadata#per-page-overrides) são ignoradas. Quando [`lastModified`](/docs/configuration#last-modified) está ativo, a data de cada página também é emitida como `dateModified`.
+A página inicial é a raiz da navegação, então a página inicial de cada idioma (`/fr`) e a raiz de um [`basePath`](/docs/deployment#mount-the-docs-under-a-path) também são WebPages.
+
+As URLs são absolutas quando [`deployment.site`](/docs/deployment) está definido. Sem ele, elas são relativas à rota, e o nó WebSite, que precisa de um identificador absoluto, fica de fora. Páginas marcadas com [`seo.noindex`](/docs/discoverability/metadata#per-page-overrides) são ignoradas. Quando [`lastModified`](/docs/configuration#last-modified) está ativo, a data de cada página também é emitida como `dateModified`, e a data visível de "Última atualização" é marcada como um `<time datetime>`, para que os motores de busca leiam essa data e não alguma outra data da página.
 
 ## Identidade do site [#site-identity]
 
@@ -43,10 +45,10 @@ seo: {
 }
 ```
 
-`organization` adiciona um nó **Organization** a todas as páginas — os nós WebSite e article o citam como `publisher` — com o e-mail e o telefone como um `ContactPoint` (`contactType` tem como padrão `"customer support"`) e o endereço como um `PostalAddress`, os dois campos que as verificações de validação de negócio procuram. `name` e `url` assumem por padrão os do site; um `logo` relativo à raiz é absolutizado como qualquer URL de página.
+`organization` adiciona um nó **Organization** a todas as páginas — os nós WebSite e de página o citam como `publisher` — com o e-mail e o telefone como um `ContactPoint` (`contactType` tem como padrão `"customer support"`) e o endereço como um `PostalAddress`, os dois campos que as verificações de validação de negócio procuram. `name` e `url` assumem por padrão os do site; um `logo` relativo à raiz é absolutizado como qualquer URL de página.
 
 `software` adiciona um nó **SoftwareApplication** à página inicial: o nome e a descrição do produto (assumindo por padrão os do site), `applicationCategory` (padrão `"DeveloperApplication"`), sistema operacional, licença, um `Offer` quando `price` está definido, e as URLs do registro ou repositório em `sameAs`. Passe `software: true` para aceitar todos os padrões. A organização, quando configurada, é citada como seu `publisher`.
 
 ## Páginas personalizadas [#custom-pages]
 
-Uma [página `.astro`](/docs/advanced/custom-pages) personalizada renderizada através do `PageLayout` emite o mesmo grafo `WebSite`, então uma página inicial de marketing não fica sendo a única URL sem dados estruturados. Passe `structuredDataEnabled={config.structuredData}` para mantê-la em sincronia com essa configuração, ou `structuredDataEnabled={false}` para desativá-la apenas naquela página.
+Uma [página `.astro`](/docs/advanced/custom-pages) personalizada renderizada através do `PageLayout` emite o mesmo grafo, então uma página inicial de marketing não fica sendo a única URL sem dados estruturados. Uma página personalizada não tem um arquivo de conteúdo de onde tirar a data, então passe `lastModified` para dar a ela um `dateModified`. Passe `structuredDataEnabled={config.structuredData}` para mantê-la em sincronia com essa configuração, ou `structuredDataEnabled={false}` para desativá-la apenas naquela página.
