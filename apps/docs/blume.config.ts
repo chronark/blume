@@ -263,6 +263,12 @@ export default defineConfig({
       from: "/pt/docs/configuration/ask-ai",
       to: "/pt/docs/configuration/assistant",
     },
+    // Releases can't be translated, so the changelog only exists in English;
+    // these send the retired localized copies to the release they mirrored.
+    { from: "/de/changelog/:slug*", to: "/changelog/:slug*" },
+    { from: "/hi/changelog/:slug*", to: "/changelog/:slug*" },
+    { from: "/ja/changelog/:slug*", to: "/changelog/:slug*" },
+    { from: "/pt/changelog/:slug*", to: "/changelog/:slug*" },
   ],
   seo: {
     og: {
