@@ -1305,8 +1305,24 @@ describe("rss feeds", () => {
   });
 });
 
+/** The node types the French homepage `/fr` gets, given the home route. */
+const frenchHomeTypes = (homeRoute?: string) =>
+  graphOf(
+    buildStructuredData({
+      breadcrumbs: [
+        { label: "Accueil", route: "/fr" },
+        { label: "Guide", route: "/fr/guide" },
+      ],
+      homeRoute,
+      route: "/fr",
+      siteName: "Docs",
+      siteUrl: "https://x.com",
+      title: "Accueil",
+    })
+  ).map((n) => n["@type"]);
+
 describe("structured data", () => {
-  it("emits only a WebSite node for the homepage", () => {
+  it("emits a WebSite and an undated WebPage node for the homepage", () => {
     const data = buildStructuredData({
       breadcrumbs: [],
       route: "/",
@@ -1314,7 +1330,49 @@ describe("structured data", () => {
       siteUrl: "https://x.com",
       title: "Home",
     });
-    expect(graphOf(data).map((n) => n["@type"])).toStrictEqual(["WebSite"]);
+    const graph = graphOf(data);
+    expect(graph.map((n) => n["@type"])).toStrictEqual(["WebSite", "WebPage"]);
+    expect(graph[1]).toStrictEqual({
+      "@id": "https://x.com/#page",
+      "@type": "WebPage",
+      inLanguage: "en",
+      isPartOf: { "@id": "https://x.com#website" },
+      name: "Home",
+      url: "https://x.com/",
+    });
+  });
+
+  it("gives the homepage WebPage its description, language, and dates", () => {
+    const data = buildStructuredData({
+      breadcrumbs: [],
+      description: "The docs.",
+      locale: "de",
+      modified: "2026-10-01T09:00:00Z",
+      published: "2026-01-01",
+      route: "/",
+      siteName: "Docs",
+      siteUrl: "https://x.com",
+      title: "Home",
+    });
+    const page = graphOf(data).find((n) => n["@type"] === "WebPage");
+    expect(page).toMatchObject({
+      dateModified: "2026-10-01T09:00:00.000Z",
+      datePublished: "2026-01-01T00:00:00.000Z",
+      description: "The docs.",
+      inLanguage: "de",
+    });
+    // A headline is an article property; the homepage isn't one.
+    expect(page?.headline).toBeUndefined();
+  });
+
+  it("treats the navigation root as the homepage under a locale or basePath", () => {
+    expect(frenchHomeTypes("/fr")).toStrictEqual(["WebSite", "WebPage"]);
+    // Without one, only `/` is the homepage.
+    expect(frenchHomeTypes()).toStrictEqual([
+      "WebSite",
+      "TechArticle",
+      "BreadcrumbList",
+    ]);
   });
 
   it("emits a BlogPosting with absolute url, datePublished, and breadcrumbs", () => {
@@ -1397,16 +1455,25 @@ describe("structured data", () => {
     expect(graph[0]?.url).toBe("/guide");
   });
 
-  it("returns null for the homepage without a site", () => {
-    expect(
-      buildStructuredData({
-        breadcrumbs: [],
-        route: "/",
-        siteName: "Docs",
-        siteUrl: null,
-        title: "Home",
-      })
-    ).toBeNull();
+  it("still dates the homepage without a site, with a relative url", () => {
+    const data = buildStructuredData({
+      breadcrumbs: [],
+      modified: "2026-10-01",
+      route: "/",
+      siteName: "Docs",
+      siteUrl: null,
+      title: "Home",
+    });
+    expect(graphOf(data)).toStrictEqual([
+      {
+        "@id": "/#page",
+        "@type": "WebPage",
+        dateModified: "2026-10-01T00:00:00.000Z",
+        inLanguage: "en",
+        name: "Home",
+        url: "/",
+      },
+    ]);
   });
 });
 

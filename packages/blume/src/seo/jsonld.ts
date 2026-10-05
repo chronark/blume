@@ -19,7 +19,7 @@ export interface PostalAddressIdentity {
 
 /**
  * `seo.organization`: the organization behind the site, emitted on every page
- * as an `Organization` node the WebSite and article nodes cite as publisher.
+ * as an `Organization` node the WebSite and page nodes cite as publisher.
  */
 export interface OrganizationIdentity {
   address?: PostalAddressIdentity;
@@ -73,6 +73,12 @@ export interface StructuredDataInput {
   description?: string;
   /** Page route, e.g. `/blog/post`. */
   route: string;
+  /**
+   * The route of this page's homepage: the navigation tree root
+   * (`navigation.root` — `/fr` for a locale, `/docs` under a `basePath`,
+   * `/v1.0` in an archived version). Defaults to `/`.
+   */
+  homeRoute?: string;
   /** Deployment base (`import.meta.env.BASE_URL`); prefixed onto absolute URLs. */
   base?: string;
   /** Content type — `blog` and `changelog` map to richer article types. */
@@ -246,24 +252,41 @@ const softwareNode = (
   return node;
 };
 
-/** The page as an article node (`BlogPosting`/`TechArticle`). */
-const articleNode = (
+/** The page's schema.org `@type`: a `WebPage` for a homepage, else an article. */
+const pageSchemaType = (input: StructuredDataInput, home: boolean): string => {
+  if (home) {
+    return "WebPage";
+  }
+  const pageType = input.pageType ?? "";
+  return isArticleType(pageType) ? ARTICLE_TYPES[pageType] : "TechArticle";
+};
+
+/**
+ * The page's own node: a homepage is a `WebPage` (it isn't an article, but it
+ * still needs a machine-readable date, or search engines take whatever other
+ * date the page shows), and every other page an article (`BlogPosting`/
+ * `TechArticle`) with a `headline`. Both carry the language, description,
+ * dates, the WebSite they belong to, and the publisher.
+ */
+const pageNode = (
   input: StructuredDataInput,
   context: {
     base: string | null;
+    home: boolean;
     organizationId: string | null;
     pageUrl: string;
   }
 ): JsonLdNode => {
-  const pageType = input.pageType ?? "";
   const node: JsonLdNode = {
     "@id": `${context.pageUrl}#page`,
-    "@type": isArticleType(pageType) ? ARTICLE_TYPES[pageType] : "TechArticle",
-    headline: input.title,
+    "@type": pageSchemaType(input, context.home),
     inLanguage: input.locale || "en",
     name: input.title,
     url: context.pageUrl,
   };
+  if (!context.home) {
+    node.headline = input.title;
+  }
   if (input.description) {
     node.description = input.description;
   }
@@ -315,14 +338,11 @@ const breadcrumbNode = (
 /**
  * Build a schema.org JSON-LD `@graph` for a page: site identity (the WebSite,
  * plus the configured Organization everywhere and the SoftwareApplication on
- * the homepage), the page as an article, and its breadcrumb trail. Returns
- * null when there is nothing useful to emit (e.g. the homepage without a
- * configured site). URLs are absolute when `siteUrl` is set, otherwise
- * route-relative.
+ * the homepage), the page itself (a WebPage on the homepage, an article
+ * elsewhere), and an article's breadcrumb trail. URLs are absolute when
+ * `siteUrl` is set, otherwise route-relative.
  */
-export const buildStructuredData = (
-  input: StructuredDataInput
-): JsonLdNode | null => {
+export const buildStructuredData = (input: StructuredDataInput): JsonLdNode => {
   const base = input.siteUrl ? trimSlash(input.siteUrl) : null;
   // Routes carry `basePath`; a `deployment.base` subdirectory is layered on top
   // so JSON-LD URLs match the served location.
@@ -365,9 +385,11 @@ export const buildStructuredData = (
     );
   }
 
-  // The homepage is described by the WebSite node (and the product, when one
-  // is configured); deeper pages get an article node plus a breadcrumb trail.
-  if (input.route === "/") {
+  // The homepage is a WebPage, next to the product when one is configured;
+  // deeper pages are articles with a breadcrumb trail.
+  const home = input.route === (input.homeRoute ?? "/");
+  graph.push(pageNode(input, { base, home, organizationId, pageUrl }));
+  if (home) {
     if (software && base) {
       graph.push(
         softwareNode(software, {
@@ -380,15 +402,11 @@ export const buildStructuredData = (
       );
     }
   } else {
-    graph.push(articleNode(input, { base, organizationId, pageUrl }));
     const breadcrumbs = breadcrumbNode(input.breadcrumbs, base, deployBase);
     if (breadcrumbs) {
       graph.push(breadcrumbs);
     }
   }
 
-  if (graph.length === 0) {
-    return null;
-  }
   return { "@context": "https://schema.org", "@graph": graph };
 };
