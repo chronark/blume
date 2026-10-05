@@ -88,7 +88,7 @@ export default defineConfig({
 - `netlify()`, `cloudflare()`, and `node()` work the same way. Naming a host adapter switches to server output; pass `output: "static"` to keep a static build with that host's platform files.
 - A config that only sets `site` or `base` stays as it is: `deployment: { site, base }` is still the static form.
 - `redirects` read `:name` segments and a trailing `*` as patterns, matched the same way on every host (see [Pattern redirects](/docs/deployment#pattern-redirects)). Blume 1 never supported patterns and handed them to each host as written, so check any `from` or `to` that holds one.
-- The `--adapter`, `--output`, and `--base` flags on `blume build` are gone, and passing one stops the build with an error naming the `deployment` setting that replaces it. Set the adapter in `blume.config.ts`, and name it explicitly: server output is no longer inferred from the platform's environment.
+- The `--adapter`, `--output`, and `--base` flags on `blume build` are gone, and passing one stops the build with an error naming the `deployment` setting that replaces it. Set the adapter in `blume.config.ts`, and name it explicitly: server output is no longer inferred from the platform's environment. A CI step that passed a different `--base` per deploy can [read it from an environment variable](/docs/deployment#a-different-base-per-deploy) in the config instead.
 
 See [Deployment](/docs/deployment) for each adapter's options.
 

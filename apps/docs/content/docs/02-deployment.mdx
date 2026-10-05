@@ -82,6 +82,22 @@ deployment: {
 
 Every page keeps its own path under the base, even in a content folder that shares the base's name: with `base: "/docs"`, `docs/setup.md` is served at `/docs/docs/setup`, and its canonical URL, sidebar link, and `llms.txt` entry point there. A root-relative link you write that already starts with the base is taken to include it and left as written, so link to that page with a relative link (`./docs/setup`) or its full path (`/docs/docs/setup`).
 
+### A different base per deploy
+
+`blume.config.ts` is a module, so `base` can come from an environment variable. That lets CI build each pull request's preview under its own path without editing the config:
+
+```ts blume.config.ts lineNumbers
+deployment: {
+  base: process.env.DOCS_BASE,
+}
+```
+
+```bash
+DOCS_BASE=/pr-1234 blume build
+```
+
+With `DOCS_BASE` unset, the site builds at the root, so production needs nothing extra.
+
 ## Mount the docs under a path
 
 `basePath` mounts every generated route under a segment (`/docs/getting-started`) while leaving the sidebar untouched — the top level is your sections, not a wrapper group. Use it when the docs live at `/docs/*` but the site root stays yours (like Docusaurus `routeBasePath` or Fumadocs `baseUrl`).
