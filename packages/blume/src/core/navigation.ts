@@ -397,16 +397,21 @@ const applyFolderMeta = (
 
 /**
  * Warn when an index page's own frontmatter title diverges from its folder's
- * explicit `meta.title`. The sidebar label and the page's own `<title>`/heading
- * are resolved from two independent sources — under i18n, a translator can
- * update the folder's `meta.ts` and forget the index page's own frontmatter
- * (or vice versa), and a correct-looking sidebar hides the mismatch.
+ * explicit `meta.title`. The sidebar label and the page's own title (its
+ * heading, and its `<title>` unless `seo.title` replaces that) are resolved
+ * from two independent sources — under i18n, a translator can update the
+ * folder's `meta.ts` and forget the index page's own frontmatter (or vice
+ * versa), and a correct-looking sidebar hides the mismatch.
  *
  * Only fires when the index page's own sidebar row is hidden
  * (`sidebar.hidden`), so the linked group header is the only sidebar label the
  * page has. A visible index row shows the page's own label beneath the header,
  * so the sidebar already carries both titles and a divergence there is a
- * deliberate pairing ("CLI" over "Overview"), not drift.
+ * deliberate pairing ("CLI" over "Overview"), not drift. A hidden index keeps a
+ * different title on purpose the same way any page does: its `sidebar.label`
+ * names the folder title, so the label its own row would carry agrees with the
+ * header. The suggestion names only ways out that clear the warning:
+ * `validate --strict` fails on any warning, so leaving it is not one.
  *
  * Only fires when the page has an explicit frontmatter `title` of its own:
  * when it's absent, `page.title` is derived from the first heading or the
@@ -440,15 +445,19 @@ const indexTitleMismatchDiagnostic = (
   const meta =
     folderMeta.get(metaKey(folderPath, metaPrefix)) ??
     sharedMeta.get(metaKey(folderPath, sharedMetaPrefix));
-  if (!meta?.title || meta.title === page.title) {
+  if (
+    !meta?.title ||
+    meta.title === page.title ||
+    meta.title === page.meta.sidebar.label
+  ) {
     return undefined;
   }
   return {
     code: "BLUME_NAV_INDEX_TITLE_MISMATCH",
     file: page.sourcePath ?? page.id,
-    message: `Index page "${page.navPath}" has title "${page.title}", but its folder's meta.title is "${meta.title}" — the sidebar shows the folder title while the page's own <title>/heading still say "${page.title}".`,
+    message: `Index page "${page.navPath}" has title "${page.title}", but its folder's meta.title is "${meta.title}". The page hides its own sidebar row, so "${meta.title}" is the only sidebar label it has.`,
     severity: "warning",
-    suggestion: `Update the page's frontmatter title to match ("${meta.title}"), or leave it if the divergence is intentional.`,
+    suggestion: `Change the page's title or the folder's meta.ts title so they match, set the page's sidebar.label to "${meta.title}" to keep its title on purpose, or remove sidebar.hidden so the sidebar also lists the page under its own label.`,
   };
 };
 

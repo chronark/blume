@@ -917,7 +917,7 @@ describe("buildNavigation — page icons", () => {
 describe("buildNavigation — index title / folder meta title diagnostics", () => {
   it("warns when a hidden index page's title diverges from its folder's meta.title", () => {
     // With its own row hidden, the linked group header is the page's only
-    // sidebar label, so the header and the page's own <title> disagree.
+    // sidebar label, so the header and the page's own title disagree.
     const folderMeta = new Map<string, FolderMeta>([
       ["guide", { title: "Guides" }],
     ]);
@@ -930,6 +930,89 @@ describe("buildNavigation — index title / folder meta title diagnostics", () =
     expect(diagnostics[0]?.code).toBe("BLUME_NAV_INDEX_TITLE_MISMATCH");
     expect(diagnostics[0]?.message).toContain('"Guide Home"');
     expect(diagnostics[0]?.message).toContain('"Guides"');
+  });
+
+  it("names only ways out that clear the warning under --strict", () => {
+    // `validate --strict` fails on any warning, so "leave it if intentional"
+    // is no way out. Each one the suggestion names must clear it.
+    const folderMeta = new Map<string, FolderMeta>([
+      ["guide", { title: "Guides" }],
+    ]);
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [page("guide/index.md", "/guide", "Guide Home", { hidden: true })],
+      { diagnostics, folderMeta }
+    );
+    const suggestion = diagnostics[0]?.suggestion ?? "";
+    expect(suggestion).not.toContain("leave it");
+    expect(suggestion).toContain("so they match");
+    expect(suggestion).toContain('sidebar.label to "Guides"');
+    expect(suggestion).toContain("remove sidebar.hidden");
+  });
+
+  it("does not claim the <title> shows the page title when seo.title replaces it", () => {
+    // The built <title> reads seo.title ("Guides"), while the heading still
+    // reads the page's own title, so the warning stands, but its message must
+    // not say the <title> does.
+    const folderMeta = new Map<string, FolderMeta>([
+      ["guide", { title: "Guides" }],
+    ]);
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [
+        {
+          ...page("guide/index.md", "/guide", "Guide Home"),
+          meta: pageMetaSchema.parse({
+            seo: { title: "Guides" },
+            sidebar: { hidden: true },
+            title: "Guide Home",
+          }),
+        },
+      ],
+      { diagnostics, folderMeta }
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.message).not.toContain("<title>");
+    expect(diagnostics[0]?.message).toContain(
+      '"Guides" is the only sidebar label it has'
+    );
+  });
+
+  it("does not warn when the index page's sidebar.label names the folder title", () => {
+    // sidebar.label is how any page keeps a title apart from its sidebar
+    // label; on a hidden index it says the header is the label it means.
+    const folderMeta = new Map<string, FolderMeta>([
+      ["guide", { title: "Guides" }],
+    ]);
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [
+        page("guide/index.md", "/guide", "Guide Home", {
+          hidden: true,
+          label: "Guides",
+        }),
+      ],
+      { diagnostics, folderMeta }
+    );
+    expect(diagnostics).toHaveLength(0);
+  });
+
+  it("warns when the index page's sidebar.label names neither title", () => {
+    const folderMeta = new Map<string, FolderMeta>([
+      ["guide", { title: "Guides" }],
+    ]);
+    const diagnostics: Diagnostic[] = [];
+    buildNavigation(
+      [
+        page("guide/index.md", "/guide", "Guide Home", {
+          hidden: true,
+          label: "Guide",
+        }),
+      ],
+      { diagnostics, folderMeta }
+    );
+    expect(diagnostics).toHaveLength(1);
+    expect(diagnostics[0]?.code).toBe("BLUME_NAV_INDEX_TITLE_MISMATCH");
   });
 
   it("does not warn when the index page's own row is visible", () => {
@@ -1026,7 +1109,7 @@ describe("buildNavigation — index title / folder meta title diagnostics", () =
     expect(diagnostics).toHaveLength(0);
   });
 
-  it("warns for a sidebar-hidden index page, which still renders its own <title>", () => {
+  it("warns for a sidebar-hidden index page without leaking it into the tree", () => {
     const folderMeta = new Map<string, FolderMeta>([
       ["guide", { title: "Guides" }],
     ]);
