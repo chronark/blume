@@ -103,6 +103,7 @@ const fetchPage = async (
 describe("servePagesFirst", () => {
   it("rewrites requests before the server's own handler sees them", async () => {
     const server = createServer((request, response) => {
+      response.writeHead(200, { "content-type": "text/plain" });
       response.end(request.url);
     });
     server.listen(0, "127.0.0.1");
