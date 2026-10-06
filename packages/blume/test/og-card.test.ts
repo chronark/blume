@@ -14,14 +14,15 @@ import {
   renderOgImage,
 } from "../src/og/card.ts";
 import type { OgCardOptions } from "../src/og/card.ts";
+import { resolveOgFonts } from "../src/og/derive.ts";
+
+/** The path of a woff2 katex ships, a real font without a checked-in fixture. */
+const katexFont = (file: string): string =>
+  createRequire(import.meta.url).resolve(`katex/dist/fonts/${file}`);
 
 // A real woff2 (shipped by katex) to serve as the subset bytes, so `googleFonts`
 // + `render` run end-to-end without a real network fetch or a checked-in fixture.
-const SUBSET_WOFF2 = readFileSync(
-  createRequire(import.meta.url).resolve(
-    "katex/dist/fonts/KaTeX_Main-Regular.woff2"
-  )
-);
+const SUBSET_WOFF2 = readFileSync(katexFont("KaTeX_Main-Regular.woff2"));
 
 // One `@font-face` block: a family's subset served from `file`, claiming the
 // `unicode-range` given.
@@ -345,6 +346,66 @@ describe("renderOgImage", () => {
         title: "Hi",
       })
     ).rejects.toThrow();
+  });
+
+  it("renders curated families whose names carry a digit token", async () => {
+    // `source-sans-3` and `source-serif-4` derive "Source Sans 3" and "Source
+    // Serif 4". Takumi parses `fontFamily` as CSS, where an unquoted family is
+    // a run of identifiers and `3` isn't one, so the card used to fail the
+    // build with "invalid value for fontFamily". Runs the build's own path:
+    // theme.fonts -> resolveOgFonts -> renderOgImage.
+    const og = resolveOgFonts(
+      {
+        ogFonts: undefined,
+        themeFonts: { body: "source-sans-3", display: "source-serif-4" },
+        themeFontsConfigured: true,
+      },
+      "/site"
+    );
+    expect(og.families).toEqual({
+      body: "Source Sans 3",
+      title: "Source Serif 4",
+    });
+    const css = [
+      face("Source Serif 4", "sourceserif4/x.woff2", "U+0000-00FF"),
+      face("Source Sans 3", "sourcesans3/x.woff2", "U+0000-00FF"),
+    ].join("\n");
+    await withStubbedFonts(async () => {
+      await expectPng({
+        ...og,
+        description: "Body copy in the body face.",
+        repo: "acme/docs",
+        site: "docs.acme.com",
+        title: "Getting started",
+      });
+    }, css);
+  });
+
+  it("pins each role to its own face whatever the family name holds", async () => {
+    // Quoting must still select the named face. A name that resolves to no
+    // face falls back to the first loaded one (the control here), so each
+    // card differing from it, and from the others, shows each name found its
+    // own face. Each face reads its own file: the renderer registers a path
+    // once.
+    const fonts = [
+      { name: "Control", src: katexFont("KaTeX_Fraktur-Regular.woff2") },
+      { name: "3270", src: katexFont("KaTeX_Typewriter-Regular.woff2") },
+      { name: "Sans 3", src: katexFont("KaTeX_SansSerif-Regular.woff2") },
+      { name: 'Brand "Serif" \\ 4', src: katexFont("KaTeX_Main-Bold.woff2") },
+    ];
+    const card = async (family: string): Promise<string> =>
+      Buffer.from(
+        await renderOgImage({ families: { title: family }, fonts, title: "Hi" })
+      ).toString("base64");
+    const unresolved = await card("Unloaded Face");
+    expect(await card("Control")).toBe(unresolved);
+    const cards = [
+      unresolved,
+      await card("3270"),
+      await card("Sans 3"),
+      await card('Brand "Serif" \\ 4'),
+    ];
+    expect(new Set(cards).size).toBe(cards.length);
   });
 
   it("applies role families to a card with title and body text", async () => {

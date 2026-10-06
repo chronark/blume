@@ -52,9 +52,10 @@ export type OgFont =
 export type OgGoogleFont = Exclude<OgFont, OgLocalFont>;
 
 /**
- * Which loaded family each card role renders in. Takumi still falls back
- * across every loaded font per glyph, so a family that misses a script
- * degrades to the rest of the chain instead of tofu.
+ * Which loaded family each card role renders in, by plain family name (the
+ * card quotes it for the renderer). Takumi still falls back across every
+ * loaded font per glyph, so a family that misses a script degrades to the
+ * rest of the chain instead of tofu.
  */
 export interface OgFontFamilies {
   /** Family for the description and footer text. */
@@ -423,9 +424,18 @@ const titleSize = (title: string): number => {
   return 76;
 };
 
+/**
+ * `family` as a quoted CSS string. Takumi parses `fontFamily` with the CSS
+ * grammar, where an unquoted family must be a run of identifiers, so a name
+ * with a token that starts with a digit ("Source Sans 3", "3270") fails the
+ * render. A quoted string accepts any name, escaped per CSS.
+ */
+const cssFamilyName = (family: string): string =>
+  `"${family.replaceAll(/["\\]/gu, "\\$&")}"`;
+
 /** A spreadable `fontFamily` style, empty when no family is configured. */
 const familyStyle = (family?: string): { fontFamily?: string } =>
-  family ? { fontFamily: family } : {};
+  family ? { fontFamily: cssFamilyName(family) } : {};
 
 /** Render a 1200x630 Open Graph card to a PNG buffer. */
 export const renderOgImage = async (
