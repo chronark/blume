@@ -75,9 +75,9 @@ const installScaffold = async (
 /**
  * Eject the freshly scaffolded project, or print the install-then-eject path.
  * Eject jiti-loads the scaffolded blume.config.ts, whose `import { defineConfig }
- * from "blume"` only resolves once dependencies are installed (or blume is
- * hoisted from an ancestor node_modules, as in a monorepo) — so the fallback
- * below is the common path when the install step was skipped.
+ * from "blume"` resolves to the running Blume package even before an install
+ * (see `blumeModuleAliases`). When eject still fails after a skipped install,
+ * the fallback below names the install as the likely fix.
  */
 const ejectScaffold = async (
   root: string,
