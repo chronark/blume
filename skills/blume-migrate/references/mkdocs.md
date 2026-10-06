@@ -86,7 +86,7 @@ Map only what's set:
 | `navigation.sections` | top-level sections stay Blume's default `flat` headers; set **`display: "group"` in the `meta.ts` of every second-level section**: Material renders those as collapsible, and a `flat` group lists its pages above its subgroups, reordering a section that interleaves them |
 | neither `sections` nor `tabs` | `navigation.sidebar.display: "group"` (Material's collapsible tree) |
 | `navigation.expand` | `collapsed: false` in those folders' `meta.ts` |
-| `navigation.indexes`, plugin `section-index` | a folder's `index` page links its group header. Blume also lists it as the group's first row, so the label shows twice. To show it once, as Material does, set `sidebar.hidden: true` on the index: that drops only the duplicate row, and the page stays in `sitemap.xml`, search, and `llms.txt`. A hidden index whose `title` differs from its folder's `meta.ts` `title` warns `BLUME_NAV_INDEX_TITLE_MISMATCH`, which fails `validate --strict`: match the two titles, or leave that index's row showing |
+| `navigation.indexes`, plugin `section-index` | a folder's `index` page links its group header. Blume also lists it as the group's first row, so the label shows twice. To show it once, as Material does, set `sidebar.hidden: true` on the index: that drops only the duplicate row, and the page stays in `sitemap.xml`, search, and `llms.txt`. A hidden index whose `title` differs from its folder's `meta.ts` `title` warns `BLUME_NAV_INDEX_TITLE_MISMATCH`, which fails `validate --strict`: match the two titles, set the index's `sidebar.label` to the folder title to keep its heading, or leave that index's row showing |
 | `content.tabs.link` | same-titled tabs sync within a page, not across pages |
 | `content.action.edit` / `.view` | `github` |
 | `announce.dismiss` | `banner.dismissible`; the text is `main.html`'s `{% block announce %}` → `banner.content` |
@@ -166,7 +166,7 @@ What the codemod converts, for checking its output, and what it leaves for you:
 
 - Snippet paths resolve from the snippets `base_path` (default: where MkDocs runs), never the page; the codemod rewrites them to `/`-rooted `<include>`s.
 - Includes must live in the content root. The codemod copies outside files (`CONTRIBUTING.md`, `examples/`) into `_snippets/`; if the source keeps changing, ship a small `predev`/`prebuild` script that re-copies it, and gitignore the copy. Drop a copied file's H1 (the codemod reports it) — the page's title already renders one.
-- Line ranges and sections (`file.py:3:10`, `file.md:name`) have no equivalent: split the excerpt into its own file.
+- Line ranges (`file.py:3:10`) have no `<include>` equivalent: generate the excerpt with `<skill>/scripts/include-excerpts.mjs` (`lines`, run before every build so it keeps tracking the source). Sections (`file.md:name`, marked `--8<-- [start:name]`) aren't read by that script: split the section into its own file and report it.
 - `auto_append` link-definition files: **definitions in an included file don't resolve references in the including page** — paste the ones each page uses into that page.
 - A partial is parsed with the page that includes it: its directives render only in an `.mdx` page, and an HTML comment in it shows as text there.
 - A snippet file that isn't under a `_` or `.` folder or name is a page too, and publishes on its own as it did in MkDocs; the codemod reports each one. Move it under `_snippets/` unless it should stay a page.

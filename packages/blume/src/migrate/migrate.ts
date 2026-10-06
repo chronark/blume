@@ -21,12 +21,16 @@ export const MIGRATE_SOURCES = [
   "nextra",
   "vitepress",
   "vuepress",
+  "docus",
   "mkdocs",
+  "mdbook",
   "fern",
   "gitbook",
   "redocly",
   "readme",
   "docsify",
+  "jekyll",
+  "github-wiki",
 ] as const;
 
 export type MigrateSourceId = (typeof MIGRATE_SOURCES)[number];
@@ -34,10 +38,14 @@ export type MigrateSourceId = (typeof MIGRATE_SOURCES)[number];
 /** Display names, for messages and the prompt. */
 export const MIGRATE_SOURCE_NAMES: Record<MigrateSourceId, string> = {
   docsify: "Docsify",
+  docus: "Docus",
   docusaurus: "Docusaurus",
   fern: "Fern",
   fumadocs: "Fumadocs",
   gitbook: "GitBook",
+  "github-wiki": "GitHub Wiki",
+  jekyll: "Jekyll",
+  mdbook: "mdBook",
   mintlify: "Mintlify",
   mkdocs: "MkDocs",
   nextra: "Nextra",
@@ -88,7 +96,9 @@ const dependencyNames = async (root: string): Promise<Set<string>> => {
 
 /**
  * Each source's tell, in the order the skill's workflow checks them: a config
- * file the framework owns, or a dependency only it installs.
+ * file the framework owns, or a dependency only it installs. A GitHub wiki
+ * clone has neither (its tell is the `.wiki.git` remote), so `github-wiki` is
+ * named-only.
  */
 const SIGNALS: {
   deps?: string[];
@@ -136,6 +146,8 @@ const SIGNALS: {
     ],
     source: "vuepress",
   },
+  // The Nuxt docs theme (not Docusaurus); 1.x shipped as @nuxt-themes/docus.
+  { deps: ["docus", "@nuxt-themes/docus"], source: "docus" },
   // MkDocs and the tools that build its projects (Zensical, ProperDocs). They
   // come after the JavaScript frameworks, so a stale mkdocs.yml doesn't win.
   {
@@ -147,6 +159,11 @@ const SIGNALS: {
       "properdocs.yaml",
     ],
     source: "mkdocs",
+  },
+  // A code repo usually keeps its book in a subfolder.
+  {
+    files: ["book.toml", "docs/book.toml", "book/book.toml"],
+    source: "mdbook",
   },
   // Not fern.config.json alone: plenty of repos run Fern only to generate SDKs.
   { files: ["fern/docs.yml"], source: "fern" },
@@ -188,6 +205,10 @@ const SIGNALS: {
   // the ones with a manifest give themselves away. Not _sidebar.md: on a
   // case-insensitive filesystem it also matches a GitHub wiki's _Sidebar.md.
   { deps: ["docsify-cli", "docsify"], source: "docsify" },
+  // Last: _config.yml is a generic name (Hexo and Jupyter Book use it too), so
+  // every more specific tell wins first, and the reference says how to spot
+  // the others.
+  { files: ["_config.yml", "docs/_config.yml"], source: "jekyll" },
 ];
 
 /**
@@ -213,6 +234,15 @@ export const detectMigrateSource = async (
 };
 
 /**
+ * The prompt's URL rule, where a source can't follow the default: a GitHub
+ * wiki's old URLs stay on github.com, where no redirect can reach them.
+ */
+const URL_RULES: Partial<Record<MigrateSourceId, string>> = {
+  "github-wiki":
+    "Keep every content page. The old wiki URLs stay on github.com and can't be redirected, so map them with the reference's route table and link stubs instead: add no `redirects`, and never push to the wiki; prepare the stubs for the user.",
+};
+
+/**
  * The handoff prompt: follow the skill, where its mappings for this source
  * are, and the few rules worth restating — the target version, and that no
  * page or URL is lost.
@@ -231,11 +261,14 @@ export const migratePrompt = (options: {
   const sourceLine = source
     ? `The source is ${MIGRATE_SOURCE_NAMES[source]}${evidence}. Its exact mappings are in ${join(skillDir, "references", `${source}.md`)}.`
     : `The source framework wasn't detected, so inventory the repo first. If it's ${MIGRATE_SOURCES.map((id) => MIGRATE_SOURCE_NAMES[id]).join(", ")}, read that framework's file in ${join(skillDir, "references")}; otherwise follow the skill's mental model directly.`;
+  const urlRule =
+    (source && URL_RULES[source]) ??
+    "Keep every page, and add a redirect for any URL that moves.";
   return `Migrate this documentation project to Blume ${version}.
 
 Follow the blume-migrate skill: read ${join(skillDir, "SKILL.md")} first and work through its migration workflow. Wherever the skill says \`<skill>\`, it means ${skillDir}.
 
 ${sourceLine}
 
-Add \`blume@^${version}\` as the docs package's dependency. Keep every page, and add a redirect for any URL that moves. Report everything you drop or approximate, and run the skill's verification steps before you finish.`;
+Add \`blume@^${version}\` as the docs package's dependency. ${urlRule} Report everything you drop or approximate, and run the skill's verification steps before you finish.`;
 };

@@ -119,7 +119,7 @@ VuePress shares the container and fence conventions; its snippet and include syn
 | `// [!code error]` / `// [!code warning]` | no equivalent: the comment stays visible. Make it `[!code highlight]` or delete it (report) |
 | `js-vue` | plain `js`; resolve its `{{ }}` by hand |
 | `<<< @/path/file.ts{2,4} [Label]` (`{lang}`, `:line-numbers`) | `<include meta="Label {2,4}">/path/file.ts</include>` (`lang="…"`, `lineNumbers`); `@` is the srcDir, `/` Blume's content root. In a code group VitePress titles an unlabeled import with its file name. A `.md` target gets `lang="md"`: VitePress showed it as code, Blume would splice it (`.md` OK; codemod) |
-| `<<< file#region` | no region selection: move the region into its own file under `_snippets/` (report: it stops tracking the source) |
+| `<<< file#region` | no region selection in `<include>`: generate the excerpt with `<skill>/scripts/include-excerpts.mjs` (selects `#region` markers; set `"dedent": true`, since VitePress always dedents regions; runs before every build, so the excerpt keeps tracking the source). Where VitePress couldn't find the region it showed the whole file, so check the old build |
 | a snippet outside the content root (`@/../packages/…`) | `BLUME_INCLUDE_OUTSIDE_ROOT` fails the build: copy the file under `_snippets/` and report |
 | `<!--@include: ./part.md-->` | `<include>./part.md</include>` (`.md` OK; codemod). A line range or region → split the partial. VitePress publishes a partial as a page unless `srcExclude` hides it: prefix partials with `_` (excluded by default) and update the paths. A partial is parsed in the including page's format, so one spliced into `.mdx` must be MDX-safe |
 | `[[toc]]` | delete; Blume has the outline rail (codemod) |

@@ -150,6 +150,18 @@ describe("detectMigrateSource", () => {
     ).toEqual({ evidence: "docs.json", source: "mintlify" });
   });
 
+  it("detects mdBook from book.toml at the root or in a book folder", async () => {
+    const files = ["book.toml", "docs/book.toml", "book/book.toml"];
+    const detected = await Promise.all(
+      files.map(async (file) =>
+        detectMigrateSource(await project({ [file]: "" }))
+      )
+    );
+    expect(detected).toEqual(
+      files.map((file) => ({ evidence: file, source: "mdbook" }))
+    );
+  });
+
   it("detects Fern from fern/docs.yml, not an SDK-only fern/ folder", async () => {
     expect(
       await detectMigrateSource(
@@ -227,6 +239,46 @@ describe("detectMigrateSource", () => {
     ).toEqual({ evidence: "reference/_order.yaml", source: "readme" });
   });
 
+  it("detects Docus from its packages", async () => {
+    expect(
+      await detectMigrateSource(
+        await project({ "package.json": deps("dependencies", ["docus"]) })
+      )
+    ).toEqual({ evidence: "docus in package.json", source: "docus" });
+    expect(
+      await detectMigrateSource(
+        await project({
+          "package.json": deps("devDependencies", ["@nuxt-themes/docus"]),
+        })
+      )
+    ).toEqual({
+      evidence: "@nuxt-themes/docus in package.json",
+      source: "docus",
+    });
+  });
+
+  it("detects Jekyll from _config.yml, after every other source", async () => {
+    expect(
+      await detectMigrateSource(await project({ "_config.yml": "" }))
+    ).toEqual({ evidence: "_config.yml", source: "jekyll" });
+    expect(
+      await detectMigrateSource(await project({ "docs/_config.yml": "" }))
+    ).toEqual({ evidence: "docs/_config.yml", source: "jekyll" });
+    expect(
+      await detectMigrateSource(
+        await project({ "_config.yml": "", "mkdocs.yml": "" })
+      )
+    ).toEqual({ evidence: "mkdocs.yml", source: "mkdocs" });
+  });
+
+  it("never detects a GitHub wiki clone, which is named-only", async () => {
+    expect(
+      await detectMigrateSource(
+        await project({ "Home.md": "", "_Footer.md": "", "_Sidebar.md": "" })
+      )
+    ).toBeNull();
+  });
+
   it("detects Docsify from its packages, not a _sidebar.md", async () => {
     expect(
       await detectMigrateSource(
@@ -273,6 +325,25 @@ describe("migratePrompt", () => {
       "The source is Mintlify (detected from docs.json). Its exact mappings are in /pkg/skills/blume-migrate/references/mintlify.md."
     );
     expect(prompt).toContain("`blume@^2.0.0`");
+  });
+
+  it("swaps the redirect rule for a GitHub wiki, whose URLs can't move", () => {
+    const prompt = migratePrompt({
+      detected: null,
+      skillDir,
+      source: "github-wiki",
+      version: "2.0.0",
+    });
+    expect(prompt).toContain("can't be redirected");
+    expect(prompt).not.toContain("add a redirect for any URL that moves");
+    expect(
+      migratePrompt({
+        detected: null,
+        skillDir,
+        source: "mkdocs",
+        version: "2.0.0",
+      })
+    ).toContain("add a redirect for any URL that moves");
   });
 
   it("names a source the user chose without claiming detection", () => {

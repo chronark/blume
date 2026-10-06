@@ -1,7 +1,14 @@
 import { afterAll, describe, expect, it } from "bun:test";
 import { execFile, spawnSync } from "node:child_process";
 import { once } from "node:events";
-import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  rename,
+  rm,
+  writeFile,
+} from "node:fs/promises";
 import { createServer } from "node:http";
 import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
@@ -523,11 +530,131 @@ describe("pin-heading-ids", () => {
     }
   });
 
+  it("pairs a section that repeats the page title with its own old id", async () => {
+    const root = await fixture();
+    await put(
+      join(root, "docs", "install.md"),
+      [
+        "---",
+        "title: Install",
+        "---",
+        "",
+        "Intro.",
+        "",
+        "## Install",
+        "",
+        "## Verify",
+        "",
+        "## Über uns",
+        "",
+      ].join("\n")
+    );
+    const manifestPath = join(root, ".blume", "blume.manifest.json");
+    // SAFETY: the fixture wrote this manifest with exactly these fields.
+    const manifest = JSON.parse(await readFile(manifestPath, "utf-8")) as {
+      routes: { path: string; sourcePath: string }[];
+    };
+    manifest.routes.push({
+      path: "/install",
+      sourcePath: join(root, "docs", "install.md"),
+    });
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    // Blume's title h1 has no id, so the section takes the plain slug.
+    await put(
+      join(root, "dist", "install", "index.html"),
+      builtPage("Install", [
+        blumeHeading(2, "install", "Install"),
+        blumeHeading(2, "verify", "Verify"),
+        blumeHeading(2, "über-uns", "Über uns"),
+      ])
+    );
+    // mdBook and others count the title, so the section was #install-1. The
+    // page's second h1, an h2 now, still pairs: mdBook 0.4 kept its capital.
+    await put(
+      join(root, "old", "install.html"),
+      oldPage([
+        '<h1 id="install"><a class="header" href="#install">Install</a></h1>',
+        '<h2 id="install-1"><a class="header" href="#install-1">Install</a></h2>',
+        '<h2 id="verify"><a class="header" href="#verify">Verify</a></h2>',
+        '<h1 id="Über-uns"><a class="header" href="#Über-uns">Über uns</a></h1>',
+      ])
+    );
+
+    const report = jsonReport(root, "--old", "old");
+    expect(
+      report.pins
+        .filter((pin) => pin.route === "/install")
+        .map((pin) => `${pin.line} ${pin.from} -> ${pin.to}`)
+    ).toEqual(["7 install -> install-1", "11 über-uns -> Über-uns"]);
+    expect(report.notes.join("\n")).not.toContain("/install");
+  });
+
+  it("reads a server build's client half", async () => {
+    const root = await fixture();
+    const dist = join(root, "dist");
+    const client = join(root, "client");
+    await rename(dist, client);
+    await mkdir(dist, { recursive: true });
+    await rename(client, join(dist, "client"));
+
+    // vercel() writes only client/; node() and cloudflare() add server/.
+    const vercel = runScript(root, "--old", "old", "--json");
+    await mkdir(join(dist, "server"), { recursive: true });
+    const node = runScript(root, "--old", "old", "--json");
+    for (const result of [vercel, node]) {
+      expect(result.status).toBe(0);
+      expect(result.stderr).toContain("reading");
+      expect(result.stderr).toContain("a server build's pages");
+      // SAFETY: --json prints exactly this shape (jsonReport in the script).
+      const report = JSON.parse(result.stdout) as Report;
+      expect(report.pins.map((pin) => pin.to)).toContain(
+        "appconfig-ocsp-enabled"
+      );
+    }
+  });
+
+  it("warns when nothing pairs, naming the build directory it read", async () => {
+    const root = await fixture();
+    await mkdir(join(root, "elsewhere"), { recursive: true });
+
+    const empty = runScript(root, "--old", "old", "--dist", "elsewhere");
+    expect(empty.status).toBe(0);
+    expect(empty.stdout).toContain("0 heading(s) paired");
+    expect(empty.stderr).toContain(
+      "WARNING: 0 headings paired: no page was found in both the build in elsewhere and the old site at old."
+    );
+    expect(empty.stderr).toContain("dist/client");
+
+    // Pages on both sides whose headings never match: an old site that isn't
+    // this one, say.
+    const unrelated = join(root, "unrelated");
+    await put(
+      join(unrelated, "index.html"),
+      oldPage(['<h2 id="pricing">Pricing</h2>'])
+    );
+    const mismatched = runScript(root, "--old", "unrelated");
+    expect(mismatched.stderr).toContain(
+      "the old pages have 1 section heading(s), but none matched a heading in the build in dist and the old site at unrelated."
+    );
+  });
+
+  it("stays quiet when the old site has no section headings to pair", async () => {
+    const root = await fixture();
+    const bare = join(root, "bare");
+    await put(join(bare, "index.html"), oldPage(['<h1 id="home">Home</h1>']));
+
+    const result = runScript(root, "--old", "bare");
+    expect(result.status).toBe(0);
+    expect(result.stdout).toContain("0 heading(s) paired");
+    expect(result.stderr).toBe("");
+  });
+
   it("explains its usage and rejects bad arguments", async () => {
     const root = await fixture();
     const help = runScript(root);
     expect(help.status).toBe(0);
     expect(help.stdout).toContain("Usage: node pin-heading-ids.mjs");
+    expect(help.stdout).toContain("dist/client");
 
     const noOld = runScript(root, "--write");
     expect(noOld.status).toBe(2);

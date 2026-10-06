@@ -35,7 +35,11 @@
 // Options:
 //   --old <url|dir>    The old site: its base URL (pages are fetched one at a
 //                      time) or a directory of its built HTML. Required.
-//   --dist <dir>       The migrated build (default: dist).
+//   --dist <dir>       The migrated build (default: dist). A server build
+//                      (vercel(), node(), cloudflare()) keeps its pages in
+//                      dist/client, which is read when dist has a client/
+//                      folder and no index.html of its own. Vercel's build
+//                      also copies them to .vercel/output/static.
 //   --manifest <file>  Blume's route manifest, which maps each route to its
 //                      source file (default: <runtime dir>/blume.manifest.json,
 //                      the runtime dir being $BLUME_RUNTIME_DIR or .blume).
@@ -88,7 +92,8 @@ const USAGE = [
   "Usage: node pin-heading-ids.mjs --old <url|dir> [options]",
   "",
   "  --old <url|dir>    the old site's base URL, or a directory of its built HTML",
-  "  --dist <dir>       the migrated build (default: dist)",
+  "  --dist <dir>       the migrated build (default: dist; a server build's",
+  "                     dist/client is read when dist has no index.html)",
   "  --manifest <file>  Blume's route manifest (default: .blume/blume.manifest.json)",
   "  --docs <dir>       the content root (default: the manifest's, else docs)",
   "  --map <file>       old URL → new route, as JSON (dist/blume-redirects.json, written with no host adapter, works)",
@@ -661,6 +666,24 @@ const linkedIds = (options, contentRoot, cwd) => {
 
 // --- Pairing -------------------------------------------------------------------------
 
+const isDirectory = (dir) => existsSync(dir) && statSync(dir).isDirectory();
+
+/**
+ * The directory holding the pages: a server build's `client/` half, else
+ * `dist`. node() and cloudflare() write `client/` beside `server/`, vercel()
+ * writes only `client/`, and none of them puts an index.html in `dist`.
+ */
+const pagesRoot = (dist) => {
+  const client = path.join(dist, "client");
+  if (isDirectory(client) && !existsSync(path.join(dist, "index.html"))) {
+    process.stderr.write(
+      `pin-heading-ids: reading ${client}, a server build's pages.\n`
+    );
+    return client;
+  }
+  return dist;
+};
+
 const distPage = (dist, route) => {
   const base = path.join(dist, ...route.split("/").filter(Boolean));
   const candidates =
@@ -684,10 +707,37 @@ const takeSource = (lines, state, key) => {
   return entry;
 };
 
-/** The next old heading, from the cursor on, with the same text as `key`. */
-const takeOld = (before, state, key) => {
+const TITLE = /<h1(?<attributes>\s[^>]*)?>(?<inner>[\s\S]*?)<\/h1\s*>/iu;
+
+/**
+ * The index of the old heading that became the page title: the first old h1
+ * with the text of the build's title, an h1 Blume renders without an id.
+ * Else -1.
+ */
+const oldTitleIndex = (before, builtHtml) => {
+  const title = TITLE.exec(builtHtml.replaceAll(HIDDEN_MARKUP, ""))?.groups;
+  if (!title || ID_ATTRIBUTE.test(title.attributes ?? "")) {
+    return -1;
+  }
+  const key = normalize(visibleText(title.inner));
+  return before.findIndex(
+    (heading) => heading.level === 1 && normalize(heading.text) === key
+  );
+};
+
+/**
+ * The next old heading, from the cursor on, with the same text as `key`,
+ * passing over the one the page title took: a section that repeats the
+ * title's text (`# Install`, then `## Install`, which the old site gave
+ * `#install-1`) pairs with its own old heading. A later h1 (a section the
+ * migration turned into an h2) still pairs.
+ */
+const takeOld = (before, state, key, title) => {
   let k = state.oldCursor;
-  while (k < before.length && normalize(before[k].text) !== key) {
+  while (
+    k < before.length &&
+    (k === title || normalize(before[k].text) !== key)
+  ) {
     k += 1;
   }
   if (k === before.length) {
@@ -760,17 +810,19 @@ const reportLost = (result, page, before, pairedOld) => {
 const pairPage = (result, page, oldHtml, builtHtml) => {
   const { linked, options } = result;
   const before = htmlHeadings(scope(oldHtml, options["old-scope"] ?? "main"));
-  const after = htmlHeadings(
-    scope(builtHtml, options["new-scope"] ?? "article")
-  );
+  const built = scope(builtHtml, options["new-scope"] ?? "article");
+  const after = htmlHeadings(built);
+  const title = oldTitleIndex(before, built);
   const lines = sourceHeadings(page.file, result);
   const pairedOld = new Set();
   const state = { oldCursor: 0, sourceCursor: 0 };
+  result.compared += 1;
+  result.oldSections += before.filter((heading) => heading.level > 1).length;
   for (const heading of after) {
     const key = normalize(heading.text);
     // Source lines and rendered headings share an order, so both scan forward.
     const entry = takeSource(lines, state, key);
-    const k = takeOld(before, state, key);
+    const k = takeOld(before, state, key, title);
     const oldId = k === -1 ? heading.id : before[k].id;
     if (k !== -1) {
       pairedOld.add(k);
@@ -817,10 +869,11 @@ const visitPages = async (pages, visit) => {
 const run = async (options) => {
   const cwd = real(process.cwd());
   const { contentRoot, pages } = loadPages(options, cwd);
-  const dist = path.resolve(cwd, options.dist ?? "dist");
-  if (!existsSync(dist)) {
-    throw new Error(`no build at ${dist}: run \`blume build\` first`);
+  const given = path.resolve(cwd, options.dist ?? "dist");
+  if (!existsSync(given)) {
+    throw new Error(`no build at ${given}: run \`blume build\` first`);
   }
+  const dist = pagesRoot(given);
   const oldFor = options.map
     ? loadMap(path.resolve(cwd, options.map))
     : new Map();
@@ -829,11 +882,14 @@ const run = async (options) => {
   const result = {
     awaitingBuild: 0,
     claims: new Map(),
+    compared: 0,
     contentRoot,
     cwd,
+    dist,
     edits: new Map(),
     linked: onlyLinked ? linkedIds(options, contentRoot, cwd) : undefined,
     notes: [],
+    oldSections: 0,
     options,
     paired: 0,
     pins: [],
@@ -900,6 +956,27 @@ const report = (result, write) => {
   return out.join("\n");
 };
 
+/**
+ * A warning when nothing paired for a reason other than an old site with no
+ * section headings: no page found on both sides, usually the wrong --dist or
+ * --old, or headings that never matched.
+ */
+const noPairsWarning = (result) => {
+  if (result.paired > 0 || (result.compared > 0 && result.oldSections === 0)) {
+    return;
+  }
+  const built = path.relative(result.cwd, result.dist) || ".";
+  const where = `the build in ${built} and the old site at ${result.options.old}`;
+  const what =
+    result.compared === 0
+      ? `no page was found in both ${where}`
+      : `the old pages have ${result.oldSections} section heading(s), but none matched a heading in ${where}`;
+  return [
+    `WARNING: 0 headings paired: ${what}.`,
+    "A server build keeps its pages in dist/client (read when dist has no index.html of its own); pass another folder with --dist. Check that --old points at the old site's pages, too.",
+  ].join("\n");
+};
+
 const jsonReport = (result, write) =>
   JSON.stringify(
     {
@@ -937,6 +1014,10 @@ const main = async () => {
       ? jsonReport(result, write)
       : report(result, write);
     process.stdout.write(`${output}\n`);
+    const warning = noPairsWarning(result);
+    if (warning) {
+      process.stderr.write(`${warning}\n`);
+    }
   } catch (error) {
     process.stderr.write(`${error.message}\n`);
     process.exit(1);
