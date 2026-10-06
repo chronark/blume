@@ -52,21 +52,36 @@ export const blumeModuleAliases = (): Record<string, string> => {
 };
 
 /**
- * One jiti instance for every file a loader is called with, created on its
- * first call so that importing this module (the `blume` barrel reaches it
- * through `defineConfig`) reads nothing from disk. `moduleCache: false`
- * ensures edits are picked up on each load, which is what makes dev-server
- * regeneration reflect config/meta changes.
+ * An import through one jiti instance for every file a loader is called with,
+ * created on its first call so that importing this module (the `blume` barrel
+ * reaches it through `defineConfig`) reads nothing from disk. `moduleCache:
+ * false` ensures edits are picked up on each load, which is what makes
+ * dev-server regeneration reflect config/meta changes.
+ *
+ * Each import leaves `Error.prepareStackTrace` as it found it. The first file
+ * jiti compiles loads its bundled Babel, which wraps that formatter for the
+ * whole process to hide its own frames. Under Bun the wrapper hands off to
+ * Bun's native formatter, which throws for an object that isn't a native
+ * `Error`, and Vite's bundled follow-redirects captures a stack trace on one
+ * as it loads, so importing Astro or Vite after a compiled config or meta file
+ * would crash.
  */
-const lazyJiti = (options: JitiOptions): (() => Jiti) => {
+const lazyImport = (
+  options: JitiOptions
+): ((file: string) => Promise<{ default?: unknown }>) => {
   let jiti: Jiti | undefined;
-  return () => {
+  return async (file) => {
     jiti ??= createJiti(import.meta.url, {
       ...options,
       alias: blumeModuleAliases(),
       moduleCache: false,
     });
-    return jiti;
+    const { prepareStackTrace } = Error;
+    try {
+      return await jiti.import<{ default?: unknown }>(file);
+    } finally {
+      Error.prepareStackTrace = prepareStackTrace;
+    }
   };
 };
 
@@ -77,9 +92,9 @@ const lazyJiti = (options: JitiOptions): (() => Jiti) => {
  */
 // oxlint-disable-next-line anti-slop/no-unknown-returns -- user-authored modules can export anything; callers validate the loaded value at their own boundary
 export const createModuleLoader = (): ((file: string) => Promise<unknown>) => {
-  const jiti = lazyJiti({});
+  const load = lazyImport({});
   return async (file: string) => {
-    const loaded = await jiti().import<{ default?: unknown }>(file);
+    const loaded = await load(file);
     return loaded?.default ?? loaded;
   };
 };
@@ -99,12 +114,12 @@ export const createModuleLoader = (): ((file: string) => Promise<unknown>) => {
  * first.
  */
 export const createDefaultExportLoader: typeof createModuleLoader = () => {
-  const jiti = lazyJiti({
+  const load = lazyImport({
     fsCache: join(tmpdir(), "jiti-blume-default-export"),
     interopDefault: false,
   });
   return async (file: string) => {
-    const loaded = await jiti().import<{ default?: unknown }>(file);
+    const loaded = await load(file);
     return loaded.default ?? undefined;
   };
 };

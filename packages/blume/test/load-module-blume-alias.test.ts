@@ -5,7 +5,10 @@ import { tmpdir } from "node:os";
 import { dirname, join } from "pathe";
 
 import { loadConfig } from "../src/core/config.ts";
-import { blumeModuleAliases } from "../src/core/load-module.ts";
+import {
+  blumeModuleAliases,
+  createModuleLoader,
+} from "../src/core/load-module.ts";
 import { discoverFolderMeta } from "../src/core/meta.ts";
 import { packageRoot } from "../src/core/package-root.ts";
 
@@ -54,6 +57,22 @@ describe("blumeModuleAliases", () => {
 });
 
 describe("modules loaded from outside the project", () => {
+  // A `blume` import Bun can't resolve sends the file to jiti's compiler,
+  // whose Babel wraps Error.prepareStackTrace on its first compile. Under Bun
+  // that wrapper crashes Vite's import later in the process.
+  it("leaves Error.prepareStackTrace as it was after compiling a module", async () => {
+    const root = await makeTree({
+      "docs/meta.ts":
+        'import { defineMeta } from "blume";\n\nexport default defineMeta({ title: "Compiled" });\n',
+    });
+    const { prepareStackTrace } = Error;
+
+    const loaded = await createModuleLoader()(join(root, "docs/meta.ts"));
+
+    expect(loaded).toStrictEqual({ title: "Compiled" });
+    expect(Error.prepareStackTrace).toBe(prepareStackTrace);
+  });
+
   it("resolves blume and its subpaths in a meta.ts with no blume above it", async () => {
     const root = await makeTree({
       "docs/guide/meta.ts": [
