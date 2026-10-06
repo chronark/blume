@@ -38,6 +38,24 @@ describe("extractComponentTags", () => {
     const body = ["~~~tsx", "<InTildeFence />", "~~~", "<Real />"].join("\n");
     expect(extractComponentTags(body)).toEqual(["Real"]);
   });
+
+  it("ignores a backslash-escaped `<`, which renders as text", () => {
+    // MDX reads `\<App>` as the text `<App>`: an odd run of backslashes
+    // escapes the `<`, while an even run is escaped backslashes before a
+    // real tag. `&lt;` is an entity, never a tag either.
+    const body = [
+      String.raw`\<Escaped> at the start of a line`,
+      String.raw`Returns Promise\<App>, \<Not set>, or \<TPayload>.`,
+      String.raw`An odd run \\\<OddRun> stays text.`,
+      "An entity &lt;Entity> is text.",
+      String.raw`An even run \\<EvenRun /> is a real tag.`,
+      String.raw`Mixed \<Text> then <Unknown /> on one line.`,
+    ].join("\n");
+    expect(extractComponentTags(body).toSorted()).toEqual([
+      "EvenRun",
+      "Unknown",
+    ]);
+  });
 });
 
 describe("validateUsedComponents", () => {
@@ -93,6 +111,16 @@ describe("extractExampleUses", () => {
     expect(extractExampleUses(body, 3)).toStrictEqual([
       { column: 24, line: 4, path: "counter" },
       { column: 9, line: 7, path: "forms/login" },
+    ]);
+  });
+
+  it("skips an escaped \\<Component path>, which renders as text", () => {
+    const body = [
+      String.raw`Write \<Component path="escaped" /> to embed one.`,
+      String.raw`\\<Component path="after-backslash" />`,
+    ].join("\n");
+    expect(extractExampleUses(body)).toStrictEqual([
+      { column: 20, line: 2, path: "after-backslash" },
     ]);
   });
 

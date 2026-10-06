@@ -992,8 +992,16 @@ describe(scanBody, () => {
       '<a id="hidden"></a>',
       "</Prompt>",
       '<p data-id="attribute-suffix">x</p>',
+      // An escaped `<` renders the tag as text in `.md` and `.mdx` alike.
+      String.raw`Write \<a id="escaped">x\</a> for an anchor.`,
     ].join("\n");
     expect(scanBody(body).anchors).toStrictEqual([]);
+  });
+
+  it("keeps an id after an escaped backslash, which leaves the `<` a tag", () => {
+    expect(
+      scanBody(String.raw`\\<a id="after-backslash"></a>`).anchors
+    ).toStrictEqual(["after-backslash"]);
   });
 
   it("never lets a stripped comment splice its neighbors into new markup", () => {

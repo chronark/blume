@@ -131,6 +131,16 @@ describe(extractLinks, () => {
     ]);
   });
 
+  it("skips an escaped \\<a href> or \\<Card href>, which renders as text", () => {
+    const body = [
+      String.raw`Write \<a href="/escaped">x\</a> or \<Card href="./card" />.`,
+      String.raw`\\<a href="/after-backslash">real</a>`,
+    ].join("\n");
+    expect(extractLinks(body)).toStrictEqual([
+      { column: 12, line: 2, raw: true, target: "/after-backslash" },
+    ]);
+  });
+
   it("skips links inside fenced code blocks", () => {
     const body = ["```md", "[x](/nope)", "```", "[y](/yes)"].join("\n");
     expect(extractLinks(body).map((l) => l.target)).toStrictEqual(["/yes"]);

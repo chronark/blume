@@ -278,8 +278,14 @@ const BARE_CURLY_MARKER =
 // `JSX_OPEN` split below). `[^<>]` bounds the attribute run, so a wrapped tag
 // (`<div\n  id="x"\n>`) still matches while a long tag-free line can't
 // backtrack quadratically, and the run never reaches into a neighboring tag.
+//
+// `HTML_ID`, `ELEMENT_HREF`, `COMPONENT_PATH`, and `JSX_OPEN` open with the
+// lookbehind `(?<=(?:^|[^\\])(?:\\\\)*)`: a `<` opens a tag only after an even
+// run of backslashes (none, or `\\` pairs, each an escaped backslash). An odd
+// run escapes the `<` itself, so `\<a id="x">` and `Promise\<App>` render as
+// text in `.md` and `.mdx` alike.
 const HTML_ID =
-  /<[a-z][a-z0-9-]*(?:\s[^<>]*?)?\sid=(?:(?<quote>["'])(?<quoted>[^"'<>]+)\k<quote>|\{(?<jsxQuote>["'])(?<jsx>[^"'<>]+)\k<jsxQuote>\}|(?<bare>[^\s"'=<>`{}]+))/gu;
+  /(?<=(?:^|[^\\])(?:\\\\)*)<[a-z][a-z0-9-]*(?:\s[^<>]*?)?\sid=(?:(?<quote>["'])(?<quoted>[^"'<>]+)\k<quote>|\{(?<jsxQuote>["'])(?<jsx>[^"'<>]+)\k<jsxQuote>\}|(?<bare>[^\s"'=<>`{}]+))/gu;
 // Commented-out markup renders nothing; matched across lines once the
 // scannable lines are joined back together. Shared with the search
 // extractor so both agree on what a comment is.
@@ -1037,10 +1043,11 @@ const scanLinkLine = (
  * `<a href>`: the attribute may sit on a later line than the tag name, where
  * a formatter wraps a long element, so the gap between them spans lines. An
  * expression-valued `href={…}` isn't a literal target, so it isn't matched,
- * and no other lowercase tag is a link.
+ * and no other lowercase tag is a link. An escaped `\<a href>` is text, not a
+ * link (see `HTML_ID`).
  */
 const ELEMENT_HREF =
-  /<(?:[A-Z][\w.]*|(?<anchor>a))(?=[\s/>])[^<>]*?\shref=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
+  /(?<=(?:^|[^\\])(?:\\\\)*)<(?:[A-Z][\w.]*|(?<anchor>a))(?=[\s/>])[^<>]*?\shref=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
 
 /**
  * An inline link whose label wraps onto later lines of its paragraph
@@ -1163,10 +1170,11 @@ export const extractLinks = (body: string, lineOffset = 0): PageLink[] => {
 /**
  * A `<Component>` example's string `path` (`<Component path="forms/login" />`),
  * wrapped onto a later line or not, read the way `ELEMENT_HREF` reads an
- * `href`. An expression-valued `path={…}` isn't a literal, so it isn't matched.
+ * `href`. An expression-valued `path={…}` isn't a literal, so it isn't matched,
+ * and an escaped `\<Component>` is text (see `HTML_ID`).
  */
 const COMPONENT_PATH =
-  /<Component(?=[\s/>])[^<>]*?\spath=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
+  /(?<=(?:^|[^\\])(?:\\\\)*)<Component(?=[\s/>])[^<>]*?\spath=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
 
 /**
  * Every `<Component path>` in an `.mdx` body, with the 1-based position of its
@@ -1195,13 +1203,15 @@ export const extractExampleUses = (
 // isn't a real usage. Single quotes are left alone so prose apostrophes don't
 // swallow a real tag between two words.
 const DOUBLE_QUOTED = /"[^"]*"/gu;
-const JSX_OPEN = /<(?<tag>[A-Z][A-Za-z0-9]*)/gu;
+// An escaped `Promise\<App>` renders `Promise<App>` as text, so it uses no
+// component (see `HTML_ID`); `\\<App>` is an escaped backslash, then a tag.
+const JSX_OPEN = /(?<=(?:^|[^\\])(?:\\\\)*)<(?<tag>[A-Z][A-Za-z0-9]*)/gu;
 
 /**
  * Capitalized JSX component tags used in an `.mdx` body (`<Callout>`,
- * `<Tree.File>` → `Tree`). Skips fenced code, inline code, and double-quoted
- * strings so code samples and prose don't count. Powers the missing-component
- * diagnostic.
+ * `<Tree.File>` → `Tree`). Skips fenced code, inline code, double-quoted
+ * strings, and escaped `\<Tag>` text so code samples and prose don't count.
+ * Powers the missing-component diagnostic.
  */
 /** Scan one line for JSX component tags; returns the next fenced-block state. */
 const scanTagLine = (
