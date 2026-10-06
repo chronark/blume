@@ -1,0 +1,1406 @@
+---
+// Publish Laravel API documentation with Scramble: checked against the
+// OpenAPI reference (spec loading, Authorization, Try it, credentials, CORS),
+// validate, and deployment docs; on main (cf03b9cf) against the operation
+// slug rule (openapi/model.ts operationKey, run on Scramble's IDs), the Try it
+// fetch (components/openapi/playground-client.ts: no Accept header, default
+// credentials), `blume init` (cli/init/scaffold.ts), and the agent Markdown
+// serializers (ai/openapi-components.ts). Scramble side: the 0.13.47 source in
+// vendor/ (ExportDocumentation, Generator::makeOpenApi writing 3.1.0,
+// RequestEssentialsExtension's operation IDs and tags, ModelInfo's database
+// reads, GeneratorConfig::expose, RestrictedDocsAccess, SecurityScheme) and
+// scramble.dedoc.co's installation, getting-started, request, response,
+// authentication, servers, renderers, caching, export, and document
+// transformer pages; Sanctum's 13.x docs (token issuing); the setup-php README.
+//
+// Ran end to end on 2026-10-05 in a fresh folder outside the repo, with PHP
+// 8.5.11 and Composer 2.10.3 (Homebrew), Node 24.14.1: every command and file
+// on this page, extracted from the page and applied in order. Laravel
+// skeleton 13.10.1 (framework 13.34.0), Sanctum 4.3.3, Scramble 0.13.47
+// (d1597812). Blume 2.1.3 from main, linked into node_modules and run by path
+// in place of `npx blume` and `npm run`; `blume init` ran with --no-install.
+// Results: the export and jq output shown (byte-identical to the working
+// probe's), `blume build` (8 pages), `validate --strict` exit 0, `blume audit`
+// 0 errors and 0 warnings, `blume preview` with curl (200 on every route in
+// the table, page text checked for request bodies, response schemas, auth,
+// the page parameter, and samples), the local loop against `php artisan
+// serve` (token 201; Try it's requests replayed with an Origin header: 401
+// without a token, 202 with one, preflight allowed), the getting-started
+// curl commands (201, 202, 200), and the workflow's run steps in a fresh git
+// clone with no .env (pass; fail with the diff shown after the template
+// PHPDoc changed; pass after exporting). In the working probe: Try it in
+// Chrome against a local server (401 without a token, 202 with one, and the
+// 500 "Route [login] not defined." without the bootstrap/app.php line);
+// `blume dev` updating a page after a re-export; production APP_ENV giving
+// 403 on /docs/api, then 404 with expose(false); exports identical across
+// APP_URL and APP_ENV; the MD001 export without a migrated table; the empty
+// export with api_domain set (BLUME_OPENAPI_EMPTY under validate --strict);
+// BLUME_NAV_DUPLICATE_LABEL without summaries; BLUME_OPENAPI_UNAVAILABLE
+// without the file; default operation IDs with plain routes and with
+// apiResource; #[Group] weight reordering the tags. Not run: `npm ci` (Blume
+// was linked), the workflow on GitHub Actions, a deploy, MySQL or Postgres,
+// and the MiddlewareAuthSecurityStrategy alternative (from Scramble's docs).
+// Reviewer, in copies of the probe: re-exported the spec (byte-identical to
+// the committed one, no trailing newline); the export without the messages
+// table (exit 0, MD001, the type changes listed; exit 1 with
+// --fail-on-unknown); the export without each @var, #[QueryParameter], and
+// path example (array of strings, SE001 on the token, no page parameter,
+// samples calling /messages/string); `blume validate --strict` and `blume
+// build` (8 pages); the operation .md files and llms-full.txt; validate
+// --strict on the empty spec (exit 1); a build without the spec
+// (BLUME_OPENAPI_UNAVAILABLE, exit 1); and a build without tabs, where the
+// operations join the guides' sidebar (so with tabs they get their own).
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const migrationPhp = `<?php
+
+use Illuminate\\Database\\Migrations\\Migration;
+use Illuminate\\Database\\Schema\\Blueprint;
+use Illuminate\\Support\\Facades\\Schema;
+
+return new class extends Migration
+{
+    public function up(): void
+    {
+        Schema::create('messages', function (Blueprint $table) {
+            $table->ulid('id')->primary();
+            $table->foreignId('user_id')->constrained()->cascadeOnDelete();
+            $table->string('channel');
+            $table->string('to');
+            $table->string('template');
+            $table->json('variables')->nullable();
+            $table->string('status')->default('queued');
+            $table->timestamps();
+        });
+    }
+
+    public function down(): void
+    {
+        Schema::dropIfExists('messages');
+    }
+};`;
+
+const channelPhp = `<?php
+
+namespace App\\Enums;
+
+enum Channel: string
+{
+    case Email = 'email';
+    case Sms = 'sms';
+}`;
+
+const statusPhp = `<?php
+
+namespace App\\Enums;
+
+enum MessageStatus: string
+{
+    case Queued = 'queued';
+    case Sent = 'sent';
+    case Delivered = 'delivered';
+    case Failed = 'failed';
+}`;
+
+const messagePhp = `<?php
+
+namespace App\\Models;
+
+use App\\Enums\\Channel;
+use App\\Enums\\MessageStatus;
+use Illuminate\\Database\\Eloquent\\Attributes\\Fillable;
+use Illuminate\\Database\\Eloquent\\Concerns\\HasUlids;
+use Illuminate\\Database\\Eloquent\\Model;
+use Illuminate\\Database\\Eloquent\\Relations\\BelongsTo;
+
+#[Fillable(['channel', 'to', 'template', 'variables'])]
+class Message extends Model
+{
+    use HasUlids;
+
+    protected $attributes = [
+        'status' => 'queued',
+    ];
+
+    protected function casts(): array
+    {
+        return [
+            'channel' => Channel::class,
+            'status' => MessageStatus::class,
+            'variables' => 'array',
+        ];
+    }
+
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+}`;
+
+const userPhp = `<?php
+
+namespace App\\Models;
+
+// use Illuminate\\Contracts\\Auth\\MustVerifyEmail;
+use Database\\Factories\\UserFactory;
+use Illuminate\\Database\\Eloquent\\Attributes\\Fillable;
+use Illuminate\\Database\\Eloquent\\Attributes\\Hidden;
+use Illuminate\\Database\\Eloquent\\Factories\\HasFactory;
+use Illuminate\\Database\\Eloquent\\Relations\\HasMany;
+use Illuminate\\Foundation\\Auth\\User as Authenticatable;
+use Illuminate\\Notifications\\Notifiable;
+use Laravel\\Sanctum\\HasApiTokens;
+
+#[Fillable(['name', 'email', 'password'])]
+#[Hidden(['password', 'remember_token'])]
+class User extends Authenticatable
+{
+    /** @use HasFactory<UserFactory> */
+    use HasApiTokens, HasFactory, Notifiable;
+
+    /**
+     * Get the attributes that should be cast.
+     *
+     * @return array<string, string>
+     */
+    protected function casts(): array
+    {
+        return [
+            'email_verified_at' => 'datetime',
+            'password' => 'hashed',
+        ];
+    }
+
+    public function messages(): HasMany
+    {
+        return $this->hasMany(Message::class);
+    }
+}`;
+
+const requestPhp = `<?php
+
+namespace App\\Http\\Requests;
+
+use App\\Enums\\Channel;
+use Illuminate\\Foundation\\Http\\FormRequest;
+use Illuminate\\Validation\\Rule;
+
+class StoreMessageRequest extends FormRequest
+{
+    public function authorize(): bool
+    {
+        return true;
+    }
+
+    public function rules(): array
+    {
+        return [
+            /**
+             * How to deliver the message.
+             */
+            'channel' => ['required', Rule::enum(Channel::class)],
+            /**
+             * An email address, or a phone number in E.164 format.
+             *
+             * @example ada@example.com
+             */
+            'to' => ['required', 'string', 'max:254'],
+            /**
+             * The ID of the template to send.
+             *
+             * @example welcome
+             */
+            'template' => ['required', 'string', 'max:64'],
+            /**
+             * Values for the template's variables.
+             *
+             * @var array<string, string>
+             *
+             * @example {"name": "Ada"}
+             */
+            'variables' => ['sometimes', 'array'],
+            'variables.*' => ['string'],
+        ];
+    }
+}`;
+
+const resourcePhp = `<?php
+
+namespace App\\Http\\Resources;
+
+use App\\Models\\Message;
+use Dedoc\\Scramble\\Attributes\\SchemaName;
+use Illuminate\\Http\\Request;
+use Illuminate\\Http\\Resources\\Json\\JsonResource;
+
+/**
+ * @mixin Message
+ */
+#[SchemaName('Message')]
+class MessageResource extends JsonResource
+{
+    public function toArray(Request $request): array
+    {
+        return [
+            /** @example 01m47e4jq23fz89dn02eezd3c9 */
+            'id' => $this->id,
+            'channel' => $this->channel,
+            /** @example ada@example.com */
+            'to' => $this->to,
+            /** @example welcome */
+            'template' => $this->template,
+            /**
+             * @var array<string, string>|null
+             *
+             * @example {"name": "Ada"}
+             */
+            'variables' => $this->variables,
+            'status' => $this->status,
+            'created_at' => $this->created_at,
+        ];
+    }
+}`;
+
+const messageControllerPhp = `<?php
+
+namespace App\\Http\\Controllers;
+
+use App\\Http\\Requests\\StoreMessageRequest;
+use App\\Http\\Resources\\MessageResource;
+use App\\Models\\Message;
+use Dedoc\\Scramble\\Attributes\\Group;
+use Dedoc\\Scramble\\Attributes\\PathParameter;
+use Dedoc\\Scramble\\Attributes\\QueryParameter;
+use Illuminate\\Http\\Request;
+
+#[Group('Messages', 'Send a message and check whether it arrived.', weight: 1)]
+class MessageController extends Controller
+{
+    /**
+     * List messages
+     *
+     * Returns your messages, newest first, 20 per page.
+     *
+     * @operationId listMessages
+     */
+    #[QueryParameter('page', description: 'The page to return.', type: 'int', default: 1)]
+    public function index(Request $request)
+    {
+        return MessageResource::collection(
+            $request->user()->messages()->latest()->paginate(20)
+        );
+    }
+
+    /**
+     * Send a message
+     *
+     * Queues an email or SMS for delivery and returns it right away, with the status \`queued\`.
+     *
+     * @operationId sendMessage
+     */
+    public function store(StoreMessageRequest $request)
+    {
+        $message = $request->user()->messages()->create($request->validated());
+
+        /** @description The message is queued. */
+        return MessageResource::make($message)
+            ->response()
+            ->setStatusCode(202);
+    }
+
+    /**
+     * Get a message
+     *
+     * Returns a message and its delivery status.
+     *
+     * @operationId getMessage
+     */
+    #[PathParameter('message', description: 'The message ID, from the response to Send a message.', example: '01m47e4jq23fz89dn02eezd3c9')]
+    public function show(Request $request, Message $message)
+    {
+        abort_unless($message->user()->is($request->user()), 404);
+
+        /** @description The message. */
+        return MessageResource::make($message);
+    }
+}`;
+
+const tokenControllerPhp = `<?php
+
+namespace App\\Http\\Controllers;
+
+use App\\Models\\User;
+use Dedoc\\Scramble\\Attributes\\Group;
+use Illuminate\\Http\\Request;
+use Illuminate\\Support\\Facades\\Hash;
+use Illuminate\\Validation\\ValidationException;
+
+#[Group('Authentication', 'Exchange your account credentials for an API token.', weight: 0)]
+class TokenController extends Controller
+{
+    /**
+     * Create a token
+     *
+     * Exchanges your email address and password for an API token. Send the token
+     * in the \`Authorization\` header of every other request, as \`Bearer <token>\`.
+     *
+     * @unauthenticated
+     *
+     * @operationId createToken
+     */
+    public function store(Request $request)
+    {
+        $request->validate([
+            /** @example ada@example.com */
+            'email' => ['required', 'email'],
+            'password' => ['required', 'string'],
+            /**
+             * A name for the token, like the app or machine that uses it.
+             *
+             * @example ci-server
+             */
+            'device_name' => ['required', 'string', 'max:255'],
+        ]);
+
+        $user = User::where('email', $request->email)->first();
+
+        if (! $user || ! Hash::check($request->password, $user->password)) {
+            throw ValidationException::withMessages([
+                'email' => ['The provided credentials are incorrect.'],
+            ]);
+        }
+
+        /** @description The token was created. */
+        return response()->json([
+            /**
+             * The API token. Send it as a bearer token.
+             *
+             * @var string
+             *
+             * @example 1|miNQQG7KxUv8UJDcQUyLSRyTu4aNbo6C1fsez75046d7f853
+             */
+            'token' => $user->createToken($request->device_name)->plainTextToken,
+        ], 201);
+    }
+}`;
+
+const routesPhp = `<?php
+
+use App\\Http\\Controllers\\MessageController;
+use App\\Http\\Controllers\\TokenController;
+use Illuminate\\Support\\Facades\\Route;
+
+Route::post('/tokens', [TokenController::class, 'store']);
+
+Route::middleware('auth:sanctum')->group(function () {
+    Route::get('/messages', [MessageController::class, 'index']);
+    Route::post('/messages', [MessageController::class, 'store']);
+    Route::get('/messages/{message}', [MessageController::class, 'show']);
+});`;
+
+const bootstrapPhp = `<?php
+
+use Illuminate\\Foundation\\Application;
+use Illuminate\\Foundation\\Configuration\\Exceptions;
+use Illuminate\\Foundation\\Configuration\\Middleware;
+use Illuminate\\Http\\Request;
+
+return Application::configure(basePath: dirname(__DIR__))
+    ->withRouting(
+        web: __DIR__.'/../routes/web.php',
+        api: __DIR__.'/../routes/api.php',
+        commands: __DIR__.'/../routes/console.php',
+        health: '/up',
+    )
+    ->withMiddleware(function (Middleware $middleware): void {
+        $middleware->redirectGuestsTo(fn (Request $request) => $request->is('api/*') ? null : route('login'));
+    })
+    ->withExceptions(function (Exceptions $exceptions): void {
+        $exceptions->shouldRenderJsonWhen(
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
+        );
+    })->create();`;
+
+const scrambleConfigPhp = `return [
+    'api_path' => 'api',
+
+    'api_domain' => null,
+
+    // ...
+
+    'info' => [
+        'version' => '1.0.0',
+
+        'description' => 'Send transactional email and SMS from your app with one request, then check whether each message was queued, sent, delivered, or failed.',
+    ],
+
+    'ui' => [
+        'title' => 'Acme Messages API',
+    ],
+
+    // ...
+
+    'servers' => [
+        'Production' => 'https://acme.example/api',
+    ],
+
+    // ...
+];`;
+
+const providerPhp = `<?php
+
+namespace App\\Providers;
+
+use Dedoc\\Scramble\\Scramble;
+use Dedoc\\Scramble\\Support\\Generator\\OpenApi;
+use Dedoc\\Scramble\\Support\\Generator\\SecurityScheme;
+use Illuminate\\Support\\ServiceProvider;
+
+class AppServiceProvider extends ServiceProvider
+{
+    /**
+     * Register any application services.
+     */
+    public function register(): void
+    {
+        //
+    }
+
+    /**
+     * Bootstrap any application services.
+     */
+    public function boot(): void
+    {
+        Scramble::configure()
+            ->withDocumentTransformers(function (OpenApi $openApi) {
+                $openApi->secure(
+                    SecurityScheme::http('bearer')
+                        ->as('bearerAuth')
+                        ->setDescription('A Sanctum API token from Create a token.')
+                );
+            });
+
+        // The public reference is the docs site. Keep Scramble's own UI and
+        // JSON routes for local development only.
+        if (! $this->app->environment('local')) {
+            Scramble::configure()->expose(false);
+        }
+    }
+}`;
+
+const indexMdx = `---
+title: Introduction
+description: Send transactional email and SMS from your app with the Acme Messages API, then check whether each message arrived.
+---
+
+The Acme Messages API sends transactional email and SMS for your app.
+
+- [Getting started](/getting-started): create a token, send your first message, and check that it arrived.
+- [API reference](/api): every endpoint, generated from the Laravel app's code.`;
+
+const gettingStartedMdx = `---
+title: Getting started
+description: Create an API token, send your first email with the Acme Messages API, and check whether the message was delivered.
+---
+
+Every request except [Create a token](/api/authentication/create-token) needs
+an API token, sent as a bearer token in the \`Authorization\` header.
+
+## Create a token
+
+Exchange your account's email address and password for a token, named after
+the app or machine that will use it:
+
+\`\`\`bash
+curl https://acme.example/api/tokens \\
+  -H "Content-Type: application/json" \\
+  -d '{"email": "ada@example.com", "password": "your-password", "device_name": "ci-server"}'
+\`\`\`
+
+The API answers \`201 Created\` with the token. It's only shown once, so keep it
+somewhere safe, like an environment variable:
+
+\`\`\`bash
+export ACME_TOKEN="1|miNQQG7KxUv8UJDcQUyLSRyTu4aNbo6C1fsez75046d7f853"
+\`\`\`
+
+## Send a message
+
+[Send a message](/api/messages/send-message) queues an email from the
+\`welcome\` template and fills in its \`name\` variable:
+
+\`\`\`bash
+curl https://acme.example/api/messages \\
+  -H "Authorization: Bearer $ACME_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"channel": "email", "to": "ada@example.com", "template": "welcome", "variables": {"name": "Ada"}}'
+\`\`\`
+
+The API answers \`202 Accepted\` before the email goes out:
+
+\`\`\`json
+{
+  "data": {
+    "id": "01m47e4jq23fz89dn02eezd3c9",
+    "channel": "email",
+    "to": "ada@example.com",
+    "template": "welcome",
+    "variables": { "name": "Ada" },
+    "status": "queued",
+    "created_at": "2026-10-06T01:44:33.000000Z"
+  }
+}
+\`\`\`
+
+## Check its status
+
+Pass the ID to [Get a message](/api/messages/get-message):
+
+\`\`\`bash
+curl https://acme.example/api/messages/01m47e4jq23fz89dn02eezd3c9 \\
+  -H "Authorization: Bearer $ACME_TOKEN"
+\`\`\`
+
+\`status\` is one of \`queued\`, \`sent\`, \`delivered\`, or \`failed\`.
+
+## When a request fails
+
+- \`401 Unauthorized\`: the token is missing, revoked, or not sent as \`Bearer\`.
+- \`422 Unprocessable Content\`: \`errors\` lists the problems with each field.
+- \`404 Not Found\`: no message in your account has that ID.`;
+
+const workflowYaml = `name: API docs
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.5"
+          coverage: none
+
+      - name: Install the API's dependencies
+        working-directory: acme-api
+        run: composer install --no-interaction --no-progress
+
+      - name: Migrate a SQLite database for Scramble
+        working-directory: acme-api
+        run: |
+          touch database/database.sqlite
+          php artisan migrate --force
+
+      - name: Export the spec
+        working-directory: acme-api
+        run: php artisan scramble:export --path=../docs-site/openapi.json --fail-on-unknown
+
+      - name: Fail if the committed spec is stale
+        run: |
+          if [ -n "$(git status --porcelain -- docs-site/openapi.json)" ]; then
+            git diff -- docs-site/openapi.json
+            echo "::error file=docs-site/openapi.json::The spec is stale. Run the export in acme-api/ and commit docs-site/openapi.json."
+            exit 1
+          fi
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Build the docs
+        working-directory: docs-site
+        run: |
+          npm ci
+          npx blume validate --strict
+          npm run build`;
+
+const blumeConfigTs = `import { defineConfig } from "blume";
+import { openapi } from "blume/reference";
+
+export default defineConfig({
+  title: "Acme Docs",
+  description: "Guides and API reference for the Acme Messages API.",
+  deployment: { site: "https://docs.acme.example" },
+  navigation: {
+    tabs: [
+      { label: "Docs", path: "/" },
+      { label: "API reference", path: "/api" },
+    ],
+  },
+  reference: [openapi({ route: "/api", spec: "./openapi.json" })],
+});`;
+
+const staleDiff = `                     "template": {
+                         "type": "string",
+-                        "description": "The ID of the template to send.",
++                        "description": "The ID of the template to send. Create templates in the dashboard.",
+                         "examples": [`;
+---
+
+<GuidePage guide={guideById("laravel-api-documentation-scramble")}>
+  <p>
+    To publish Laravel API documentation, let Scramble generate an OpenAPI
+    document from your routes, Form Requests, and API resources, export it to a
+    file with <code>php artisan scramble:export</code>, and point Blume at that
+    file. Scramble reads your code, so validation rules become request bodies
+    and resources become response schemas without annotations for every field.
+    Blume turns the file into a page per endpoint, next to the guides you write
+    in Markdown.
+  </p>
+  <p>
+    By the end of this guide, you have a small Laravel API with Sanctum token
+    auth, Form Request validation, and API resources, an OpenAPI 3.1 spec
+    exported from it and committed, and a Blume site with a getting-started
+    guide and an API reference whose Try it panel sends the reader's token. A
+    GitHub Actions job exports the spec again on every pull request, fails if
+    the committed copy is stale, and builds the docs. The example is the
+    fictional Acme Messages API, which sends email and SMS.
+  </p>
+
+  <h2>Where Scramble's /docs/api fits</h2>
+  <p>
+    Installing Scramble adds two routes to your app: <code>/docs/api</code>, a
+    reference UI built on Stoplight Elements (or Scalar, with{" "}
+    <code>'renderer' =&gt; 'scalar'</code>), and <code>/docs/api.json</code>,
+    the spec itself. They're the right tool while you build. A docs site does a
+    different job:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <td></td>
+        <th scope="col">Scramble's /docs/api</th>
+        <th scope="col">A Blume site</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Served by</td>
+        <td>Your Laravel app</td>
+        <td>Any static host, separate from the API</td>
+      </tr>
+      <tr>
+        <td>Content</td>
+        <td>The reference</td>
+        <td>Guides and the reference, on one site with one search</td>
+      </tr>
+      <tr>
+        <td>Updates</td>
+        <td>
+          On every request, or when you run <code>scramble:cache</code>
+        </td>
+        <td>When you export the spec and rebuild</td>
+      </tr>
+      <tr>
+        <td>Who can open it</td>
+        <td>
+          The <code>local</code> environment, plus whoever your{" "}
+          <code>viewApiDocs</code> gate allows
+        </td>
+        <td>Anyone, or whoever your host lets in</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Outside the <code>local</code> environment, both routes answer 403 unless
+    a <code>viewApiDocs</code> gate lets the request through. This guide goes
+    one step further and switches them off in every environment but{" "}
+    <code>local</code>, so the docs site is the only public reference.{" "}
+    <code>scramble:export</code> doesn't need the routes, so the export keeps
+    working.
+  </p>
+
+  <h2>Set up the two projects</h2>
+  <p>The example keeps the API and its docs in one repository, as two folders:</p>
+  <CodeBlock
+    code={`acme/
+  acme-api/    the Laravel API (PHP, Composer)
+  docs-site/   the Blume docs (Node.js)`}
+    lang="txt"
+  />
+  <p>
+    Create the Laravel app, scaffold the docs project beside it, then add
+    Sanctum and Scramble to the app:
+  </p>
+  <CodeBlock
+    code={`mkdir acme && cd acme
+composer create-project laravel/laravel:13.10.1 acme-api
+npx blume init docs-site --template docs --yes
+cd acme-api
+php artisan install:api
+composer require "dedoc/scramble:^0.13.47"
+php artisan vendor:publish --provider="Dedoc\\Scramble\\ScrambleServiceProvider" --tag="scramble-config"`}
+    lang="bash"
+  />
+  <ul>
+    <li>
+      <code>composer create-project</code> writes a Laravel 13 app that uses
+      SQLite, creates <code>database/database.sqlite</code>, and runs the
+      default migrations. Laravel 13 needs PHP 8.3 or later.
+    </li>
+    <li>
+      <code>blume init</code> writes <code>docs-site/</code> with a{" "}
+      <code>docs/</code> content folder, a <code>blume.config.ts</code>, and a{" "}
+      <code>package.json</code> whose <code>dev</code> and <code>build</code>{" "}
+      scripts run Blume, then installs its dependencies.
+    </li>
+    <li>
+      <code>php artisan install:api</code> installs Laravel Sanctum, creates{" "}
+      <code>routes/api.php</code>, and publishes the migration for API tokens.
+      Answer yes when it asks to run the migrations.
+    </li>
+    <li>
+      The last two commands install Scramble and publish its config to{" "}
+      <code>config/scramble.php</code>. Scramble is still on 0.x releases, so
+      the caret pins it to 0.13.
+    </li>
+  </ul>
+  <p>
+    The <code>13.10.1</code> pins the application skeleton, and Composer
+    installs the newest Laravel 13 framework release for it. This guide ran on
+    Laravel 13.34, Sanctum 4.3.3, and Scramble 0.13.47, on PHP 8.5. Commit{" "}
+    <code>composer.lock</code>: the CI check later compares the exported spec
+    byte for byte, so CI has to install the Scramble release you exported
+    with.
+  </p>
+
+  <h2>Build the API</h2>
+  <p>
+    Scramble documents what your code already says, so this section is an
+    ordinary Laravel API with a few PHPDoc comments. Create the model and its
+    migration:
+  </p>
+  <CodeBlock code="php artisan make:model Message -m" lang="bash" />
+  <p>
+    Replace the contents of the migration it created,{" "}
+    <code>database/migrations/&lt;timestamp&gt;_create_messages_table.php</code>.
+    Messages use ULIDs as IDs:
+  </p>
+  <CodeBlock code={migrationPhp} lang="php" />
+  <p>Two string-backed enums hold the channels and statuses:</p>
+  <CodeBlock code={channelPhp} lang="php" title="app/Enums/Channel.php" />
+  <CodeBlock code={statusPhp} lang="php" title="app/Enums/MessageStatus.php" />
+  <CodeBlock code={messagePhp} lang="php" title="app/Models/Message.php" />
+  <p>
+    In the <code>User</code> model, add Sanctum's <code>HasApiTokens</code>{" "}
+    trait, which <code>install:api</code> asks for, and a{" "}
+    <code>messages</code> relation:
+  </p>
+  <CodeBlock code={userPhp} lang="php" title="app/Models/User.php" />
+  <p>Run <code>php artisan migrate</code> to create the table.</p>
+
+  <h3>Validate requests with a Form Request</h3>
+  <p>
+    Scramble reads the <code>rules()</code> of a Form Request and turns them
+    into the request body schema. A PHPDoc comment above a rule adds a
+    description, <code>@example</code> adds an example, and <code>@var</code>{" "}
+    overrides the type it infers:
+  </p>
+  <CodeBlock
+    code={requestPhp}
+    lang="php"
+    title="app/Http/Requests/StoreMessageRequest.php"
+  />
+  <p>
+    <code>Rule::enum(Channel::class)</code> becomes a reference to a{" "}
+    <code>Channel</code> schema with <code>email</code> and <code>sms</code> as
+    its allowed values, <code>required</code> marks the field required, and{" "}
+    <code>max:254</code> becomes <code>maxLength</code>. Without the{" "}
+    <code>@var</code>, the <code>array</code> rule on <code>variables</code>{" "}
+    reads as a JSON array of strings, while clients send an object like{" "}
+    <code>{`{"name": "Ada"}`}</code>.
+  </p>
+
+  <h3>Shape responses with an API resource</h3>
+  <p>
+    Scramble analyzes a resource's <code>toArray</code> and types each field
+    from the model behind it: its casts and, for plain columns, the column type
+    it reads from the database. <code>@mixin</code> names the model, and{" "}
+    <code>#[SchemaName]</code> names the schema, which is otherwise the class
+    name, <code>MessageResource</code>:
+  </p>
+  <CodeBlock
+    code={resourcePhp}
+    lang="php"
+    title="app/Http/Resources/MessageResource.php"
+  />
+  <p>
+    The enum casts on the model become the <code>Channel</code> and{" "}
+    <code>MessageStatus</code> schemas, and <code>created_at</code> becomes a
+    nullable <code>date-time</code>. The <code>@example</code> values replace
+    the placeholders, like <code>"string"</code>, that the response examples
+    would otherwise show.
+  </p>
+
+  <h3>Write the controllers</h3>
+  <p>
+    The first line of a method's PHPDoc becomes the operation's summary, and
+    the paragraph after it the description. <code>#[Group]</code> names the
+    tag, gives it a description, and orders it by <code>weight</code>:
+  </p>
+  <CodeBlock
+    code={messageControllerPhp}
+    lang="php"
+    title="app/Http/Controllers/MessageController.php"
+  />
+  <p>
+    The token endpoint follows the pattern Sanctum's docs give for issuing
+    tokens to mobile apps. <code>@unauthenticated</code> marks it as public,
+    since it's how a reader gets a token in the first place:
+  </p>
+  <CodeBlock
+    code={tokenControllerPhp}
+    lang="php"
+    title="app/Http/Controllers/TokenController.php"
+  />
+  <p>Replace the routes file that <code>install:api</code> created:</p>
+  <CodeBlock code={routesPhp} lang="php" title="routes/api.php" />
+  <p>
+    Last, one line in <code>bootstrap/app.php</code>. Laravel's auth middleware
+    redirects a guest to a <code>login</code> route unless the request asks
+    for JSON with <code>Accept: application/json</code>. This app has no such
+    route, so a request without a token and without that header gets a 500{" "}
+    <code>Route [login] not defined.</code> instead of a 401. Browsers don't
+    send that header, so this is what Try it would show:
+  </p>
+  <CodeBlock code={bootstrapPhp} lang="php" title="bootstrap/app.php" />
+
+  <h3>Where each part shows up</h3>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In Laravel</th>
+        <th scope="col">In the spec</th>
+        <th scope="col">On the docs site</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>#[Group('Messages', '…')]</code></td>
+        <td>The tag and its description</td>
+        <td>
+          The sidebar group, its intro on the overview, and the URL segment{" "}
+          <code>/api/messages/</code>
+        </td>
+      </tr>
+      <tr>
+        <td><code>@operationId sendMessage</code></td>
+        <td><code>operationId</code></td>
+        <td>The page URL, <code>/api/messages/send-message</code></td>
+      </tr>
+      <tr>
+        <td>The PHPDoc's first line and paragraph</td>
+        <td><code>summary</code> and <code>description</code></td>
+        <td>The page title, sidebar label, and introduction</td>
+      </tr>
+      <tr>
+        <td>The Form Request's rules and their PHPDoc</td>
+        <td>The request body schema</td>
+        <td>The request body table and the Try it form</td>
+      </tr>
+      <tr>
+        <td>The resource and the model's casts</td>
+        <td>The <code>Message</code> schema</td>
+        <td>The response tables and examples</td>
+      </tr>
+      <tr>
+        <td>
+          <code>auth:sanctum</code>, <code>validate</code>, and route model
+          binding
+        </td>
+        <td>401, 422, and 404 responses</td>
+        <td>Extra entries under Responses</td>
+      </tr>
+      <tr>
+        <td><code>#[QueryParameter]</code>, <code>#[PathParameter]</code></td>
+        <td>Parameters with descriptions and examples</td>
+        <td>
+          The parameter tables, and the values Try it and the code samples
+          start with
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Some of it doesn't happen without help:</p>
+  <ul>
+    <li>
+      <strong>Operation IDs.</strong> Scramble uses the route's name, or the
+      controller and method when there isn't one, so without{" "}
+      <code>@operationId</code> the IDs here would be{" "}
+      <code>message.store</code> and the page{" "}
+      <code>/api/messages/message-store</code>. With{" "}
+      <code>Route::apiResource</code>, the route names make it{" "}
+      <code>messages.store</code>.
+    </li>
+    <li>
+      <strong>Tags.</strong> Without <code>#[Group]</code>, the tag is the
+      controller's name without "Controller", <code>Message</code>, with no
+      description.
+    </li>
+    <li>
+      <strong>Pagination.</strong> Scramble documents the paginated response,
+      with its <code>links</code> and <code>meta</code>, but not the{" "}
+      <code>page</code> parameter <code>paginate()</code> reads, so{" "}
+      <code>#[QueryParameter]</code> adds it.
+    </li>
+    <li>
+      <strong>Path parameter examples.</strong> Without the{" "}
+      <code>example</code> in <code>#[PathParameter]</code>, the code samples
+      call <code>/messages/string</code>.
+    </li>
+  </ul>
+
+  <h2>Configure Scramble</h2>
+  <p>
+    Set the document's metadata in the published config. These are the keys
+    this guide changes or relies on:
+  </p>
+  <CodeBlock
+    code={scrambleConfigPhp}
+    lang="php"
+    title="config/scramble.php"
+  />
+  <ul>
+    <li>
+      <strong><code>api_path</code></strong> picks which routes to document:
+      every route under <code>api</code>. With a single prefix like this,
+      Scramble strips it from the paths, so operations read{" "}
+      <code>/messages</code>, and the server URL carries it.
+    </li>
+    <li>
+      <strong><code>api_domain</code></strong> is for an API served on its own
+      domain with <code>Route::domain()</code>. It's also part of the route
+      matching, so setting it for routes that don't declare that domain
+      documents nothing: the export writes a spec with no paths and still
+      exits 0.
+    </li>
+    <li>
+      <strong><code>info</code> and <code>ui.title</code></strong> become the
+      spec's version, description, and title, which head the reference's
+      overview page. Left alone, the title is your <code>APP_NAME</code>,{" "}
+      <code>Laravel</code>, and the version is <code>0.0.1</code>.
+    </li>
+    <li>
+      <strong><code>servers</code></strong> is where Try it and the code
+      samples send requests. Left at <code>null</code>, Scramble builds the
+      server from <code>APP_URL</code>, so an export on your machine writes{" "}
+      <code>http://localhost:8000/api</code> and one in CI, with no{" "}
+      <code>.env</code>, writes <code>http://localhost/api</code>. Use an
+      absolute URL, and the export comes out the same everywhere.
+    </li>
+  </ul>
+  <p>
+    Scramble adds 401 responses to routes behind <code>auth:sanctum</code>,
+    but no security scheme until you add one, so without it no page has an
+    Authorization section. Describe Sanctum's tokens as a bearer scheme with a
+    document transformer in{" "}
+    <code>AppServiceProvider</code>, and turn off Scramble's routes outside{" "}
+    <code>local</code> in the same place:
+  </p>
+  <CodeBlock
+    code={providerPhp}
+    lang="php"
+    title="app/Providers/AppServiceProvider.php"
+  />
+  <p>
+    <code>secure()</code> adds the scheme to{" "}
+    <code>components.securitySchemes</code> and makes it the default for every
+    operation. <code>as('bearerAuth')</code> names it; the default name is{" "}
+    <code>http</code>. Create a token opts out with{" "}
+    <code>@unauthenticated</code>, which writes <code>security: []</code> on
+    that operation.
+  </p>
+  <p>
+    Scramble 0.13.24 and later can also derive auth from middleware: set{" "}
+    <code>security_strategy</code> in <code>config/scramble.php</code> to{" "}
+    <code>MiddlewareAuthSecurityStrategy</code>, and routes behind{" "}
+    <code>auth:sanctum</code> get a bearer scheme while the rest are marked
+    public. Use one approach or the other, not both, or the spec can list the
+    scheme twice.
+  </p>
+
+  <h2>Export the spec</h2>
+  <p>From <code>acme-api/</code>, write the spec into the docs project:</p>
+  <CodeBlock
+    code="php artisan scramble:export --path=../docs-site/openapi.json --fail-on-unknown"
+    lang="bash"
+  />
+  <p>
+    The command prints{" "}
+    <code>OpenAPI document exported to ../docs-site/openapi.json.</code> The
+    path is relative to where you run it. To make the path the default, set{" "}
+    <code>export_path</code> in <code>config/scramble.php</code>.{" "}
+    <code>--stdout</code> prints the spec instead of writing a file.
+  </p>
+  <p>
+    <code>--fail-on-unknown</code> makes the export exit 1 when Scramble
+    couldn't infer a type, which it would otherwise write as{" "}
+    <code>string</code> without a word. It still writes the file, and it lists
+    each field with its source line. On this app, it caught the token in the
+    token response before the <code>@var string</code> was added, since
+    Scramble can't infer <code>plainTextToken</code>.
+  </p>
+  <p>
+    Scramble writes OpenAPI 3.1.0, which Blume reads as written. To see the
+    parts Blume turns into the Authorization section and the Try it server:
+  </p>
+  <CodeBlock
+    code="jq '{openapi, servers, security, securitySchemes: .components.securitySchemes}' ../docs-site/openapi.json"
+    lang="bash"
+  />
+  <CodeBlock
+    code={`{
+  "openapi": "3.1.0",
+  "servers": [
+    {
+      "url": "https://acme.example/api",
+      "description": "Production"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    }
+  ],
+  "securitySchemes": {
+    "bearerAuth": {
+      "type": "http",
+      "description": "A Sanctum API token from Create a token.",
+      "scheme": "bearer"
+    }
+  }
+}`}
+    lang="json"
+  />
+  <p>Three things about the export decide how you run it later:</p>
+  <ul>
+    <li>
+      <strong>It needs a migrated database.</strong> Scramble reads your
+      models' columns to type resource fields. Without the{" "}
+      <code>messages</code> table, it warns with{" "}
+      <code>MD001 Cannot read database schema</code>, still exits 0, and
+      writes a spec in which the response's <code>channel</code> and{" "}
+      <code>status</code> are plain strings, <code>created_at</code> loses its{" "}
+      <code>date-time</code> format, and the path parameter is an integer.{" "}
+      <code>--fail-on-unknown</code> turns that into a failure.
+    </li>
+    <li>
+      <strong>It doesn't need secrets or a server.</strong> The command boots
+      the app in the console and analyzes the code. It runs without an{" "}
+      <code>APP_KEY</code> or a <code>.env</code> file, and nothing listens on a
+      port.
+    </li>
+    <li>
+      <strong>It's deterministic.</strong> Two exports of the same code write
+      the same bytes, and so does an export with a different{" "}
+      <code>APP_URL</code> or <code>APP_ENV</code>, once{" "}
+      <code>servers</code> is set. The file is JSON indented with four spaces
+      and has no trailing newline, so keep editors and formatters away from
+      it.
+    </li>
+  </ul>
+
+  <h2>Build the docs site</h2>
+  <p>Replace the scaffolded config:</p>
+  <CodeBlock code={blumeConfigTs} lang="ts" title="docs-site/blume.config.ts" />
+  <p>
+    The reference mounts at <code>/api</code>. It doesn't add a header tab on
+    its own: the API reference tab puts it in the header and gives the
+    operations a sidebar of their own, apart from the guides.{" "}
+    <code>deployment.site</code> gives the sitemap and canonical links their
+    origin. For the reference's other options, like which code-sample
+    languages to show, see{" "}
+    <a href="/guides/openapi-documentation-website">Generate API docs from an OpenAPI spec</a>.
+  </p>
+  <p>
+    The reference answers "what does each endpoint take?" A getting-started
+    guide answers "how do I make my first call?", starting with the token.
+    Replace the scaffolded home page, then add the guide beside it:
+  </p>
+  <CodeBlock code={indexMdx} lang="mdx" title="docs-site/docs/index.mdx" />
+  <CodeBlock
+    code={gettingStartedMdx}
+    lang="mdx"
+    title="docs-site/docs/getting-started.mdx"
+  />
+  <p>
+    The guide links to operation pages by URL, like any other page. From{" "}
+    <code>docs-site/</code>, build the site, check every link, and serve the
+    build:
+  </p>
+  <CodeBlock
+    code={`npm run build
+npx blume validate --strict
+npx blume preview`}
+    lang="bash"
+  />
+  <p>
+    <code>blume validate --strict</code> fails on broken links and on
+    warnings, including an empty reference or two sidebar entries with the
+    same label. Open <code>http://localhost:4321</code>, and you have these
+    pages:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Page</th>
+        <th scope="col">From</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>/</code></td>
+        <td><code>docs/index.mdx</code></td>
+      </tr>
+      <tr>
+        <td><code>/getting-started</code></td>
+        <td><code>docs/getting-started.mdx</code></td>
+      </tr>
+      <tr>
+        <td><code>/api</code></td>
+        <td>The spec's title, description, version, server, and tags</td>
+      </tr>
+      <tr>
+        <td><code>/api/authentication/create-token</code></td>
+        <td><code>POST /tokens</code></td>
+      </tr>
+      <tr>
+        <td><code>/api/messages/list-messages</code></td>
+        <td><code>GET /messages</code></td>
+      </tr>
+      <tr>
+        <td><code>/api/messages/send-message</code></td>
+        <td><code>POST /messages</code></td>
+      </tr>
+      <tr>
+        <td><code>/api/messages/get-message</code></td>
+        <td><code>GET /messages/&#123;message&#125;</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    On Send a message, the request body table lists <code>channel</code>,{" "}
+    <code>to</code>, and <code>template</code> as required, with each rule's
+    description, the allowed channels, and the max lengths, and{" "}
+    <code>variables</code> as an optional object. The 202 response shows the{" "}
+    <code>Message</code> schema with the allowed statuses, followed by 401 and
+    422 with Laravel's error shapes. Create a token has no Authorization
+    section. List messages has the <code>page</code> parameter and the{" "}
+    <code>data</code>, <code>links</code>, and <code>meta</code> of the
+    paginated response.
+  </p>
+
+  <h2>Send requests with a Sanctum token</h2>
+  <p>
+    Every operation except Create a token has an Authorization section that
+    names the bearer scheme and its description, and its code samples send a
+    placeholder token. On Send a message:
+  </p>
+  <CodeBlock
+    code={`curl -X POST 'https://acme.example/api/messages' \\
+  -H 'Authorization: Bearer YOUR_TOKEN' \\
+  -H 'Content-Type: application/json' \\
+  -d '{
+  "channel": "email",
+  "to": "ada@example.com",
+  "template": "welcome",
+  "variables": {
+    "name": "Ada"
+  }
+}'`}
+    lang="bash"
+  />
+  <p>
+    The Try it panel has a Bearer token field. A token typed there is sent
+    with Send, and stays in memory unless the reader checks{" "}
+    <strong>Remember on this device</strong>. The samples keep showing{" "}
+    <code>YOUR_TOKEN</code> unless the reader checks{" "}
+    <strong>Include my values in samples</strong>.
+  </p>
+  <p>
+    You can try the whole loop locally. Start the API, create a user, and get a
+    token from it:
+  </p>
+  <CodeBlock
+    code={`php artisan serve
+php artisan tinker --execute="App\\Models\\User::factory()->create(['email' => 'ada@example.com', 'password' => 'secret-password']);"
+curl http://127.0.0.1:8000/api/tokens \\
+  -H "Content-Type: application/json" \\
+  -d '{"email": "ada@example.com", "password": "secret-password", "device_name": "docs"}'`}
+    lang="bash"
+  />
+  <p>
+    Run <code>php artisan serve</code> in its own terminal. The last command
+    answers 201 with <code>{`{"token":"1|…"}`}</code>. Then, with{" "}
+    <code>npx blume preview</code> running in <code>docs-site/</code>, open{" "}
+    <code>/api/messages/send-message</code>, expand Try it, enter{" "}
+    <code>http://127.0.0.1:8000/api</code> as the Custom base URL, and click
+    Send. Without a token, the panel shows{" "}
+    <code>401 Unauthorized</code> and{" "}
+    <code>{`{"message": "Unauthenticated."}`}</code>. Paste the token into
+    Bearer token and click Send again: the panel shows{" "}
+    <code>202 Accepted</code> and the queued message.
+  </p>
+  <p>
+    The panel calls the API from the docs site's origin, and that works here
+    because Laravel's default CORS settings allow any origin on{" "}
+    <code>api/*</code>, without credentials. The panel sends no cookies, and
+    the token travels in the <code>Authorization</code> header, which Laravel
+    allows in its answer to the preflight. To allow
+    only your docs origin, run <code>php artisan config:publish cors</code>{" "}
+    and set <code>allowed_origins</code>.{" "}
+    <a href="/guides/api-documentation-cors-errors">Fix CORS errors in an API documentation playground</a>{" "}
+    covers reading the preflight, and Blume's proxy for APIs you can't change.
+  </p>
+
+  <h2>Regenerate the spec on every change</h2>
+  <p>
+    The reference changes only when <code>openapi.json</code> does. Run the
+    export after you change a route, a rule, a resource, or a PHPDoc comment,
+    and commit the spec with the code. <code>blume dev</code> watches the file,
+    so with <code>npm run dev</code> running in <code>docs-site/</code>, each
+    export updates the pages without a restart.
+  </p>
+  <p>
+    To catch a forgotten export, this workflow exports the spec on every pull
+    request, fails when the committed copy differs, and builds the docs:
+  </p>
+  <CodeBlock
+    code={workflowYaml}
+    lang="yaml"
+    title=".github/workflows/api-docs.yml"
+  />
+  <ul>
+    <li>
+      <strong>setup-php</strong> installs PHP 8.5 with Composer. Use the PHP
+      version you develop on, since <code>composer.lock</code> was resolved
+      for it. <code>coverage: none</code> skips Xdebug and PCOV, which the
+      export doesn't need.
+    </li>
+    <li>
+      <strong>The SQLite step</strong> gives Scramble the tables it reads.
+      With no <code>.env</code>, Laravel uses SQLite at{" "}
+      <code>database/database.sqlite</code> and the <code>production</code>{" "}
+      environment, which is why <code>migrate</code> needs{" "}
+      <code>--force</code>. The job needs no secrets. If your app runs on
+      MySQL or Postgres, check that an export against a SQLite copy writes the
+      same file before you rely on this step, since the column types come from
+      the database.
+    </li>
+    <li>
+      <strong>The freshness check</strong> asks Git whether the export changed
+      the committed file. <code>git status --porcelain</code> also catches a
+      spec that was never committed, which <code>git diff</code> alone would
+      miss.
+    </li>
+    <li>
+      <strong>The docs steps</strong> install from{" "}
+      <code>docs-site/package-lock.json</code>, so commit it, then check the
+      links and build into <code>docs-site/dist</code>. Add your host's deploy
+      step after the build; the <a href="/docs/deployment">deployment docs</a>{" "}
+      cover each host.
+    </li>
+  </ul>
+  <p>
+    A docs-only change counts too. Reword a rule's PHPDoc, like the{" "}
+    <code>template</code> description, and push without exporting: the
+    freshness check fails, prints the diff, and annotates the file:
+  </p>
+  <CodeBlock code={staleDiff} lang="diff" title="docs-site/openapi.json" />
+  <p>
+    Run the export, commit <code>docs-site/openapi.json</code>, and the check
+    passes. For breaking-change detection on top of this, like failing a pull
+    request that adds a required field, see{" "}
+    <a href="/guides/openapi-documentation-ci">Keep API documentation in sync with backend changes in CI</a>.
+  </p>
+
+  <h2>Limitations</h2>
+  <ul>
+    <li>
+      <strong>Only what Scramble writes reaches the docs.</strong> Blume reads
+      the exported file, never your PHP. What Scramble can't infer, like the
+      type of <code>plainTextToken</code> or the <code>page</code> parameter
+      here, needs a PHPDoc annotation or an attribute before it shows up.
+    </li>
+    <li>
+      <strong>The export needs your schema.</strong> CI has to migrate a
+      database before it exports, and Scramble types resource fields from that
+      database's columns.
+    </li>
+    <li>
+      <strong>Operation order doesn't follow your code.</strong> The sidebar
+      lists a tag's operations alphabetically, Get, List, Send. The overview
+      follows the spec's paths but puts each path's methods in a fixed order,
+      GET before POST. The tag order does follow <code>#[Group]</code>'s{" "}
+      <code>weight</code>.
+    </li>
+    <li>
+      <strong>Agents get the prose, not the tables.</strong> The Markdown copy
+      of each operation page, which <code>llms-full.txt</code> and the{" "}
+      <code>.md</code> URLs serve, carries the summary, description, and
+      endpoint, without parameters, schemas, or responses. Write PHPDoc
+      descriptions that stand on their own.
+    </li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <h3>Page URLs end in message-store or messages-store</h3>
+  <p>
+    The method has no <code>@operationId</code>, so Scramble used the route
+    name or the controller and method. Add one to each method's PHPDoc, and if
+    the old URLs are already public, add a{" "}
+    <a href="/docs/deployment#redirects">redirect</a> for each in{" "}
+    <code>blume.config.ts</code>.
+  </p>
+  <h3>validate --strict fails with BLUME_NAV_DUPLICATE_LABEL</h3>
+  <p>
+    Two operations on the same path have no PHPDoc summary, so both sidebar
+    entries are labeled with the path, like <code>/messages</code>. Give each
+    method a first line in its PHPDoc.
+  </p>
+  <h3>The export warns MD001 Cannot read database schema</h3>
+  <p>
+    The database the export uses has no table for that model. Run{" "}
+    <code>php artisan migrate</code> first. In CI, check that the migrate step
+    runs before the export.
+  </p>
+  <h3>validate --strict fails with BLUME_OPENAPI_EMPTY</h3>
+  <p>
+    The spec has no operations. Check <code>api_path</code> against{" "}
+    <code>php artisan route:list --path=api</code>, and unset{" "}
+    <code>api_domain</code> unless your routes declare that domain.{" "}
+    <code>php artisan scramble:analyze --fail-on-empty</code> prints the
+    selection rule and exits 1 when no route matches.
+  </p>
+  <h3>Try it gets a 500 with "Route [login] not defined."</h3>
+  <p>
+    The request had no valid token, and the auth middleware tried to redirect
+    to a login page. Add the <code>redirectGuestsTo</code> line to{" "}
+    <code>bootstrap/app.php</code> as shown above, so API guests get a 401.
+  </p>
+  <h3>Try it sends requests to localhost</h3>
+  <p>
+    <code>servers</code> is <code>null</code>, so the export used{" "}
+    <code>APP_URL</code>. Set an absolute production URL in{" "}
+    <code>config/scramble.php</code> and export again.
+  </p>
+  <h3>The build fails with BLUME_OPENAPI_UNAVAILABLE</h3>
+  <p>
+    Blume couldn't read the spec where <code>spec</code> points. It's
+    resolved from <code>docs-site/</code>, so check that the export wrote{" "}
+    <code>docs-site/openapi.json</code> and that the file is committed. In{" "}
+    <code>blume dev</code> this is only a warning and the reference is
+    skipped, so a working dev server can hide it.
+  </p>
+</GuidePage>

@@ -692,6 +692,46 @@ export const guides: Guide[] = [
         href: "/docs/references/openapi#authorization",
         label: "Authorization",
       },
+      { href: "/docs/content/navigation#tabs", label: "Navigation tabs" },
+      { href: "/docs/cli/validate", label: "Validate links" },
+      { href: "/docs/deployment", label: "Deployment" },
+    ],
+    id: "aspnet-core-api-documentation",
+    image: { src: "/guides/aspnet-core-api-documentation.webp" },
+    meta: {
+      description:
+        "Generate your ASP.NET Core OpenAPI document at build time, describe endpoints with XML comments and JWT auth, and publish it as a docs site with guides.",
+      title: "How to publish ASP.NET Core API documentation from OpenAPI",
+    },
+    nextStep: {
+      body: "Run it at the root of your repository, beside your API project, then point OpenApiDocumentsDirectory at the new docs-site folder.",
+      command: "npx blume init docs-site --template docs --yes",
+      link: {
+        href: "/guides/openapi-documentation-ci",
+        label: "Add breaking-change checks in CI",
+      },
+      title: "Add docs to your ASP.NET Core API",
+    },
+    prerequisites: [
+      "The .NET 10 SDK",
+      "Node.js 22.12 or later",
+      "An ASP.NET Core API, or the template created in the guide",
+    ],
+    published: "2026-10-05",
+    summary:
+      "Generate an ASP.NET Core API's OpenAPI document on every build, turn its XML comments and JWT auth into a page per operation beside your guides, and fail CI when the committed spec goes stale.",
+    tested: { date: "2026-10-05", version: "2.1.3" },
+    title: "Publish ASP.NET Core API documentation from build-time OpenAPI",
+    topic: "reference",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/references/openapi", label: "OpenAPI reference" },
+      {
+        href: "/docs/references/openapi#authorization",
+        label: "Authorization",
+      },
       { href: "/docs/cli/validate", label: "Validate links" },
       { href: "/docs/deployment", label: "Deployment" },
     ],
@@ -719,6 +759,86 @@ export const guides: Guide[] = [
     summary:
       "A DRF API whose drf-spectacular schema generates without warnings, published as an API reference with a first-request tutorial beside it and rebuilt from code in CI.",
     title: "Build Django REST Framework docs with drf-spectacular",
+    topic: "reference",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/references/openapi", label: "OpenAPI reference" },
+      {
+        href: "/docs/references/openapi#authorization",
+        label: "Authorization",
+      },
+      {
+        href: "/docs/references/openapi#try-it-playground",
+        label: "Try it",
+      },
+      { href: "/docs/cli/validate", label: "Validate" },
+    ],
+    id: "laravel-api-documentation-scramble",
+    image: { src: "/guides/laravel-api-documentation-scramble.webp" },
+    meta: {
+      description:
+        "Generate an OpenAPI spec from Laravel routes, Form Requests, and API resources with Scramble, then publish it as a static API reference beside your guides.",
+      title: "How to publish Laravel API documentation with Scramble",
+    },
+    nextStep: {
+      body: "Add oasdiff to the workflow, so a pull request that would break existing clients, like one adding a required request field, fails before it merges.",
+      link: {
+        href: "/guides/openapi-documentation-ci",
+        label: "Read the CI sync guide",
+      },
+      title: "Catch breaking changes in review",
+    },
+    prerequisites: [
+      "A Laravel API, or PHP 8.3 or later and Composer to create one",
+      "Node.js 22.12 or later",
+      "A GitHub repository, for the CI step",
+    ],
+    published: "2026-10-05",
+    summary:
+      "A Laravel API whose Form Requests, resources, and PHPDoc become an OpenAPI 3.1 spec through Scramble, published as a Blume reference with Sanctum tokens in Try it and checked for freshness in CI.",
+    tested: { date: "2026-10-05", version: "2.1.3" },
+    title: "Publish Laravel API documentation with Scramble",
+    topic: "reference",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/references/openapi", label: "OpenAPI reference" },
+      {
+        href: "/docs/references/openapi#try-it-playground",
+        label: "Try it playground",
+      },
+      { href: "/docs/cli/validate", label: "Validate links" },
+      { href: "/docs/deployment", label: "Deployment" },
+    ],
+    id: "rails-api-documentation-rswag",
+    image: { src: "/guides/rails-api-documentation-rswag.webp" },
+    meta: {
+      description:
+        "Turn rswag request specs into OpenAPI with examples recorded from real test runs, and publish Rails API docs that only rebuild after the specs pass.",
+      title: "How to publish Rails API documentation from rswag specs",
+    },
+    nextStep: {
+      body: "Run it at the root of your Rails app once rswag writes docs-site/openapi.yaml, then mount the file with openapi().",
+      command: "npx blume init docs-site --template docs --yes",
+      link: {
+        href: "/guides/openapi-documentation-ci",
+        label: "Add breaking-change checks in CI",
+      },
+      title: "Add docs to your Rails API",
+    },
+    prerequisites: [
+      "A Rails API, or Ruby 3.2 or later to build the one here",
+      "Node.js 22.12 or later",
+      "A GitHub repository, for the CI step",
+    ],
+    published: "2026-10-05",
+    summary:
+      "Describe your Rails API in rswag request specs that test every documented response, write OpenAPI with real recorded examples, and rebuild the docs only when the specs pass.",
+    tested: { date: "2026-10-05", version: "2.1.3" },
+    title: "Publish Rails API documentation from rswag request specs",
     topic: "reference",
   },
   {

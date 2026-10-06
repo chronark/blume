@@ -1,0 +1,1507 @@
+---
+// Publish ASP.NET Core API documentation from build-time OpenAPI: checked
+// against the OpenAPI, navigation, folder meta, validate, audit, and
+// deployment docs, and on main (cf03b9cf, no packages/blume/src changes since
+// the 2.1.3 release commit) against the openapi() options
+// (reference/openapi.ts, reference/options.ts), operation slugs, key
+// de-duplication, and tag order (openapi/model.ts operationKey,
+// operationCollector), the generated tag folder meta (openapi/source.ts
+// tagFolderMeta) and its override (core/project-graph.ts), the empty-server
+// fallback (components/openapi/request.ts), schema-row descriptions beside a
+// $ref (components/openapi/SchemaProperty.astro, helpers.ts resolveSchema),
+// example sampling (helpers.ts exampleValue), and `blume init --no-install`
+// (cli/commands/init.ts). .NET side: Microsoft Learn's "Generate OpenAPI
+// documents" (AspNetCore.Docs c6120ec0), "OpenAPI XML documentation comment
+// support" and "Customize OpenAPI documents" (adf460c8), the
+// Microsoft.Extensions.ApiDescription.Server 10.0.12 MSBuild targets
+// (GenerateOpenApiDocuments Inputs/Outputs), the actions/setup-dotnet README
+// (global-json-file, rollForward) and its v6.0.0 source
+// (getVersionFromGlobalJson turns latestPatch into 10.0.4xx), and the latest
+// action releases (checkout v7.0.1, setup-dotnet v6.0.0, setup-node v7.0.0).
+//
+// Ran end to end on 2026-10-05 with the .NET SDK 10.0.401 (Homebrew; ASP.NET
+// Core runtime 10.0.12, web templates 10.0.12), Node 24.14.1, npm 11.11.0,
+// jq 1.7.1, in a fresh folder outside the repo: every command and file on
+// this page, in order, extracted from this page and compared byte for byte
+// with the probe project. Packages: Microsoft.AspNetCore.OpenApi,
+// Microsoft.Extensions.ApiDescription.Server, and
+// Microsoft.AspNetCore.Authentication.JwtBearer 10.0.12 (Microsoft.OpenApi
+// 2.12.0 transitively). Blume 2.1.3 was symlinked from main into
+// node_modules and run by path in place of `npx blume` (`blume init` with
+// --no-install); the curl port was that project's own (5103), and preview
+// used a spare port. Results: `dotnet build` wrote docs-site/openapi.json
+// (OpenAPI 3.1.1) and the jq output shown; curl got 401 then 202, and
+// `kill %1` stopped the app; `npm run spec` rewrote identical bytes; `npm run
+// build` with no warnings; validate --strict exit 0; audit 0 errors and 0
+// warnings; preview with curl: 200 on every route in the table and the three
+// guides, 404 on /api/messages/post-messages, and page text checked for the
+// summary titles, remarks, the request body's <param>, property descriptions
+// and limits, "Bearer token (JWT)" in Authorization and Try it, no
+// Authorization on Get the API status, and the C# sample; the guides' curl
+// commands against the local API (200, 202, 409, 204 as described); the
+// workflow's steps locally after a git commit (no diff; adding ReplyTo
+// failed with exactly the hunk shown; regenerating passed); and the startup
+// guard snippet (export succeeded, a normal run threw).
+//
+// Also probed: the template's defaults (obj/AcmeApi.json, "AcmeApi | v1",
+// tag AcmeApi, no servers, integer typed ["integer","string"]); no WithName
+// (post-messages, get-messages-id); no JSON options (bare integer enums,
+// "integer | string" rows); a CamelCase enum policy (?status=scheduled 400,
+// Scheduled 200); a <param> on the injected service replacing the body's
+// description; an enum <summary> shown on every property row; XML comments
+// winning over WithSummary/WithDescription, which work on a lambda; the
+// controllers template (Name= gives the operationId, tag = controller name,
+// XML comments on actions); a duplicate WithName (both IDs in the spec,
+// Blume's silent get-message-get); an incremental build skipping the export
+// even after the file was deleted, and --no-incremental rewriting it; Debug,
+// Release, and clean builds writing identical bytes; the export running all
+// of Program.cs (app.Run() included) in Production unless
+// ASPNETCORE_ENVIRONMENT is set; a throwing startup ("exited with code 11");
+// a missing output folder being created; `dotnet publish` writing the spec,
+// and -p:OpenApiGenerateDocumentsOnBuild=false skipping it; /openapi/v1.json
+// 404 in Production; the CORS preflight; UseCors after UseAuthorization
+// sending the 401 without Access-Control-Allow-Origin; AddProblemDetails
+// changing the 400 body; .NET 9-style OpenApiReference code failing with
+// CS0117 and CS0246; `blume dev` picking up a regenerated spec without a
+// restart; Blume's generated C# sample run as a .NET 10 file-based app
+// against the local API (202); validate's BLUME_BROKEN_LINK after renaming
+// SendMessage; actionlint 1.7.12 on the workflow; and @astrojs/compiler
+// 2.13.1 on this page (0 diagnostics). Not run: `npm install` or `npm ci`
+// (Blume was linked, so there's no package-lock.json and the setup-node
+// cache path is unverified), the workflow on GitHub Actions (including
+// setup-dotnet's global.json resolution), a deploy, `astro check`, and Send
+// in a browser's Try it panel.
+//
+// A review re-ran, in a copy of the probe project: the guides' curl calls
+// against the local API (the 401's empty body and WWW-Authenticate header,
+// the 400 problem details body as shown, ?status=scheduled 400 and
+// Scheduled 200, 204, 409); a <response> for a status code the endpoint
+// doesn't declare (left out of the spec); .NET 9-style security code (CS0234
+// with the Models using, CS0117 and CS0246 without it); `--tl:off` printing
+// "Writing document named 'v1'"; `blume build` with openapi.json missing
+// (BLUME_OPENAPI_UNAVAILABLE, exit 1); and the template's spec with no
+// servers (samples call a bare /weatherforecast, rows read
+// "integer | string").
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const csproj = `<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <NoWarn>$(NoWarn);CS1573;CS1591</NoWarn>
+    <OpenApiDocumentsDirectory>../docs-site</OpenApiDocumentsDirectory>
+    <OpenApiGenerateDocumentsOptions>--file-name openapi</OpenApiGenerateDocumentsOptions>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.12" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.ApiDescription.Server" Version="10.0.12">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>`;
+
+const models = `using System.ComponentModel.DataAnnotations;
+
+namespace AcmeApi.Messages;
+
+public enum Channel
+{
+    Email,
+    Sms,
+}
+
+public enum MessageStatus
+{
+    Scheduled,
+    Queued,
+    Sent,
+    Delivered,
+    Failed,
+    Canceled,
+}
+
+/// <summary>A message to send.</summary>
+public sealed record SendMessageRequest
+{
+    /// <summary>How to deliver the message.</summary>
+    /// <example>"Email"</example>
+    public required Channel Channel { get; init; }
+
+    /// <summary>An email address, or a phone number in E.164 format.</summary>
+    /// <example>"ada@example.com"</example>
+    [MaxLength(320)]
+    public required string To { get; init; }
+
+    /// <summary>The ID of the template to send.</summary>
+    /// <example>"welcome"</example>
+    [MaxLength(64)]
+    public required string Template { get; init; }
+
+    /// <summary>Values for the template's variables.</summary>
+    /// <example>{ "firstName": "Ada" }</example>
+    public Dictionary<string, string>? Variables { get; init; }
+
+    /// <summary>When to send the message. Leave it out to send right away.</summary>
+    /// <example>"2026-11-01T09:00:00Z"</example>
+    public DateTimeOffset? SendAt { get; init; }
+}
+
+/// <summary>A message and where it is in delivery.</summary>
+public sealed record Message
+{
+    /// <summary>The message ID.</summary>
+    /// <example>"msg_8f2k"</example>
+    public required string Id { get; init; }
+
+    /// <summary>How the message is delivered.</summary>
+    public required Channel Channel { get; init; }
+
+    /// <summary>Who the message goes to.</summary>
+    /// <example>"ada@example.com"</example>
+    public required string To { get; init; }
+
+    /// <summary>Where the message is in delivery.</summary>
+    public required MessageStatus Status { get; init; }
+
+    /// <summary>When the API accepted the message.</summary>
+    /// <example>"2026-11-01T08:30:00Z"</example>
+    public required DateTimeOffset CreatedAt { get; init; }
+
+    /// <summary>When a scheduled message goes out.</summary>
+    public DateTimeOffset? SendAt { get; init; }
+}
+
+/// <summary>A page of messages, newest first.</summary>
+public sealed record MessageList
+{
+    /// <summary>The messages on this page.</summary>
+    public required IReadOnlyList<Message> Items { get; init; }
+}`;
+
+const store = `using System.Collections.Concurrent;
+
+namespace AcmeApi.Messages;
+
+// Stands in for your database.
+public sealed class MessageStore
+{
+    private readonly ConcurrentDictionary<string, Message> _messages = new();
+
+    public Message Add(SendMessageRequest request)
+    {
+        var message = new Message
+        {
+            Id = $"msg_{Guid.NewGuid().ToString("N")[..8]}",
+            Channel = request.Channel,
+            To = request.To,
+            Status = request.SendAt is null ? MessageStatus.Queued : MessageStatus.Scheduled,
+            CreatedAt = DateTimeOffset.UtcNow,
+            SendAt = request.SendAt,
+        };
+        _messages[message.Id] = message;
+        return message;
+    }
+
+    public Message? Find(string id) => _messages.GetValueOrDefault(id);
+
+    public IReadOnlyList<Message> List(MessageStatus? status, int limit) =>
+        _messages.Values
+            .Where(message => status is null || message.Status == status)
+            .OrderByDescending(message => message.CreatedAt)
+            .Take(limit)
+            .ToList();
+
+    public void Update(Message message) => _messages[message.Id] = message;
+}`;
+
+const endpoints = `using System.ComponentModel.DataAnnotations;
+using Microsoft.AspNetCore.Http.HttpResults;
+using Microsoft.AspNetCore.Mvc;
+
+namespace AcmeApi.Messages;
+
+public static class MessageEndpoints
+{
+    public static void MapMessageEndpoints(this IEndpointRouteBuilder app)
+    {
+        var messages = app.MapGroup("/messages")
+            .WithTags("Messages")
+            .RequireAuthorization();
+
+        messages.MapPost("/", SendMessage)
+            .WithName(nameof(SendMessage))
+            .ProducesValidationProblem();
+        messages.MapGet("/", ListMessages).WithName(nameof(ListMessages));
+        messages.MapGet("/{id}", GetMessage).WithName(nameof(GetMessage));
+        messages.MapDelete("/{id}", CancelMessage).WithName(nameof(CancelMessage));
+    }
+
+    /// <summary>Send a message</summary>
+    /// <remarks>
+    /// Queues an email or SMS for delivery and returns it right away, with the
+    /// ID you use to check on it. Set <c>sendAt</c> to schedule it instead.
+    /// </remarks>
+    /// <param name="request">The message to send.</param>
+    /// <response code="202">The message is queued or scheduled.</response>
+    /// <response code="400">The request body failed validation.</response>
+    public static Accepted<Message> SendMessage(SendMessageRequest request, MessageStore store)
+    {
+        var message = store.Add(request);
+        return TypedResults.Accepted($"/messages/{message.Id}", message);
+    }
+
+    /// <summary>List messages</summary>
+    /// <remarks>Returns your most recent messages, newest first.</remarks>
+    /// <param name="status">Only return messages with this status.</param>
+    /// <param name="limit">How many messages to return, from 1 to 100.</param>
+    /// <response code="200">A page of messages.</response>
+    public static Ok<MessageList> ListMessages(
+        MessageStatus? status,
+        MessageStore store,
+        [Range(1, 100)] int limit = 20)
+    {
+        return TypedResults.Ok(new MessageList { Items = store.List(status, limit) });
+    }
+
+    /// <summary>Get a message</summary>
+    /// <remarks>Returns a message and its delivery status.</remarks>
+    /// <param name="id" example="msg_8f2k">The message ID, from the response to Send a message.</param>
+    /// <response code="200">The message.</response>
+    /// <response code="404">No message has that ID.</response>
+    public static Results<Ok<Message>, NotFound> GetMessage(string id, MessageStore store)
+    {
+        return store.Find(id) is { } message ? TypedResults.Ok(message) : TypedResults.NotFound();
+    }
+
+    /// <summary>Cancel a scheduled message</summary>
+    /// <remarks>
+    /// Stops a scheduled message from going out. A message that's already
+    /// queued or sent can't be canceled.
+    /// </remarks>
+    /// <param name="id" example="msg_8f2k">The ID of the message to cancel.</param>
+    /// <response code="204">The message is canceled.</response>
+    /// <response code="404">No message has that ID.</response>
+    /// <response code="409">The message isn't scheduled, so it can't be canceled.</response>
+    public static Results<NoContent, NotFound, Conflict<ProblemDetails>> CancelMessage(string id, MessageStore store)
+    {
+        if (store.Find(id) is not { } message)
+        {
+            return TypedResults.NotFound();
+        }
+        if (message.Status != MessageStatus.Scheduled)
+        {
+            return TypedResults.Conflict(new ProblemDetails
+            {
+                Title = "Only a scheduled message can be canceled.",
+                Status = StatusCodes.Status409Conflict,
+            });
+        }
+        store.Update(message with { Status = MessageStatus.Canceled });
+        return TypedResults.NoContent();
+    }
+}`;
+
+const statusEndpoints = `using Microsoft.AspNetCore.Http.HttpResults;
+
+namespace AcmeApi;
+
+/// <summary>Whether the API is up.</summary>
+public sealed record ApiStatus
+{
+    /// <summary>Whether the API is accepting messages.</summary>
+    /// <example>true</example>
+    public required bool AcceptingMessages { get; init; }
+}
+
+public static class StatusEndpoints
+{
+    public static void MapStatusEndpoints(this IEndpointRouteBuilder app)
+    {
+        app.MapGet("/status", GetStatus)
+            .WithName(nameof(GetStatus))
+            .WithTags("Status");
+    }
+
+    /// <summary>Get the API status</summary>
+    /// <remarks>
+    /// Reports whether the API is accepting messages. It needs no token, so
+    /// call it first to check that you can reach the API.
+    /// </remarks>
+    /// <response code="200">The API's status.</response>
+    public static Ok<ApiStatus> GetStatus() =>
+        TypedResults.Ok(new ApiStatus { AcceptingMessages = true });
+}`;
+
+const transformers = `using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.OpenApi;
+using Microsoft.OpenApi;
+
+namespace AcmeApi.OpenApi;
+
+// The title, public server, and tag descriptions for the whole document.
+internal sealed class AcmeDocumentTransformer : IOpenApiDocumentTransformer
+{
+    public Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
+    {
+        document.Info = new OpenApiInfo
+        {
+            Title = "Acme Messages API",
+            Version = "1.0.0",
+            Description = "Send transactional email and SMS from your app, schedule messages for later, and check whether each one was delivered.",
+        };
+        document.Servers = [new OpenApiServer { Url = "https://api.acme.example", Description = "Production" }];
+        document.Tags = new HashSet<OpenApiTag>
+        {
+            new() { Name = "Messages", Description = "Send a message and check whether it arrived." },
+            new() { Name = "Status", Description = "Check that you can reach the API." },
+        };
+        return Task.CompletedTask;
+    }
+}
+
+// Declares the JWT bearer scheme the app registers with AddJwtBearer().
+internal sealed class BearerSecuritySchemeTransformer(IAuthenticationSchemeProvider schemes) : IOpenApiDocumentTransformer
+{
+    public async Task TransformAsync(OpenApiDocument document, OpenApiDocumentTransformerContext context, CancellationToken cancellationToken)
+    {
+        if (await schemes.GetSchemeAsync(JwtBearerDefaults.AuthenticationScheme) is null)
+        {
+            return;
+        }
+        document.Components ??= new OpenApiComponents();
+        document.Components.SecuritySchemes ??= new Dictionary<string, IOpenApiSecurityScheme>();
+        document.Components.SecuritySchemes[JwtBearerDefaults.AuthenticationScheme] = new OpenApiSecurityScheme
+        {
+            Type = SecuritySchemeType.Http,
+            Scheme = "bearer",
+            BearerFormat = "JWT",
+            Description = "An access token, sent in the Authorization header.",
+        };
+    }
+}
+
+// Marks the operations that need a token, from the endpoint's own
+// authorization metadata, so the docs match what the API enforces.
+internal sealed class BearerRequirementTransformer : IOpenApiOperationTransformer
+{
+    public Task TransformAsync(OpenApiOperation operation, OpenApiOperationTransformerContext context, CancellationToken cancellationToken)
+    {
+        var metadata = context.Description.ActionDescriptor.EndpointMetadata;
+        if (!metadata.OfType<IAuthorizeData>().Any() || metadata.OfType<IAllowAnonymous>().Any())
+        {
+            return Task.CompletedTask;
+        }
+        operation.Security =
+        [
+            new OpenApiSecurityRequirement
+            {
+                [new OpenApiSecuritySchemeReference(JwtBearerDefaults.AuthenticationScheme, context.Document)] = [],
+            },
+        ];
+        operation.Responses ??= new OpenApiResponses();
+        operation.Responses.TryAdd("401", new OpenApiResponse { Description = "The token is missing, expired, or invalid." });
+        return Task.CompletedTask;
+    }
+}`;
+
+const program = `using System.Text.Json.Serialization;
+using AcmeApi;
+using AcmeApi.Messages;
+using AcmeApi.OpenApi;
+
+var builder = WebApplication.CreateBuilder(args);
+
+builder.Services.AddAuthentication().AddJwtBearer();
+builder.Services.AddAuthorization();
+builder.Services.AddValidation();
+builder.Services.AddProblemDetails();
+builder.Services.ConfigureHttpJsonOptions(options =>
+{
+    options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
+    options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+});
+builder.Services.AddCors(options => options.AddDefaultPolicy(policy => policy
+    .WithOrigins("https://docs.acme.example")
+    .WithMethods("GET", "POST", "DELETE")
+    .WithHeaders("Authorization", "Content-Type")));
+builder.Services.AddOpenApi(options =>
+{
+    options.AddDocumentTransformer<AcmeDocumentTransformer>();
+    options.AddDocumentTransformer<BearerSecuritySchemeTransformer>();
+    options.AddOperationTransformer<BearerRequirementTransformer>();
+});
+builder.Services.AddSingleton<MessageStore>();
+
+var app = builder.Build();
+
+if (app.Environment.IsDevelopment())
+{
+    app.MapOpenApi();
+}
+
+app.UseHttpsRedirection();
+app.UseCors();
+app.UseAuthentication();
+app.UseAuthorization();
+
+app.MapMessageEndpoints();
+app.MapStatusEndpoints();
+
+app.Run();`;
+
+const startupGuard = `using System.Reflection;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// True while the build runs the app to generate the OpenAPI document.
+var generatingOpenApi = Assembly.GetEntryAssembly()?.GetName().Name == "GetDocument.Insider";
+if (!generatingOpenApi)
+{
+    var connectionString = builder.Configuration.GetConnectionString("Messages")
+        ?? throw new InvalidOperationException("ConnectionStrings:Messages is not set.");
+    // ...register the database with connectionString
+}`;
+
+const indexMdx = `---
+title: Introduction
+description: Send transactional email and SMS with the Acme Messages API, check whether they arrived, and schedule them for later.
+---
+
+The Acme Messages API sends transactional email and SMS for your app, and tells
+you whether each message arrived.
+
+- [Quickstart](/quickstart) takes you from an access token to your first delivered message.
+- [Schedule a message](/schedule-a-message) sends one later, and cancels it if plans change.
+- The [API reference](/api) lists every operation, generated from the API's own code.`;
+
+const quickstartMdx = `---
+title: Quickstart
+description: Check that you can reach the Acme Messages API, send your first email with an access token, and check whether it was delivered.
+---
+
+Every request except [Get the API status](/api/status/get-status) needs an
+access token, sent in the \`Authorization\` header as a bearer token. Set it in
+your shell first:
+
+\`\`\`bash
+export ACME_TOKEN="your-access-token"
+\`\`\`
+
+## Check that you can reach the API
+
+The status endpoint needs no token:
+
+\`\`\`bash
+curl https://api.acme.example/status
+\`\`\`
+
+\`\`\`json
+{ "acceptingMessages": true }
+\`\`\`
+
+## Send a message
+
+Send the channel, the recipient, and a template ID to
+[Send a message](/api/messages/send-message):
+
+\`\`\`bash
+curl https://api.acme.example/messages \\
+  -H "Authorization: Bearer $ACME_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"channel":"Email","to":"ada@example.com","template":"welcome"}'
+\`\`\`
+
+The API answers \`202 Accepted\` with the queued message:
+
+\`\`\`json
+{
+  "id": "msg_8f2k",
+  "channel": "Email",
+  "to": "ada@example.com",
+  "status": "Queued",
+  "createdAt": "2026-11-01T08:30:00Z",
+  "sendAt": null
+}
+\`\`\`
+
+## Check whether it arrived
+
+Pass the ID to [Get a message](/api/messages/get-message):
+
+\`\`\`bash
+curl https://api.acme.example/messages/msg_8f2k \\
+  -H "Authorization: Bearer $ACME_TOKEN"
+\`\`\`
+
+Its \`status\` moves from \`Queued\` to \`Sent\`, then to \`Delivered\` or \`Failed\`.
+
+## Read an error
+
+A request body that fails validation gets a \`400\` with a problem details
+object, which lists the problems by field:
+
+\`\`\`json
+{
+  "type": "https://tools.ietf.org/html/rfc9110#section-15.5.1",
+  "title": "One or more validation errors occurred.",
+  "status": 400,
+  "errors": {
+    "Template": [
+      "The field Template must be a string or array type with a maximum length of '64'."
+    ]
+  }
+}
+\`\`\`
+
+A missing, expired, or invalid token gets a \`401\` with an empty body and a
+\`WWW-Authenticate: Bearer\` header.`;
+
+const scheduleMdx = `---
+title: Schedule a message
+description: Send an Acme message at a set time with sendAt, list the messages still waiting to go out, and cancel one before it's sent.
+---
+
+To send a message later, add \`sendAt\` to the body of
+[Send a message](/api/messages/send-message), as an ISO 8601 date and time:
+
+\`\`\`bash
+curl https://api.acme.example/messages \\
+  -H "Authorization: Bearer $ACME_TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"channel":"Sms","to":"+15550100","template":"reminder","sendAt":"2026-11-01T09:00:00Z"}'
+\`\`\`
+
+The message comes back with the status \`Scheduled\`.
+
+## List what's waiting
+
+[List messages](/api/messages/list-messages) filters by status. Status values
+are case-sensitive in the query string, so write \`Scheduled\`, not \`scheduled\`:
+
+\`\`\`bash
+curl "https://api.acme.example/messages?status=Scheduled&limit=10" \\
+  -H "Authorization: Bearer $ACME_TOKEN"
+\`\`\`
+
+## Cancel it
+
+[Cancel a scheduled message](/api/messages/cancel-message) stops it from going
+out, and answers \`204 No Content\`:
+
+\`\`\`bash
+curl -X DELETE https://api.acme.example/messages/msg_8f2k \\
+  -H "Authorization: Bearer $ACME_TOKEN"
+\`\`\`
+
+Once a message is queued or sent, it can't be canceled, and the API answers
+\`409 Conflict\`.`;
+
+const workflow = `name: Docs
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs-site
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
+        with:
+          global-json-file: global.json
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - run: npm ci
+      - name: Generate the OpenAPI document
+        run: npm run spec
+      - name: Check the committed spec is up to date
+        run: git diff --exit-code -- openapi.json
+      - name: Check links
+        run: npx blume validate --strict
+      - name: Build the docs
+        run: npm run build`;
+
+const staleDiff = `@@ -440,6 +440,16 @@
+             "type": "string",
+             "description": "The ID of the template to send."
+           },
++          "replyTo": {
++            "examples": [
++              "support@acme.example"
++            ],
++            "type": [
++              "null",
++              "string"
++            ],
++            "description": "The address replies go to, for email."
++          },
+           "variables": {
+             "examples": [
+               {`;
+---
+
+<GuidePage guide={guideById("aspnet-core-api-documentation")}>
+  <p>
+    To publish ASP.NET Core API documentation as a site of its own, have the
+    build write your app's OpenAPI document to a file, then hand that file to
+    Blume. In .NET 10, <code>Microsoft.AspNetCore.OpenApi</code> builds an
+    OpenAPI 3.1 document from your endpoints and XML doc comments, and{" "}
+    <code>Microsoft.Extensions.ApiDescription.Server</code> writes it to disk
+    when you build. Blume turns each operation in it into a page, with its
+    schemas, auth, code samples, and a Try it panel, next to the guides you
+    write in Markdown.
+  </p>
+  <p>
+    By the end of this guide, you have a minimal API with JWT bearer auth
+    whose doc comments describe every operation, a build that exports{" "}
+    <code>openapi.json</code> into a Blume project, and a GitHub Actions
+    workflow that fails when the committed spec no longer matches the code.
+    It was tested with the .NET 10.0.401 SDK and ASP.NET Core 10.0.12.
+  </p>
+
+  <h2>Where the built-in OpenAPI support stops</h2>
+  <p>
+    The <code>webapi</code> template in .NET 10 adds OpenAPI support and
+    nothing to read it with. <code>app.MapOpenApi()</code> serves the document
+    as JSON at <code>/openapi/v1.json</code>, only in the Development
+    environment, and the template includes no Swagger UI or Scalar page. You
+    can add either as a separate package for your own team. A docs site does
+    a different job:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <td></td>
+        <th scope="col">MapOpenApi in the app</th>
+        <th scope="col">A Blume site</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Serves</td>
+        <td>The OpenAPI JSON, from the running app</td>
+        <td>A page per operation, as static files on any host</td>
+      </tr>
+      <tr>
+        <td>Available</td>
+        <td>In Development, while the app runs</td>
+        <td>Always, whether the API is up or not</td>
+      </tr>
+      <tr>
+        <td>Content</td>
+        <td>The reference</td>
+        <td>Guides and the reference, on one site with one search</td>
+      </tr>
+      <tr>
+        <td>Updates</td>
+        <td>On every request</td>
+        <td>When the build writes a new spec and the site rebuilds</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Keep <code>MapOpenApi()</code> for local tools. The build-time export
+    below doesn't use it: it generates the same document without the endpoint,
+    so it works with the endpoint switched off in production.
+  </p>
+
+  <h2>Set up the two projects</h2>
+  <p>The API and its docs live in one repository, as two folders:</p>
+  <CodeBlock
+    code={`acme/
+├── AcmeApi/       the ASP.NET Core API
+├── docs-site/     the Blume docs, and the openapi.json the build writes
+├── .github/workflows/docs.yml
+├── .gitignore
+└── global.json    pins the .NET SDK`}
+    lang="txt"
+  />
+  <p>Create them:</p>
+  <CodeBlock
+    code={`mkdir acme && cd acme
+git init
+dotnet new webapi -o AcmeApi
+dotnet new gitignore
+dotnet new globaljson --sdk-version 10.0.401 --roll-forward latestPatch
+npx blume init docs-site --template docs --yes`}
+    lang="bash"
+  />
+  <ul>
+    <li>
+      <code>dotnet new webapi</code> writes a minimal API, which is the
+      template's default. <code>--use-controllers</code> gives you
+      controllers instead, and a note below covers what changes. It already
+      references <code>Microsoft.AspNetCore.OpenApi</code> and calls{" "}
+      <code>AddOpenApi()</code>.
+    </li>
+    <li>
+      <code>dotnet new gitignore</code> ignores <code>bin/</code> and{" "}
+      <code>obj/</code>. <code>global.json</code> pins the SDK's feature band,
+      so CI builds the spec with the same SDK line as your machine.
+    </li>
+    <li>
+      <code>blume init</code> writes <code>docs-site/</code> with a{" "}
+      <code>docs/</code> content folder, a <code>blume.config.ts</code>, and a{" "}
+      <code>package.json</code>, then installs Blume. Its own{" "}
+      <code>.gitignore</code> keeps <code>node_modules/</code>,{" "}
+      <code>.blume/</code>, and <code>dist/</code> out of Git.
+    </li>
+  </ul>
+
+  <h2>Generate the OpenAPI document at build time</h2>
+  <p>Add the build-time generator and the JWT bearer handler, pinned:</p>
+  <CodeBlock
+    code={`cd AcmeApi
+dotnet add package Microsoft.Extensions.ApiDescription.Server --version 10.0.12
+dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer --version 10.0.12`}
+    lang="bash"
+  />
+  <p>Then set up the project file:</p>
+  <CodeBlock code={csproj} lang="xml" title="AcmeApi/AcmeApi.csproj" />
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Property</th>
+        <th scope="col">What it does here</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>GenerateDocumentationFile</code></td>
+        <td>
+          Turns on XML doc comments. The source generator in{" "}
+          <code>Microsoft.AspNetCore.OpenApi</code> reads them into the
+          document.
+        </td>
+      </tr>
+      <tr>
+        <td><code>NoWarn</code></td>
+        <td>
+          Silences the compiler's warnings for public members without comments
+          (CS1591) and for parameters without a <code>&lt;param&gt;</code>{" "}
+          (CS1573), which you'll leave out on purpose below.
+        </td>
+      </tr>
+      <tr>
+        <td><code>OpenApiDocumentsDirectory</code></td>
+        <td>
+          Writes the document into <code>docs-site/</code>, relative to the
+          project file. The default is <code>obj/</code>.
+        </td>
+      </tr>
+      <tr>
+        <td><code>OpenApiGenerateDocumentsOptions</code></td>
+        <td>
+          Names the file <code>openapi.json</code>. The default is the project
+          name, <code>AcmeApi.json</code>.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    The generator runs as part of the build, because{" "}
+    <code>OpenApiGenerateDocumentsOnBuild</code> defaults to{" "}
+    <code>true</code> once the package is referenced. To get the document, it
+    runs your app's <code>Program.cs</code>, <code>app.Run()</code> included,
+    with a mock server in place of Kestrel, then asks the OpenAPI service for
+    the document. Nothing listens on a port, and no request goes out.
+  </p>
+  <p>
+    The document reads better with the code in the next two sections in
+    place, so add those files before you build.
+  </p>
+
+  <h2>Describe the API in C#</h2>
+  <p>
+    Everything a reader sees on an operation page comes from the C# code:
+    XML doc comments for the prose, the handler's parameters and return types
+    for the shapes, and data annotations for the limits. Start with the
+    request and response types. A <code>&lt;summary&gt;</code> on a property
+    becomes its description, and an <code>&lt;example&gt;</code>, written as
+    JSON, becomes its example:
+  </p>
+  <CodeBlock code={models} lang="csharp" title="AcmeApi/Messages/MessageModels.cs" />
+  <p>An in-memory store stands in for your database:</p>
+  <CodeBlock code={store} lang="csharp" title="AcmeApi/Messages/MessageStore.cs" />
+  <p>
+    The handlers are static methods rather than lambdas, because a lambda
+    can't carry an XML doc comment. <code>RequireAuthorization()</code> on the
+    group makes every message endpoint need a token:
+  </p>
+  <CodeBlock
+    code={endpoints}
+    lang="csharp"
+    title="AcmeApi/Messages/MessageEndpoints.cs"
+  />
+  <p>One public endpoint, so readers can check that they can reach the API:</p>
+  <CodeBlock code={statusEndpoints} lang="csharp" title="AcmeApi/StatusEndpoints.cs" />
+
+  <h3>Where each piece shows up</h3>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In C#</th>
+        <th scope="col">In the spec</th>
+        <th scope="col">On the docs site</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>.WithTags("Messages")</code></td>
+        <td>The operation's tag</td>
+        <td>Its sidebar group, and the URL segment <code>/api/messages/</code></td>
+      </tr>
+      <tr>
+        <td><code>.WithName(nameof(SendMessage))</code></td>
+        <td><code>operationId</code></td>
+        <td>The page URL: <code>SendMessage</code> becomes <code>send-message</code></td>
+      </tr>
+      <tr>
+        <td><code>&lt;summary&gt;</code> on the handler</td>
+        <td><code>summary</code></td>
+        <td>The page title and sidebar label</td>
+      </tr>
+      <tr>
+        <td><code>&lt;remarks&gt;</code></td>
+        <td><code>description</code></td>
+        <td>The paragraph under the title, and the page's meta description</td>
+      </tr>
+      <tr>
+        <td><code>&lt;param&gt;</code></td>
+        <td>The parameter's or request body's <code>description</code></td>
+        <td>The parameter row, or the text above the body's schema</td>
+      </tr>
+      <tr>
+        <td><code>example</code> on a <code>&lt;param&gt;</code></td>
+        <td>The parameter's <code>example</code></td>
+        <td>
+          The path in the code samples, like{" "}
+          <code>/messages/msg_8f2k</code>
+        </td>
+      </tr>
+      <tr>
+        <td><code>&lt;response code="404"&gt;</code></td>
+        <td>That response's <code>description</code></td>
+        <td>The text beside the status code</td>
+      </tr>
+      <tr>
+        <td>
+          The return type, like <code>Results&lt;Ok&lt;Message&gt;, NotFound&gt;</code>,
+          and <code>ProducesValidationProblem()</code>
+        </td>
+        <td><code>responses</code>, with their schemas</td>
+        <td>The Responses section and the Response panel</td>
+      </tr>
+      <tr>
+        <td><code>required</code>, <code>[MaxLength]</code>, <code>[Range]</code>, a default value</td>
+        <td><code>required</code>, <code>maxLength</code>, <code>minimum</code>, <code>maximum</code>, <code>default</code></td>
+        <td>"required", "max length 320", and "min 1 · max 100 · default: 20" in the schema rows</td>
+      </tr>
+      <tr>
+        <td><code>&lt;example&gt;</code> on a property</td>
+        <td>The property's <code>examples</code></td>
+        <td>Request samples, Try it's starting values, and response examples</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    A <code>&lt;response&gt;</code> tag only describes a status code the
+    endpoint already declares through its return type or metadata. Adding one
+    for a code the endpoint never returns changes nothing.
+  </p>
+
+  <h3>Give every operation a name</h3>
+  <p>
+    Minimal APIs write no <code>operationId</code> unless the endpoint has a
+    name, and Blume builds each page's URL from the tag and the operation ID.
+    Without <code>WithName</code>, it falls back to the method and path, so
+    the pages land at <code>/api/messages/post-messages</code> and{" "}
+    <code>/api/messages/get-messages-id</code>. Keep the names unique: the
+    build doesn't check, a repeated name goes into the spec twice, and Blume
+    gives the second page a URL with its HTTP method added, like{" "}
+    <code>get-message-get</code>. Without{" "}
+    <code>WithTags</code>, every operation is tagged with the
+    assembly name, <code>AcmeApi</code>, and lands in one sidebar group.
+  </p>
+  <p>
+    With controllers, set the name on the route attribute, as in{" "}
+    <code>[HttpGet("&#123;id&#125;", Name = "GetMessage")]</code>. The tag
+    defaults to the controller's name, and the same XML comments work on
+    action methods.
+  </p>
+
+  <h3>Doc comment gotchas</h3>
+  <ul>
+    <li>
+      <strong>Don't document injected services.</strong> A{" "}
+      <code>&lt;param&gt;</code> on <code>MessageStore store</code> becomes
+      the request body's description, replacing the one on{" "}
+      <code>request</code>. Leave service parameters undocumented, which is
+      why CS1573 is silenced.
+    </li>
+    <li>
+      <strong>Lambdas need <code>WithSummary</code> and{" "}
+      <code>WithDescription</code>.</strong> They set the same fields. When a
+      handler has both, the XML comment wins.
+    </li>
+    <li>
+      <strong>Leave the summary off enums.</strong> The spec puts an enum in{" "}
+      <code>components.schemas</code> and points each property at it with a{" "}
+      <code>$ref</code>, with the property's own description beside it. Blume
+      shows the enum's description when it has one, so every{" "}
+      <code>channel</code> row would read the same. Without a summary on the
+      enum, each row shows its property's own.
+    </li>
+  </ul>
+
+  <h3>Make numbers and enums read right</h3>
+  <p>
+    Two lines in <code>ConfigureHttpJsonOptions</code>, in{" "}
+    <code>Program.cs</code> below, change the schemas as much as anything
+    else in this guide. Minimal APIs read numbers from JSON strings by
+    default, and the document says so: without{" "}
+    <code>JsonNumberHandling.Strict</code>, every integer is typed{" "}
+    <code>["integer", "string"]</code> with a regex pattern, and Blume's
+    schema rows read "integer | string". Without{" "}
+    <code>JsonStringEnumConverter</code>, enums are sent as numbers and
+    documented as a bare <code>integer</code>, with no list of allowed values.
+  </p>
+  <p>
+    Don't give the converter a naming policy, like{" "}
+    <code>JsonNamingPolicy.CamelCase</code>. The document would list{" "}
+    <code>scheduled</code> as a value, but the query string binds an enum by
+    its exact C# name, so <code>?status=scheduled</code> gets a 400 while{" "}
+    <code>?status=Scheduled</code> works. With the plain converter, the spec
+    lists the names the API accepts everywhere.
+  </p>
+
+  <h2>Declare the server and the bearer scheme</h2>
+  <p>
+    The generated document has no <code>servers</code> and no security
+    scheme, and its title is <code>AcmeApi | v1</code>. Without a server,
+    Blume's code samples and Try it panel send requests to a bare path on the
+    docs site's own origin. Fix all three with transformers, which edit the
+    document after ASP.NET Core builds it:
+  </p>
+  <CodeBlock
+    code={transformers}
+    lang="csharp"
+    title="AcmeApi/OpenApi/OpenApiTransformers.cs"
+  />
+  <ul>
+    <li>
+      <strong><code>AcmeDocumentTransformer</code></strong> sets the title,
+      the public server URL, and the tags list. Blume orders its sidebar
+      groups and overview sections by that list, and shows each tag's
+      description on the overview.
+    </li>
+    <li>
+      <strong><code>BearerSecuritySchemeTransformer</code></strong> adds the
+      scheme to <code>components.securitySchemes</code>, but only if the app
+      registers a <code>Bearer</code> authentication scheme, so the document
+      can't describe auth the app doesn't have.{" "}
+      <code>bearerFormat</code> labels the credential: Blume shows "Bearer
+      token (JWT)" in the Authorization section and the Try it panel.
+    </li>
+    <li>
+      <strong><code>BearerRequirementTransformer</code></strong> adds a
+      security requirement, and a 401 response, to each operation whose
+      endpoint requires authorization and doesn't allow anonymous access.
+      Operation transformers see the endpoint's metadata, so the requirement
+      follows <code>RequireAuthorization()</code> and{" "}
+      <code>AllowAnonymous()</code> rather than a list you keep by hand.
+    </li>
+  </ul>
+  <p>
+    .NET 10 builds on version 2 of <code>Microsoft.OpenApi</code>. The model
+    types are in the <code>Microsoft.OpenApi</code> namespace, and a
+    reference to a security scheme is an{" "}
+    <code>OpenApiSecuritySchemeReference</code>. Samples written for .NET 9
+    use <code>Microsoft.OpenApi.Models</code> and{" "}
+    <code>OpenApiReference</code>, which don't compile here.
+  </p>
+  <p>
+    Replace the template's <code>Program.cs</code>, which removes the weather
+    forecast endpoint:
+  </p>
+  <CodeBlock code={program} lang="csharp" title="AcmeApi/Program.cs" />
+  <p>
+    <code>AddValidation()</code> runs the data annotations on minimal API
+    parameters, and <code>AddProblemDetails()</code> makes their errors the
+    full <code>application/problem+json</code> objects the spec describes.
+    The CORS policy lets the docs site's Try it panel call the API from a
+    reader's browser. Now build:
+  </p>
+  <CodeBlock code="dotnet build" lang="bash" />
+  <p>
+    The build writes <code>docs-site/openapi.json</code>. Check what Blume
+    will use for the version, the server, and the auth:
+  </p>
+  <CodeBlock
+    code={`jq '{openapi, servers, sendMessage: .paths["/messages"].post.security, getStatus: .paths["/status"].get.security, securitySchemes: .components.securitySchemes}' ../docs-site/openapi.json`}
+    lang="bash"
+  />
+  <CodeBlock
+    code={`{
+  "openapi": "3.1.1",
+  "servers": [
+    {
+      "url": "https://api.acme.example",
+      "description": "Production"
+    }
+  ],
+  "sendMessage": [
+    {
+      "Bearer": []
+    }
+  ],
+  "getStatus": null,
+  "securitySchemes": {
+    "Bearer": {
+      "type": "http",
+      "description": "An access token, sent in the Authorization header.",
+      "scheme": "bearer",
+      "bearerFormat": "JWT"
+    }
+  }
+}`}
+    lang="json"
+  />
+  <p>
+    .NET 10 writes OpenAPI 3.1 by default, which Blume reads as written. Get
+    the API status has no <code>security</code>, so its page has no
+    Authorization section. If a change belongs in the docs but not in the
+    app's own document, like hiding an internal operation, put it in an{" "}
+    <a href="/docs/references/openapi#overlays">overlay</a> on the Blume side
+    instead of a transformer.
+  </p>
+
+  <h3>Keep startup code out of the export</h3>
+  <p>
+    The build runs your whole <code>Program.cs</code>, in the Production
+    environment unless <code>ASPNETCORE_ENVIRONMENT</code> says otherwise.
+    Code there that needs a secret or a database fails the build: a missing
+    connection string stops it with the exception and{" "}
+    <code>exited with code 11</code>. The Acme API has no such code, but in an
+    app that reads a connection string at startup, skip that code while the
+    document is being generated:
+  </p>
+  <CodeBlock code={startupGuard} lang="csharp" />
+  <p>
+    <code>GetDocument.Insider</code> is the tool the build uses to load your
+    app. Give the export stand-ins rather than real credentials: describing
+    the API should never need a production secret.
+  </p>
+
+  <h2>Run the API with a test token</h2>
+  <p>
+    <code>dotnet user-jwts</code> issues tokens that the JWT bearer handler
+    accepts in Development. From <code>AcmeApi/</code>, create one, and start
+    the API in the background:
+  </p>
+  <CodeBlock
+    code={`export TOKEN=$(dotnet user-jwts create --name ada --output token)
+dotnet run --launch-profile http &`}
+    lang="bash"
+  />
+  <p>
+    The first command also adds a <code>UserSecretsId</code> to the project
+    file and the token's issuer and audiences to{" "}
+    <code>appsettings.Development.json</code>. The template picked a random
+    port for the <code>http</code> profile; it's in{" "}
+    <code>Properties/launchSettings.json</code>, 5185 here. Once the log says{" "}
+    <code>Now listening</code>, send the same message without the token and
+    with it:
+  </p>
+  <CodeBlock
+    code={`curl -i http://localhost:5185/messages \\
+  -H "Content-Type: application/json" \\
+  -d '{"channel":"Email","to":"ada@example.com","template":"welcome"}'
+
+curl -i http://localhost:5185/messages \\
+  -H "Authorization: Bearer $TOKEN" \\
+  -H "Content-Type: application/json" \\
+  -d '{"channel":"Email","to":"ada@example.com","template":"welcome"}'`}
+    lang="bash"
+  />
+  <p>
+    The first request gets <code>401 Unauthorized</code> and the second{" "}
+    <code>202 Accepted</code>, with the queued message. Everything the docs
+    say about auth comes from the same <code>RequireAuthorization()</code>{" "}
+    call the API enforces. Stop the API with <code>kill %1</code>.
+  </p>
+
+  <h2>Build the docs site</h2>
+  <p>Replace the config that <code>blume init</code> wrote:</p>
+  <CodeBlock
+    code={`import { defineConfig } from "blume";
+import { openapi } from "blume/reference";
+
+export default defineConfig({
+  title: "Acme Docs",
+  description: "Guides and API reference for the Acme Messages API.",
+  deployment: { site: "https://docs.acme.example" },
+  navigation: {
+    tabs: [
+      { label: "Guides", path: "/" },
+      { label: "API reference", path: "/api" },
+    ],
+  },
+  reference: [
+    openapi({
+      route: "/api",
+      spec: "./openapi.json",
+      codeSamples: ["curl", "csharp", "js", "python"],
+    }),
+  ],
+});`}
+    lang="ts"
+    title="docs-site/blume.config.ts"
+  />
+  <ul>
+    <li>
+      <code>openapi()</code> mounts the reference at <code>/api</code>. It
+      doesn't add a header tab on its own, so the API reference tab is what
+      puts it in the header, and it scopes the tab's sidebar to the reference.
+    </li>
+    <li>
+      <code>codeSamples</code> adds a C# sample, written with{" "}
+      <code>HttpClient</code>, to the default cURL, JavaScript, and Python.
+    </li>
+    <li>
+      <code>deployment.site</code> gives the sitemap and canonical links their
+      origin on hosts that don't tell the build its URL.
+    </li>
+  </ul>
+  <p>
+    Add a script that regenerates the spec, beside the ones{" "}
+    <code>blume init</code> wrote:
+  </p>
+  <CodeBlock
+    code={`"scripts": {
+  "spec": "dotnet build ../AcmeApi --no-incremental",
+  "dev": "blume dev",
+  "build": "blume build",
+  "doctor": "blume doctor"
+},`}
+    lang="json"
+    title="docs-site/package.json"
+  />
+  <p>
+    <code>--no-incremental</code> matters. The generator only runs when the
+    build compiles a new assembly, so a plain <code>dotnet build</code> with
+    no code changes leaves <code>openapi.json</code> as it is, even if you
+    deleted it. <code>build</code> stays <code>blume build</code> alone, so a
+    docs host that has Node.js but no .NET SDK can build the site from the
+    committed spec.
+  </p>
+
+  <h3>Write the guides</h3>
+  <p>
+    The reference says what each operation takes and returns. Readers also
+    need to know how to authenticate and which call comes first. Replace{" "}
+    <code>docs/index.mdx</code> and add two guides:
+  </p>
+  <CodeBlock code={indexMdx} lang="mdx" title="docs-site/docs/index.mdx" />
+  <CodeBlock code={quickstartMdx} lang="mdx" title="docs-site/docs/quickstart.mdx" />
+  <CodeBlock
+    code={scheduleMdx}
+    lang="mdx"
+    title="docs-site/docs/schedule-a-message.mdx"
+  />
+  <p>
+    The responses in them are the ones the API returned locally, with simpler
+    IDs and timestamps and the error's <code>traceId</code> left out. Link to
+    operation pages by URL, which comes from the tag and the endpoint name, so{" "}
+    <code>blume validate</code> can tell you when renaming an endpoint breaks
+    a link.
+  </p>
+
+  <h3>Order the operations</h3>
+  <p>
+    Inside a tag's group, the sidebar sorts operations by their URL, which
+    would put Cancel a scheduled message first. To set the order, add a{" "}
+    <code>meta.ts</code> in the folder that matches the tag's route:
+  </p>
+  <CodeBlock
+    code={`import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Messages",
+  order: 0,
+  pages: ["send-message", "get-message", "list-messages", "cancel-message"],
+});`}
+    lang="ts"
+    title="docs-site/docs/api/messages/meta.ts"
+  />
+  <p>
+    A <code>meta.ts</code> you write replaces the one Blume derives from the
+    spec, so it repeats the tag's name and its place in the tags list.
+  </p>
+
+  <h3>Build and preview</h3>
+  <p>From <code>docs-site/</code>:</p>
+  <CodeBlock
+    code={`npm run spec
+npm run build
+npx blume validate --strict
+npx blume preview`}
+    lang="bash"
+  />
+  <p>
+    <code>validate --strict</code> checks every internal link, including the
+    guides' links to operation pages, and fails on warnings too. Open the URL
+    the preview prints and go to <code>/api</code>. The overview lists both
+    tags with their descriptions, and each operation has its own page:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Operation</th>
+        <th scope="col">Page</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>POST /messages</code></td>
+        <td><code>/api/messages/send-message</code></td>
+      </tr>
+      <tr>
+        <td><code>GET /messages/&#123;id&#125;</code></td>
+        <td><code>/api/messages/get-message</code></td>
+      </tr>
+      <tr>
+        <td><code>GET /messages</code></td>
+        <td><code>/api/messages/list-messages</code></td>
+      </tr>
+      <tr>
+        <td><code>DELETE /messages/&#123;id&#125;</code></td>
+        <td><code>/api/messages/cancel-message</code></td>
+      </tr>
+      <tr>
+        <td><code>GET /status</code></td>
+        <td><code>/api/status/get-status</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Send a message, for example, has its <code>&lt;summary&gt;</code> as the
+    title and its <code>&lt;remarks&gt;</code> under it, an Authorization
+    section for the bearer token, the request body with each property's
+    description and limits, and the 202, 400, and 401 responses. Try it
+    starts from the property examples and has a field for the token. Get the
+    API status has no Authorization section. The pages point at{" "}
+    <code>https://api.acme.example</code>, which doesn't exist, so Send can't
+    succeed here; with your own API, it calls the server your transformer
+    declares, which has to allow the docs origin through CORS.
+  </p>
+  <p>
+    While you work on the API, run <code>npm run dev</code> instead of a
+    build. <code>blume dev</code> watches <code>openapi.json</code>, so
+    after <code>npm run spec</code> the open page updates without a restart.
+  </p>
+
+  <h2>Commit the spec and check it in CI</h2>
+  <p>
+    Commit <code>docs-site/openapi.json</code>, even though the build writes
+    it. The docs host then needs only Node.js, a pull request shows each API
+    change the way clients see it, and other tools can read the spec straight
+    from Git. The risk is a committed spec that no longer matches the code,
+    so check for that in CI:
+  </p>
+  <CodeBlock code={workflow} lang="yaml" title=".github/workflows/docs.yml" />
+  <ul>
+    <li>
+      <strong>setup-dotnet</strong> installs the SDK that{" "}
+      <code>global.json</code> asks for: with <code>latestPatch</code>, the
+      newest patch in the 10.0.4xx band. Without a <code>global.json</code>,{" "}
+      <code>dotnet</code> picks the newest SDK on the runner, preinstalled
+      ones included.
+    </li>
+    <li>
+      <strong>npm run spec</strong> restores the NuGet packages, builds the
+      API, and writes the spec. A fresh checkout has no <code>obj/</code>,
+      so the generator always runs.
+    </li>
+    <li>
+      <strong>git diff --exit-code</strong> fails the job when the generated
+      spec differs from the committed one.
+    </li>
+    <li>
+      <strong>validate</strong> and <strong>build</strong> check the guides'
+      links against the new spec and build the site from it.
+    </li>
+  </ul>
+  <p>
+    The generator writes the same bytes for the same code. Say a pull request
+    adds a <code>ReplyTo</code> property to <code>SendMessageRequest</code>{" "}
+    but leaves out the regenerated spec. The check fails and prints what the
+    commit is missing:
+  </p>
+  <CodeBlock code={staleDiff} lang="diff" title="docs-site/openapi.json" />
+  <p>
+    Run <code>npm run spec</code> and commit the result. When a pull request
+    renames an endpoint, the spec check passes once it's regenerated, but{" "}
+    <code>validate</code> fails on every guide link to the old page, with{" "}
+    <code>BLUME_BROKEN_LINK</code> and the file and line. To also catch
+    changes that break existing clients, add oasdiff as shown in{" "}
+    <a href="/guides/openapi-documentation-ci">Keep API documentation in sync with backend changes in CI</a>.
+  </p>
+  <p>
+    The export also runs in builds that have nothing to do with the docs, like
+    a <code>dotnet publish</code> in your API's Dockerfile, where it starts
+    your app once more and writes a stray <code>openapi.json</code>. Turn it
+    off there with{" "}
+    <code>dotnet publish -p:OpenApiGenerateDocumentsOnBuild=false</code>.
+  </p>
+
+  <h2>Deploy</h2>
+  <p>
+    The site builds to static files in <code>docs-site/dist</code>. Point
+    your host at the <code>docs-site</code> folder:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Setting</th>
+        <th scope="col">Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Root directory</td>
+        <td><code>docs-site</code></td>
+      </tr>
+      <tr>
+        <td>Build command</td>
+        <td><code>npm run build</code></td>
+      </tr>
+      <tr>
+        <td>Output directory</td>
+        <td><code>dist</code></td>
+      </tr>
+      <tr>
+        <td>Node.js version</td>
+        <td>22.12 or later</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    The build reads the committed spec and never runs .NET, so the docs deploy
+    on their own schedule and stay up when the API is down. The{" "}
+    <a href="/docs/deployment">deployment docs</a> cover each host. Deploy the
+    API with its CORS policy too, set to your real docs origin: the Try it
+    panel sends requests from the reader's browser straight to the server in
+    the spec.
+  </p>
+
+  <h2>Limitations</h2>
+  <ul>
+    <li>
+      <strong>The export runs your startup code.</strong> All of{" "}
+      <code>Program.cs</code> runs on every build that compiles the app, in CI
+      too. Guard what needs secrets or a database.
+    </li>
+    <li>
+      <strong>Incremental builds skip the export.</strong> If no code
+      changed, <code>dotnet build</code> doesn't rewrite the spec, so a
+      deleted or hand-edited <code>openapi.json</code> stays that way until{" "}
+      <code>npm run spec</code>.
+    </li>
+    <li>
+      <strong>A description beside a <code>$ref</code> loses to the target's.</strong>{" "}
+      Blume shows a referenced schema's own description in place of the
+      property's, which is why the enums above have no summary.
+    </li>
+    <li>
+      <strong>Operation order needs a <code>meta.ts</code>.</strong> The
+      sidebar sorts a tag's operations by URL, whatever order you map them
+      in. A <code>meta.ts</code> only reorders the sidebar: the overview keeps
+      listing them in the spec's path order.
+    </li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <h3>openapi.json didn't change after dotnet build</h3>
+  <p>
+    The build was incremental and compiled nothing new, so the generator
+    didn't run. Use <code>npm run spec</code>, which passes{" "}
+    <code>--no-incremental</code>. To see the generator's own log lines, like{" "}
+    <code>Writing document named 'v1'</code>, build with{" "}
+    <code>--tl:off</code>.
+  </p>
+  <h3>The build fails with "exited with code 11"</h3>
+  <p>
+    Your app threw while the build was starting it to generate the document.
+    The lines above name the exception and the line in{" "}
+    <code>Program.cs</code>. Guard that code with the{" "}
+    <code>GetDocument.Insider</code> check shown earlier.
+  </p>
+  <h3>Pages are at post-messages and get-messages-id</h3>
+  <p>
+    The endpoints have no names, so the spec has no operation IDs. Add{" "}
+    <code>WithName</code> to each, or <code>Name</code> on a controller's
+    route attribute. If the old URLs are already public, add a{" "}
+    <a href="/docs/deployment#redirects">redirect</a> for each.
+  </p>
+  <h3>Schema rows say integer | string</h3>
+  <p>
+    The JSON options still allow numbers as strings. Set{" "}
+    <code>NumberHandling</code> to <code>JsonNumberHandling.Strict</code> in{" "}
+    <code>ConfigureHttpJsonOptions</code>, then regenerate.
+  </p>
+  <h3>The build fails with CS0234 or CS0246 on OpenAPI types</h3>
+  <p>
+    The code was written for .NET 9's <code>Microsoft.OpenApi</code> 1.x.{" "}
+    <code>using Microsoft.OpenApi.Models;</code> fails with CS0234, because
+    the namespace no longer exists, and an <code>OpenApiSecurityScheme</code>{" "}
+    with a <code>Reference</code> fails with CS0117, plus CS0246 for{" "}
+    <code>OpenApiReference</code>. Change the <code>using</code> to{" "}
+    <code>using Microsoft.OpenApi;</code>, and replace the scheme and its{" "}
+    <code>Reference</code> with an <code>OpenApiSecuritySchemeReference</code>,
+    as in the transformers above.
+  </p>
+  <h3>Send fails in Try it, but curl works</h3>
+  <p>
+    That's CORS. The panel calls your API from the docs site's origin, and the
+    browser blocks the response unless the API allows it. Check that{" "}
+    <code>WithOrigins</code> lists the docs origin exactly, scheme and host
+    with no trailing slash. If only requests with a missing or wrong token
+    fail that way, <code>UseCors()</code> comes after{" "}
+    <code>UseAuthorization()</code>: the preflight still passes, but the 401
+    goes out without an <code>Access-Control-Allow-Origin</code> header, so
+    the browser hides it. Call <code>UseCors()</code> first, as above.{" "}
+    <a href="/guides/api-documentation-cors-errors">Fix CORS errors in an API documentation playground</a>{" "}
+    covers reading the preflight, and Blume's proxy for an API you can't
+    change.
+  </p>
+  <h3>The build fails with BLUME_OPENAPI_UNAVAILABLE</h3>
+  <p>
+    Blume couldn't read <code>docs-site/openapi.json</code>. In a fresh clone,
+    the file has to be committed, since <code>npm run build</code> doesn't
+    generate it. In <code>blume dev</code>, a missing spec is only a warning
+    and the reference is left out, so a working dev server can hide it.
+  </p>
+</GuidePage>

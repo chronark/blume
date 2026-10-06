@@ -1,0 +1,1412 @@
+---
+// Publish Rails API documentation from rswag request specs: checked against
+// the OpenAPI reference (route, code samples, Try it, CORS, authorization,
+// spec warnings), navigation tabs, deployment, and validate docs, and on main
+// (cf03b9cf, package 2.1.3) against the operation routes and their
+// method-and-path fallback (openapi/model.ts operationKey, extractOperations),
+// the spec parser and 3.0 upgrade (openapi/parse.ts), example resolution
+// (components/openapi/helpers.ts declaredExample, operation-model.ts,
+// RequestPanel.astro), and `blume init` (cli/commands/init.ts). rswag side:
+// the rswag-specs 2.17.0 gem source (the swaggerize rake task, Configuration,
+// SwaggerFormatter, RequestFactory, ResponseValidator, ExtendedSchema, the
+// install generator and spec template) and the README at tag 2.17.0
+// (802c6894537513a913a72e546d54b67f54305853), compared with the README on
+// master, which documents the 3.0 API (on RubyGems only as the 3.0.0.pre
+// prerelease, whose generator writes openapi_helper.rb and whose request
+// factory reads `request_params`). Rails side: the
+// actionpack 8.1.4 token regex, `load_defaults 8.1` params wrapping, and the
+// generated Gemfile, cors.rb, Dockerfile, and .dockerignore.
+//
+// Ran end to end on 2026-10-05 with Ruby 4.0.7 (Homebrew), Rails 8.1.4,
+// rspec-rails 8.0.4, rswag-specs 2.17.0, json-schema 6.2.1, rack-cors 3.0.0,
+// sqlite3 2.9.6, Node 24.14.1, and Blume 2.1.3 symlinked from main and run by
+// path in place of `npx blume` (gems bundled into vendor/bundle, because the
+// Homebrew gem directory wasn't writable). Every command and file on this
+// page, in a fresh folder, with the files on this page compared byte for
+// byte with the final probe: `rails new`, the generators, `bundle exec
+// rspec` (11 examples, 0 failures), `bin/rubocop` (no offenses), the
+// swaggerize task with and without RSWAG_DRY_RUN=0 (the dry run wrote no
+// examples; two real runs wrote identical bytes), `blume init --no-install`,
+// `build`, `validate --strict` (exit 0), `audit` (0 errors, 0 warnings), and
+// `preview` with curl: 200 on every route in the table, page text checked
+// for titles, descriptions, Authorization sections, the Ruby tab, recorded
+// request and response examples, and Try it's prefilled body. Try it in
+// Chrome against `bin/rails server`, with the preview's origin added to the
+// CORS list for the test: 401 without a key, 201 with one; curl preflights
+// from the allowed and another origin. `blume dev` reloaded a page after the
+// task rewrote the file. The workflow's run steps in a fresh clone (db
+// prepare and swaggerize, the freshness check, validate, build); the
+// archived_at scenario (3 failures under strict properties, then the
+// freshness check failing with the diff shown and passing after the commit).
+// Also probed: a failing spec (exit 1, file still written, its example left
+// out, and recorded wrong without the exception guard); `rswag_dry_run =
+// false` in config/environments/test.rb having no effect, with and without
+// RAILS_ENV=test; `openapi: "3.1.0"` leaving `nullable` as written; routes
+// without operationId; PATTERN writing only the matching paths; the errors
+// for a missing `let(:Authorization)` and a missing `type: :request`; a
+// broken link in an operation description failing validate; `rails g
+// rswag:install` not existing without the `rswag` gem. Not run: `npm ci` and
+// `npm install` (Blume was linked), the workflow on GitHub Actions (the
+// setup, upload, and deploy actions), a Pages deploy, and PostgreSQL.
+//
+// Review, same day, in a copy of the probe: the swaggerize task again
+// (identical bytes), `bundle exec rspec` and `bin/rubocop`, `build`,
+// `validate --strict` (and a broken description link failing it), `audit`,
+// the two NoMethodError messages, CORS preflights and the 401 with curl
+// against `bin/rails server`, and `bin/rails runner` creating a key.
+// Corrected from that: Blume doesn't publish the spec file (dist/openapi.json
+// is Blume's own JSON API description), so rswag-api isn't replaced by it;
+// the generated Dockerfile's BUNDLE_WITHOUT="development" still installs the
+// :development, :test group in the image, so it's "doesn't load", not "ships
+// neither"; and in a real run the helper's hook overwrites
+// `request_body_example` entries (a dry run keeps them).
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const applicationController = `class ApplicationController < ActionController::API
+  include ActionController::HttpAuthentication::Token::ControllerMethods
+
+  before_action :authenticate
+
+  rescue_from ActiveRecord::RecordNotFound do
+    render json: { error: "Not found" }, status: :not_found
+  end
+
+  private
+
+  def authenticate
+    authenticate_with_http_token { |token| ApiKey.find_by(token:) } ||
+      render(json: { error: "Missing or invalid API key" }, status: :unauthorized)
+  end
+end`;
+
+const projectsController = `class ProjectsController < ApplicationController
+  def index
+    render json: Project.order(:id)
+  end
+
+  def show
+    render json: Project.find(params[:id])
+  end
+
+  def create
+    project = Project.new(params.expect(project: [ :name, :description ]))
+
+    if project.save
+      render json: project, status: :created
+    else
+      render json: { errors: project.errors }, status: :unprocessable_content
+    end
+  end
+end`;
+
+const tasksController = `class TasksController < ApplicationController
+  before_action :set_project
+
+  def index
+    render json: @project.tasks.order(:id)
+  end
+
+  def create
+    task = @project.tasks.new(params.expect(task: [ :title, :due_on ]))
+
+    if task.save
+      render json: task, status: :created
+    else
+      render json: { errors: task.errors }, status: :unprocessable_content
+    end
+  end
+
+  private
+
+  def set_project
+    @project = Project.find(params[:project_id])
+  end
+end`;
+
+const swaggerHelper = `# frozen_string_literal: true
+
+require "rails_helper"
+
+RSpec.configure do |config|
+  # Write the OpenAPI document into the Blume project, where the docs build reads it.
+  config.openapi_root = Rails.root.join("docs-site").to_s
+  config.openapi_format = :yaml
+
+  # Fail a spec when a response has a field its schema doesn't list.
+  config.openapi_no_additional_properties = true
+
+  config.openapi_specs = {
+    "openapi.yaml" => {
+      openapi: "3.0.3",
+      info: {
+        title: "Acme Projects API",
+        version: "1.0.0",
+        description: "Create projects and track the tasks in them with a JSON API. Every request needs an API key, sent as a bearer token."
+      },
+      servers: [ { url: "https://api.acme.example/v1" } ],
+      security: [ { bearer_auth: [] } ],
+      tags: [
+        { name: "Projects", description: "Create projects and look them up." },
+        { name: "Tasks", description: "Add tasks to a project and list them." }
+      ],
+      paths: {},
+      components: {
+        securitySchemes: {
+          bearer_auth: {
+            type: :http,
+            scheme: :bearer,
+            description: "An API key, sent as a bearer token."
+          }
+        },
+        schemas: {
+          Project: {
+            type: :object,
+            properties: {
+              id: { type: :integer, description: "The project's ID." },
+              name: { type: :string, description: "The project's name." },
+              description: { type: :string, nullable: true, description: "What the project is for." },
+              created_at: { type: :string, format: "date-time", description: "When the project was created." },
+              updated_at: { type: :string, format: "date-time", description: "When the project last changed." }
+            },
+            required: %w[id name description created_at updated_at]
+          },
+          ProjectInput: {
+            type: :object,
+            properties: {
+              name: { type: :string, maxLength: 100, description: "The project's name." },
+              description: { type: :string, nullable: true, description: "What the project is for." }
+            },
+            required: %w[name]
+          },
+          Task: {
+            type: :object,
+            properties: {
+              id: { type: :integer, description: "The task's ID." },
+              project_id: { type: :integer, description: "The ID of the project the task belongs to." },
+              title: { type: :string, description: "What needs doing." },
+              due_on: { type: :string, format: :date, nullable: true, description: "The day the task is due." },
+              created_at: { type: :string, format: "date-time", description: "When the task was created." },
+              updated_at: { type: :string, format: "date-time", description: "When the task last changed." }
+            },
+            required: %w[id project_id title due_on created_at updated_at]
+          },
+          TaskInput: {
+            type: :object,
+            properties: {
+              title: { type: :string, maxLength: 200, description: "What needs doing." },
+              due_on: { type: :string, format: :date, nullable: true, description: "The day the task is due." }
+            },
+            required: %w[title]
+          },
+          Error: {
+            type: :object,
+            properties: {
+              error: { type: :string, description: "What went wrong." }
+            },
+            required: %w[error]
+          },
+          ValidationErrors: {
+            type: :object,
+            properties: {
+              errors: {
+                type: :object,
+                description: "The invalid fields, each with its problems.",
+                additionalProperties: { type: :array, items: { type: :string } }
+              }
+            },
+            required: %w[errors]
+          }
+        }
+      }
+    }
+  }
+
+  # Request specs run at a fixed time, so timestamps in the recorded examples
+  # don't change from one run to the next.
+  config.include ActiveSupport::Testing::TimeHelpers
+  config.around(:each, :rswag) do |example|
+    travel_to(Time.utc(2026, 1, 15, 9, 30)) { example.run }
+  end
+
+  # Record each passing request spec's response as the example for its
+  # status code, and a successful request's body as the request example.
+  config.after(:each, :rswag) do |example|
+    next if example.exception
+
+    if response.body.present?
+      example.metadata[:response][:content] = {
+        "application/json" => { example: JSON.parse(response.body) }
+      }
+    end
+
+    if response.successful? && request.raw_post.present?
+      example.metadata[:operation][:request_examples] = [
+        { name: "example", value: JSON.parse(request.raw_post) }
+      ]
+    end
+  end
+end`;
+
+const projectsSpec = `require "swagger_helper"
+
+RSpec.describe "Projects", type: :request do
+  let(:api_key) { ApiKey.create!(name: "Docs") }
+  let(:Authorization) { "Bearer #{api_key.token}" }
+
+  path "/projects" do
+    get "List projects" do
+      tags "Projects"
+      operationId "listProjects"
+      description "Returns every project in your account, oldest first."
+      produces "application/json"
+
+      response "200", "The projects." do
+        schema type: :array, items: { "$ref" => "#/components/schemas/Project" }
+
+        before do
+          Project.create!(name: "Website relaunch", description: "Move the marketing site to the new design.")
+          Project.create!(name: "Mobile app", description: nil)
+        end
+
+        run_test! do |response|
+          expect(JSON.parse(response.body).map { |project| project["name"] })
+            .to eq([ "Website relaunch", "Mobile app" ])
+        end
+      end
+
+      response "401", "The API key is missing or invalid." do
+        schema "$ref" => "#/components/schemas/Error"
+
+        let(:Authorization) { "Bearer not-a-real-key" }
+
+        run_test!
+      end
+    end
+
+    post "Create a project" do
+      tags "Projects"
+      operationId "createProject"
+      description "Creates a project. Add tasks to it with [Create a task](/api/tasks/create-task)."
+      consumes "application/json"
+      produces "application/json"
+      parameter name: :project, in: :body, required: true, schema: { "$ref" => "#/components/schemas/ProjectInput" }
+
+      response "201", "The project was created." do
+        schema "$ref" => "#/components/schemas/Project"
+
+        let(:project) { { name: "Website relaunch", description: "Move the marketing site to the new design." } }
+
+        run_test!
+      end
+
+      response "422", "The project is invalid. Each invalid field is listed with its problems." do
+        schema "$ref" => "#/components/schemas/ValidationErrors"
+
+        let(:project) { { name: "" } }
+
+        run_test!
+      end
+    end
+  end
+
+  path "/projects/{id}" do
+    parameter name: :id, in: :path, schema: { type: :integer }, example: 1, description: "The project's ID."
+
+    get "Get a project" do
+      tags "Projects"
+      operationId "getProject"
+      description "Returns one project by its ID, with its name, description, and timestamps."
+      produces "application/json"
+
+      response "200", "The project." do
+        schema "$ref" => "#/components/schemas/Project"
+
+        let(:id) { Project.create!(name: "Website relaunch", description: "Move the marketing site to the new design.").id }
+
+        run_test!
+      end
+
+      response "404", "No project has that ID." do
+        schema "$ref" => "#/components/schemas/Error"
+
+        let(:id) { 999 }
+
+        run_test!
+      end
+    end
+  end
+end`;
+
+const tasksSpec = `require "swagger_helper"
+
+RSpec.describe "Tasks", type: :request do
+  let(:api_key) { ApiKey.create!(name: "Docs") }
+  let(:Authorization) { "Bearer #{api_key.token}" }
+  let(:website) { Project.create!(name: "Website relaunch", description: "Move the marketing site to the new design.") }
+
+  path "/projects/{project_id}/tasks" do
+    parameter name: :project_id, in: :path, schema: { type: :integer }, example: 1, description: "The ID of the project."
+
+    get "List tasks" do
+      tags "Tasks"
+      operationId "listTasks"
+      description "Returns the tasks in a project, oldest first."
+      produces "application/json"
+
+      response "200", "The project's tasks." do
+        schema type: :array, items: { "$ref" => "#/components/schemas/Task" }
+
+        let(:project_id) { website.id }
+
+        before do
+          website.tasks.create!(title: "Write the launch post", due_on: "2026-02-02")
+          website.tasks.create!(title: "Update the screenshots", due_on: nil)
+        end
+
+        run_test!
+      end
+
+      response "404", "No project has that ID." do
+        schema "$ref" => "#/components/schemas/Error"
+
+        let(:project_id) { 999 }
+
+        run_test!
+      end
+    end
+
+    post "Create a task" do
+      tags "Tasks"
+      operationId "createTask"
+      description "Adds a task to a project."
+      consumes "application/json"
+      produces "application/json"
+      parameter name: :task, in: :body, required: true, schema: { "$ref" => "#/components/schemas/TaskInput" }
+
+      response "201", "The task was created." do
+        schema "$ref" => "#/components/schemas/Task"
+
+        let(:project_id) { website.id }
+        let(:task) { { title: "Write the launch post", due_on: "2026-02-02" } }
+
+        run_test!
+      end
+
+      response "422", "The task is invalid. Each invalid field is listed with its problems." do
+        schema "$ref" => "#/components/schemas/ValidationErrors"
+
+        let(:project_id) { website.id }
+        let(:task) { { title: "" } }
+
+        run_test!
+      end
+
+      response "404", "No project has that ID." do
+        schema "$ref" => "#/components/schemas/Error"
+
+        let(:project_id) { 999 }
+        let(:task) { { title: "Write the launch post" } }
+
+        run_test!
+      end
+    end
+  end
+end`;
+
+const createProjectYaml = `    post:
+      summary: Create a project
+      tags:
+      - Projects
+      operationId: createProject
+      description: Creates a project. Add tasks to it with [Create a task](/api/tasks/create-task).
+      parameters: []
+      responses:
+        '201':
+          description: The project was created.
+          content:
+            application/json:
+              example:
+                id: 1
+                name: Website relaunch
+                description: Move the marketing site to the new design.
+                created_at: '2026-01-15T09:30:00.000Z'
+                updated_at: '2026-01-15T09:30:00.000Z'
+              schema:
+                "$ref": "#/components/schemas/Project"
+        '422':
+          description: The project is invalid. Each invalid field is listed with its
+            problems.
+          content:
+            application/json:
+              example:
+                errors:
+                  name:
+                  - can't be blank
+              schema:
+                "$ref": "#/components/schemas/ValidationErrors"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              "$ref": "#/components/schemas/ProjectInput"
+            examples:
+              example:
+                summary: Create a project
+                value:
+                  name: Website relaunch
+                  description: Move the marketing site to the new design.
+        required: true`;
+
+const quickstartMdx = `---
+title: Quickstart
+description: Authenticate with an API key, create a project with the Acme Projects API, and add your first task to it from the command line.
+---
+
+Every request needs an API key, sent in the \`Authorization\` header as a bearer
+token. Set it in your shell first:
+
+\`\`\`bash
+export ACME_API_KEY="your-api-key"
+\`\`\`
+
+## Create a project
+
+Send a name to [Create a project](/api/projects/create-project):
+
+\`\`\`bash
+curl https://api.acme.example/v1/projects \\
+  -H "Authorization: Bearer $ACME_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"name":"Website relaunch"}'
+\`\`\`
+
+The response is the project, with the ID the API assigned:
+
+\`\`\`json
+{
+  "id": 1,
+  "name": "Website relaunch",
+  "description": null,
+  "created_at": "2026-01-15T09:30:00.000Z",
+  "updated_at": "2026-01-15T09:30:00.000Z"
+}
+\`\`\`
+
+## Add a task
+
+Pass the project's ID to [Create a task](/api/tasks/create-task):
+
+\`\`\`bash
+curl https://api.acme.example/v1/projects/1/tasks \\
+  -H "Authorization: Bearer $ACME_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"title":"Write the launch post","due_on":"2026-02-02"}'
+\`\`\`
+
+## Handle errors
+
+A request with a missing or unknown key gets a \`401\` with an \`error\` message.
+An invalid body gets a \`422\`, with each invalid field listed under \`errors\`:
+
+\`\`\`json
+{ "errors": { "name": ["can't be blank"] } }
+\`\`\``;
+
+const indexMdx = `---
+title: Introduction
+description: "Create projects and track their tasks with the Acme Projects API: authenticate with an API key and call it from any HTTP client."
+---
+
+The Acme Projects API stores your projects and the tasks in them.
+
+- [Quickstart](/quickstart) takes you from an API key to your first task.
+- The [API reference](/api) lists every operation. Its examples are real
+  responses, recorded while the API's test suite ran.`;
+
+const corsInitializer = `# Let the docs site's Try it panel call the API from the browser.
+Rails.application.config.middleware.insert_before 0, Rack::Cors do
+  allow do
+    origins "https://docs.acme.example"
+
+    resource "/v1/*",
+      headers: %w[Authorization Content-Type],
+      methods: %i[get post options]
+  end
+end`;
+
+const workflow = `name: API docs
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ruby/setup-ruby@v1
+        with:
+          bundler-cache: true
+      - name: Run the request specs and write the spec
+        run: bin/rails db:test:prepare rswag:specs:swaggerize
+        env:
+          RSWAG_DRY_RUN: "0"
+      - name: Fail if the committed spec is out of date
+        run: git diff --exit-code -- docs-site/openapi.yaml
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+      - run: npm ci
+        working-directory: docs-site
+      - run: npx blume validate --strict
+        working-directory: docs-site
+      - run: npm run build
+        working-directory: docs-site
+      - if: github.event_name == 'push'
+        uses: actions/upload-pages-artifact@v5
+        with:
+          path: docs-site/dist
+          include-hidden-files: true
+
+  deploy:
+    if: github.event_name == 'push'
+    needs: docs
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    concurrency:
+      group: pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: \${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5`;
+
+const strictFailure = `Failures:
+
+  1) Projects /projects get The projects. returns a 200 response
+     Failure/Error: travel_to(Time.utc(2026, 1, 15, 9, 30)) { example.run }
+
+     Rswag::Specs::UnexpectedResponse:
+       Expected response body to match schema: The property '#/0' contained undefined properties: 'archived_at' in schema 05d38a59-14ed-50c4-96c2-ab9573a4c553#
+...
+11 examples, 3 failures
+
+Failed examples:
+
+rspec ./spec/requests/projects_spec.rb:14 # Projects /projects get The projects. returns a 200 response
+rspec ./spec/requests/projects_spec.rb:45 # Projects /projects post The project was created. returns a 201 response
+rspec ./spec/requests/projects_spec.rb:72 # Projects /projects/{id} get The project. returns a 200 response`;
+
+const schemaDiff = `               created_at: { type: :string, format: "date-time", description: "When the project was created." },
+-              updated_at: { type: :string, format: "date-time", description: "When the project last changed." }
++              updated_at: { type: :string, format: "date-time", description: "When the project last changed." },
++              archived_at: { type: :string, format: "date-time", nullable: true, description: "When the project was archived, or null." }
+             },
+-            required: %w[id name description created_at updated_at]
++            required: %w[id name description created_at updated_at archived_at]`;
+
+const staleDiff = `@@ -33,11 +33,13 @@ paths:
+                 description: Move the marketing site to the new design.
+                 created_at: '2026-01-15T09:30:00.000Z'
+                 updated_at: '2026-01-15T09:30:00.000Z'
++                archived_at:
+               - id: 2
+                 name: Mobile app
+                 description:
+                 created_at: '2026-01-15T09:30:00.000Z'
+                 updated_at: '2026-01-15T09:30:00.000Z'
++                archived_at:
+               schema:
+                 type: array
+                 items:`;
+---
+
+<GuidePage guide={guideById("rails-api-documentation-rswag")}>
+  <p>
+    To publish Rails API documentation with rswag, describe each endpoint in
+    an rswag request spec, run the specs to write an OpenAPI file, and build a
+    Blume site from that file. The specs send real requests to your
+    controllers and check every response against the schema you documented,
+    so the reference describes what the API actually does, and its examples
+    are responses the API returned during the test run.
+  </p>
+  <p>
+    By the end of this guide, you have a Rails 8.1 API with bearer-token auth,
+    request specs that test every documented response, an{" "}
+    <code>openapi.yaml</code> with recorded request and response examples, and
+    a docs site with a page per operation and a quickstart beside them. A
+    GitHub Actions workflow runs the specs, checks the committed spec, then
+    builds and deploys the docs, in that order, so a failing spec never
+    reaches the published docs.
+  </p>
+  <p>
+    rswag can also serve Swagger UI from your Rails app at{" "}
+    <code>/api-docs</code>. If an explorer for your own team is all you need,
+    that's less to run. A separate docs site fits when the docs are public,
+    need guides beside the reference, or shouldn't be served by the API they
+    describe. With Blume as the docs site, you need only one of rswag's gems.
+  </p>
+
+  <h2>How the pieces fit</h2>
+  <p>The docs project lives inside the Rails repository, in its own folder:</p>
+  <CodeBlock
+    code={`acme-api/                       the Rails app
+├── app/
+├── spec/
+│   ├── swagger_helper.rb       rswag's settings and the spec's header
+│   └── requests/               one request spec file per resource
+├── docs-site/
+│   ├── openapi.yaml            written by the specs, read by Blume
+│   ├── blume.config.ts
+│   ├── docs/
+│   └── package.json
+└── .github/workflows/docs.yml`}
+    lang="txt"
+  />
+  <p>
+    rswag's <code>rswag:specs:swaggerize</code> task, run with{" "}
+    <code>RSWAG_DRY_RUN=0</code>, runs the request specs and writes{" "}
+    <code>docs-site/openapi.yaml</code>. Blume reads that file at
+    build time and renders a page for each operation under <code>/api</code>.
+    Blume never reads your Ruby, so the request specs are where the docs get
+    better, and building the docs needs Node.js but no Ruby.
+  </p>
+
+  <h2>Create the API</h2>
+  <p>
+    The example is a small API for projects and their tasks, with an API key
+    per client. Rails 8.1 needs Ruby 3.2 or later; this guide ran on Ruby
+    4.0. Install Rails at a fixed version and create an API-only app on
+    SQLite:
+  </p>
+  <CodeBlock
+    code={`gem install rails -v 8.1.4
+rails _8.1.4_ new acme-api --api --database=sqlite3 --skip-test
+cd acme-api`}
+    lang="bash"
+  />
+  <p>
+    <code>--api</code> leaves out views and the middleware a browser app
+    needs. <code>--skip-test</code> leaves out Minitest, because RSpec runs the
+    tests here. Generate the models and migrate:
+  </p>
+  <CodeBlock
+    code={`bin/rails generate model ApiKey name:string token:token --no-test-framework
+bin/rails generate model Project name:string description:text --no-test-framework
+bin/rails generate model Task project:references title:string due_on:date --no-test-framework
+bin/rails db:migrate`}
+    lang="bash"
+  />
+  <p>
+    The <code>token</code> type gives <code>ApiKey</code>{" "}
+    <code>has_secure_token</code> and a unique index, so every key gets a
+    random token when it's created. Add the associations and validations to
+    the other two models:
+  </p>
+  <CodeBlock
+    code={`class Project < ApplicationRecord
+  has_many :tasks, dependent: :destroy
+
+  validates :name, presence: true, length: { maximum: 100 }
+end`}
+    lang="ruby"
+    title="app/models/project.rb"
+  />
+  <CodeBlock
+    code={`class Task < ApplicationRecord
+  belongs_to :project
+
+  validates :title, presence: true, length: { maximum: 200 }
+end`}
+    lang="ruby"
+    title="app/models/task.rb"
+  />
+  <p>
+    The application controller checks the API key on every request and turns
+    a missing record into a JSON 404.{" "}
+    <code>authenticate_with_http_token</code> reads the token from an{" "}
+    <code>Authorization</code> header that starts with <code>Bearer</code> or{" "}
+    <code>Token</code>:
+  </p>
+  <CodeBlock
+    code={applicationController}
+    lang="ruby"
+    title="app/controllers/application_controller.rb"
+  />
+  <CodeBlock
+    code={projectsController}
+    lang="ruby"
+    title="app/controllers/projects_controller.rb"
+  />
+  <CodeBlock
+    code={tasksController}
+    lang="ruby"
+    title="app/controllers/tasks_controller.rb"
+  />
+  <p>
+    Two Rails defaults matter here. <code>render json: project</code>{" "}
+    serializes every column, so a migration that adds one changes the API;
+    the specs catch that later in this guide. And Rails wraps the keys of a
+    JSON body that match the model's attributes under the model's name, so a
+    body of{" "}
+    <code>&#123;"name": "Website relaunch"&#125;</code> arrives as{" "}
+    <code>params[:project][:name]</code>, which is what{" "}
+    <code>params.expect(project: [...])</code> reads. Serve both resources
+    under <code>/v1</code>:
+  </p>
+  <CodeBlock
+    code={`Rails.application.routes.draw do
+  scope "v1" do
+    resources :projects, only: [ :index, :show, :create ] do
+      resources :tasks, only: [ :index, :create ]
+    end
+  end
+
+  # Reveal health status on /up that returns 200 if the app boots with no exceptions, otherwise 500.
+  # Can be used by load balancers and uptime monitors to verify that the app is live.
+  get "up" => "rails/health#show", as: :rails_health_check
+end`}
+    lang="ruby"
+    title="config/routes.rb"
+  />
+
+  <h2>Add rswag</h2>
+  <p>rswag is three gems, and with a Blume docs site you need only one of them:</p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Gem</th>
+        <th scope="col">What it does</th>
+        <th scope="col">Needed here</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>rswag-specs</code></td>
+        <td>The request spec DSL, and the rake task that writes the OpenAPI file</td>
+        <td>Yes</td>
+      </tr>
+      <tr>
+        <td><code>rswag-api</code></td>
+        <td>Serves the OpenAPI file from your Rails app</td>
+        <td>No: Blume reads the file from the repository</td>
+      </tr>
+      <tr>
+        <td><code>rswag-ui</code></td>
+        <td>Serves Swagger UI from your Rails app</td>
+        <td>No: Blume renders the reference</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Add RSpec and rswag-specs to the group <code>rails new</code> already
+    created, so the app doesn't load either in production:
+  </p>
+  <CodeBlock
+    code={`group :development, :test do
+  # ...the gems rails new added
+
+  # Request specs that test the API and write its OpenAPI document
+  gem "rspec-rails", "~> 8.0"
+  gem "rswag-specs", "~> 2.17"
+end`}
+    lang="ruby"
+    title="Gemfile"
+  />
+  <CodeBlock
+    code={`bundle install
+bin/rails generate rspec:install
+bin/rails generate rswag:specs:install`}
+    lang="bash"
+  />
+  <p>
+    The first generator writes <code>.rspec</code>,{" "}
+    <code>spec/spec_helper.rb</code>, and <code>spec/rails_helper.rb</code>;
+    the second writes <code>spec/swagger_helper.rb</code>. rswag's README
+    starts with <code>rails g rswag:install</code>, which comes from the{" "}
+    <code>rswag</code> gem that bundles all three, and doesn't exist with
+    rswag-specs alone. Read the README at the tag of the version you install:
+    the default branch on GitHub documents rswag 3.0, which is only out as a
+    prerelease, with an <code>openapi_helper.rb</code> and a different way to
+    pass parameters.
+  </p>
+
+  <h2>Point rswag at the docs site</h2>
+  <p>
+    Replace the generated <code>spec/swagger_helper.rb</code>. It says where
+    rswag writes the file, holds everything in the OpenAPI document that isn't
+    an operation, and records examples from the test run:
+  </p>
+  <CodeBlock code={swaggerHelper} lang="ruby" title="spec/swagger_helper.rb" />
+  <ul>
+    <li>
+      <strong>Where the file goes.</strong> <code>openapi_root</code> and the
+      key <code>openapi.yaml</code> add up to{" "}
+      <code>docs-site/openapi.yaml</code>, beside the Blume config you'll add
+      later. Without <code>openapi_format</code>, rswag writes JSON.
+    </li>
+    <li>
+      <strong>OpenAPI 3.0.</strong> rswag checks responses with JSON Schema
+      draft 4 plus OpenAPI 3.0's <code>nullable</code>, so the schemas are 3.0
+      schemas. Blume upgrades a 3.0 document to 3.1 as it reads it, which
+      turns <code>nullable: true</code> into a string-or-null type. Declare{" "}
+      <code>3.1.0</code> instead and Blume takes the file as written, where{" "}
+      <code>nullable</code> means nothing, so <code>description</code> is
+      labeled <code>string</code> rather than <code>string | null</code>.
+    </li>
+    <li>
+      <strong>The <code>/v1</code> prefix.</strong> The server URL ends in{" "}
+      <code>/v1</code> and the paths don't. When rswag sends a test request,
+      it puts the path of the first server URL in front of the spec's path,
+      so <code>/projects</code> is requested at <code>/v1/projects</code>,
+      where Rails routes it, and the docs show <code>/projects</code> under
+      the base URL.
+    </li>
+    <li>
+      <strong>Auth.</strong> The root <code>security</code> applies{" "}
+      <code>bearer_auth</code> to every operation. rswag sends the{" "}
+      <code>Authorization</code> header from a{" "}
+      <code>let(:Authorization)</code> in each spec, and Blume shows an
+      Authorization section, a bearer token field in Try it, and{" "}
+      <code>Authorization: Bearer YOUR_TOKEN</code> in the code samples.
+    </li>
+    <li>
+      <strong>Tags.</strong> The <code>tags</code> list sets the order of the
+      groups in the sidebar and on the overview page, where each description
+      introduces its group.
+    </li>
+    <li>
+      <strong>Strict responses.</strong>{" "}
+      <code>openapi_no_additional_properties</code> fails a spec when a
+      response has a field its schema doesn't list, so a field a tested
+      response returns can't go undocumented.
+    </li>
+  </ul>
+
+  <h3>Recorded examples</h3>
+  <p>
+    The last two blocks are what make the examples real. rswag sends a
+    request for every <code>run_test!</code>, and its README suggests an{" "}
+    <code>after</code> block in each response to save that response as its
+    example. The helper does it once, for every spec that{" "}
+    <code>run_test!</code> creates, since rswag tags those with{" "}
+    <code>:rswag</code>:
+  </p>
+  <ul>
+    <li>
+      The response body becomes the example for that status code. Blume's
+      Response panel shows a tab per status code, so a reader sees the 201
+      and the 422 the API really sent.
+    </li>
+    <li>
+      A successful request's body becomes the request example. rswag writes
+      it under the operation's <code>requestBody</code>, and Blume uses it in
+      the code samples and as Try it's starting values.
+    </li>
+    <li>
+      <code>next if example.exception</code> skips specs that failed. An{" "}
+      <code>after</code> hook runs after a failure too, and without the guard
+      a 201 spec that got the wrong body would document the wrong body.
+    </li>
+    <li>
+      <code>travel_to</code> pins every timestamp, and SQLite rolls back its
+      ID counter with each spec's transaction, so IDs start at 1 in every
+      spec. The same code then writes the same file, byte for byte, which the
+      CI check later in this guide depends on.
+    </li>
+  </ul>
+
+  <h2>Describe the endpoints in request specs</h2>
+  <p>One spec file per resource:</p>
+  <CodeBlock
+    code={projectsSpec}
+    lang="ruby"
+    title="spec/requests/projects_spec.rb"
+  />
+  <CodeBlock code={tasksSpec} lang="ruby" title="spec/requests/tasks_spec.rb" />
+  <p>
+    Each <code>response</code> block is a test. rswag builds the request from
+    the parameters and the <code>let</code>s, sends it, then checks the status
+    code and the body against <code>schema</code>. The <code>let</code> names
+    match the parameter names: <code>let(:project)</code> is the request body,{" "}
+    <code>let(:id)</code> fills in <code>&#123;id&#125;</code>, and{" "}
+    <code>let(:Authorization)</code> is the header.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In the spec file</th>
+        <th scope="col">In openapi.yaml</th>
+        <th scope="col">On the docs site</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>post "Create a project"</code></td>
+        <td>The operation and its <code>summary</code></td>
+        <td>The page title and sidebar label</td>
+      </tr>
+      <tr>
+        <td><code>tags "Projects"</code></td>
+        <td>The operation's <code>tags</code></td>
+        <td>Its sidebar group, and the URL segment <code>/api/projects/</code></td>
+      </tr>
+      <tr>
+        <td><code>operationId "createProject"</code></td>
+        <td><code>operationId</code></td>
+        <td>The page URL, <code>/api/projects/create-project</code></td>
+      </tr>
+      <tr>
+        <td><code>description</code></td>
+        <td><code>description</code>, as Markdown</td>
+        <td>The paragraph under the title, and the start of the page's meta description</td>
+      </tr>
+      <tr>
+        <td><code>parameter ... in: :body</code> and <code>consumes</code></td>
+        <td><code>requestBody</code></td>
+        <td>The Request body table, and Try it's body fields</td>
+      </tr>
+      <tr>
+        <td><code>parameter ... in: :path, example: 1</code></td>
+        <td>A path parameter with an <code>example</code></td>
+        <td>The Path parameters table, and <code>/projects/1</code> in the samples</td>
+      </tr>
+      <tr>
+        <td><code>response "422", "The project is invalid..."</code></td>
+        <td>A response and its <code>description</code></td>
+        <td>A status code under Responses, with the text beside it</td>
+      </tr>
+      <tr>
+        <td><code>schema</code></td>
+        <td>The response's schema</td>
+        <td>The response's schema table; the spec also checks the body against it</td>
+      </tr>
+      <tr>
+        <td>The helper's <code>after</code> hook</td>
+        <td><code>example</code> and the request's <code>examples</code></td>
+        <td>The Response panel, the code samples, and Try it's starting values</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>A few details matter for the docs:</p>
+  <ul>
+    <li>
+      rswag doesn't write an <code>operationId</code> of its own. Without
+      one, Blume builds the URL from the method and path, like{" "}
+      <code>/api/projects/post-projects</code>.
+    </li>
+    <li>
+      <code>example: 1</code> on the path parameters is written by hand. The
+      hook records bodies, not the values in the URL, and without an example
+      the samples call <code>/projects/0</code>.
+    </li>
+    <li>
+      Descriptions are Markdown. The link to Create a task renders on the
+      page, and <code>blume validate</code> checks it like a link in any page
+      you write, so it fails if that operation's URL changes.
+    </li>
+    <li>
+      <code>type: :request</code> is required. rspec-rails'{" "}
+      <code>rails_helper.rb</code> doesn't infer a spec's type from its folder
+      unless you turn that on, and rswag's DSL only exists in request specs.
+    </li>
+    <li>
+      A response written as <code>response "401", "...", document: false</code>{" "}
+      still runs as a test but stays out of the file.
+    </li>
+  </ul>
+
+  <h2>Write the spec from the tests</h2>
+  <p>Run the request specs and write the file:</p>
+  <CodeBlock
+    code="RSWAG_DRY_RUN=0 bin/rails rswag:specs:swaggerize"
+    lang="bash"
+  />
+  <CodeBlock
+    code={`Generating Swagger docs ...
+Swagger doc generated at /path/to/acme-api/docs-site/openapi.yaml
+
+11 examples, 0 failures`}
+    lang="txt"
+  />
+  <p>
+    <code>RSWAG_DRY_RUN=0</code> is what makes the task run the tests. By
+    default it passes RSpec's <code>--dry-run</code>: no request is sent and
+    no hook runs, so it writes a file with schemas and no examples, whether
+    the specs would pass or not. rswag's README also mentions a{" "}
+    <code>rswag_dry_run</code> setting for{" "}
+    <code>config/environments/test.rb</code>, but the rake task decides
+    before that file loads, and setting it there had no effect. Use the
+    environment variable.
+  </p>
+  <p>
+    The task runs the specs under <code>spec/requests</code>,{" "}
+    <code>spec/api</code>, and <code>spec/integration</code>, in the order
+    they're defined. Here's what it wrote for Create a project:
+  </p>
+  <CodeBlock code={createProjectYaml} lang="yaml" title="docs-site/openapi.yaml" />
+  <p>
+    When a spec fails, the task exits with an error but writes the file
+    anyway, without the examples of the specs that failed. A run without{" "}
+    <code>RSWAG_DRY_RUN=0</code> writes it with no examples at all. Don't
+    commit the file from either: fix what failed and run the task again.
+  </p>
+
+  <h2>Build the docs site</h2>
+  <p>
+    From the Rails root, scaffold Blume into the folder that holds the spec.
+    Blume needs Node.js 22.12 or later:
+  </p>
+  <CodeBlock
+    code="npx blume init docs-site --template docs --yes"
+    lang="bash"
+  />
+  <p>
+    It writes <code>blume.config.ts</code>, <code>docs/index.mdx</code>, a{" "}
+    <code>package.json</code> with <code>dev</code> and <code>build</code>{" "}
+    scripts, and a <code>.gitignore</code> into <code>docs-site/</code>,
+    installs Blume, and leaves <code>openapi.yaml</code> alone. Replace the
+    config:
+  </p>
+  <CodeBlock
+    code={`import { defineConfig } from "blume";
+import { openapi } from "blume/reference";
+
+export default defineConfig({
+  title: "Acme Docs",
+  description: "Guides and API reference for the Acme Projects API.",
+  deployment: { site: "https://docs.acme.example" },
+  navigation: {
+    tabs: [
+      { label: "Guides", path: "/" },
+      { label: "API reference", path: "/api" },
+    ],
+  },
+  reference: [
+    openapi({
+      route: "/api",
+      spec: "./openapi.yaml",
+      codeSamples: ["curl", "ruby", "js", "python"],
+    }),
+  ],
+});`}
+    lang="ts"
+    title="docs-site/blume.config.ts"
+  />
+  <p>
+    The reference doesn't add a header tab on its own, so the tab at{" "}
+    <code>/api</code> makes it reachable and scopes its sidebar.{" "}
+    <code>codeSamples</code> adds a Ruby tab, using <code>net/http</code>,
+    next to cURL, JavaScript, and Python. <code>deployment.site</code> gives
+    the sitemap and canonical links their origin, since GitHub Pages doesn't
+    tell the build its URL.
+  </p>
+  <p>
+    The reference says what each operation takes and returns. Readers also
+    need to know how to authenticate and which call comes first, so replace
+    the home page and add a quickstart:
+  </p>
+  <CodeBlock code={indexMdx} lang="mdx" title="docs-site/docs/index.mdx" />
+  <CodeBlock code={quickstartMdx} lang="mdx" title="docs-site/docs/quickstart.mdx" />
+  <p>
+    Link to operation pages by their URL, which comes from the tag and the
+    operation ID. Build the site, check every link, and preview it:
+  </p>
+  <CodeBlock
+    code={`cd docs-site
+npm run build
+npx blume validate --strict
+npx blume preview`}
+    lang="bash"
+  />
+  <p>
+    <code>--strict</code> fails on warnings as well as broken links. Open{" "}
+    <code>http://localhost:4321/api</code>. The overview lists both tags with
+    their descriptions, and each operation has its own page:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Operation</th>
+        <th scope="col">Page</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>GET /projects</code></td>
+        <td><code>/api/projects/list-projects</code></td>
+      </tr>
+      <tr>
+        <td><code>POST /projects</code></td>
+        <td><code>/api/projects/create-project</code></td>
+      </tr>
+      <tr>
+        <td><code>GET /projects/&#123;id&#125;</code></td>
+        <td><code>/api/projects/get-project</code></td>
+      </tr>
+      <tr>
+        <td><code>GET /projects/&#123;project_id&#125;/tasks</code></td>
+        <td><code>/api/tasks/list-tasks</code></td>
+      </tr>
+      <tr>
+        <td><code>POST /projects/&#123;project_id&#125;/tasks</code></td>
+        <td><code>/api/tasks/create-task</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Each page has the summary as its title, the description under it, an
+    Authorization section, and schema tables with the descriptions from{" "}
+    <code>swagger_helper.rb</code>. The code samples and the Response panel
+    come from the recorded examples: Create a project's cURL sample sends the
+    body the 201 spec sent, and its Response panel has a 201 tab with the
+    created project and a 422 tab with{" "}
+    <code>&#123;"errors": &#123;"name": ["can't be blank"]&#125;&#125;</code>.
+  </p>
+  <p>
+    While you write specs, run <code>npm run dev</code> in{" "}
+    <code>docs-site/</code> and the swaggerize task in another terminal.{" "}
+    <code>blume dev</code> watches <code>openapi.yaml</code>, so the open page
+    reloads each time the task rewrites it.
+  </p>
+  <p>
+    One more file outside <code>docs-site/</code>: the Dockerfile from{" "}
+    <code>rails new</code> copies the whole app into the image, docs site
+    included. Add a line to <code>.dockerignore</code>:
+  </p>
+  <CodeBlock code="/docs-site" lang="txt" title=".dockerignore" />
+
+  <h2>Let Try it call the API</h2>
+  <p>
+    The Try it panel sends requests from the reader's browser to the server
+    in the spec, so the API has to allow the docs site's origin with CORS. The
+    Gemfile from <code>rails new --api</code> already lists{" "}
+    <code>rack-cors</code>, commented out. Uncomment it, run{" "}
+    <code>bundle install</code>, and replace the commented-out initializer:
+  </p>
+  <CodeBlock
+    code={corsInitializer}
+    lang="ruby"
+    title="config/initializers/cors.rb"
+  />
+  <p>
+    <code>headers</code> lists the two Try it sends: the key and the body's
+    type. A preflight from{" "}
+    <code>https://docs.acme.example</code> then gets the origin back in{" "}
+    <code>Access-Control-Allow-Origin</code>, and one from any other origin
+    doesn't. To try it against <code>bin/rails server</code> while you work,
+    add your local docs origin, like <code>http://localhost:4321</code>, to{" "}
+    <code>origins</code>, and type <code>http://localhost:3000/v1</code> in
+    Try it's Custom base URL field. On Create a project, Send without a key
+    returns a 401. Create a key with{" "}
+    <code>bin/rails runner 'puts ApiKey.create!(name: "Local").token'</code>,
+    paste it into the bearer token field, and Send returns the 201.{" "}
+    <a href="/guides/api-documentation-cors-errors">Fix CORS errors in an API documentation playground</a>{" "}
+    covers reading a blocked preflight, and Blume's proxy for an API you
+    can't change.
+  </p>
+
+  <h2>Rebuild the docs only when the specs pass</h2>
+  <p>
+    Commit <code>openapi.yaml</code> even though it's generated. Its diff in a
+    pull request shows the API change the way clients will see it, a host
+    can build the docs from it without Ruby, and tools like a breaking-change
+    check can read the base branch's copy. Then add a workflow that runs the
+    specs, checks the committed file, and only then builds and deploys:
+  </p>
+  <CodeBlock code={workflow} lang="yaml" title=".github/workflows/docs.yml" />
+  <ul>
+    <li>
+      <strong>The specs come first.</strong> <code>db:test:prepare</code>{" "}
+      creates the test database from <code>db/schema.rb</code>, and the
+      swaggerize task runs the request specs and writes the file. A failing
+      spec fails the step, and nothing after it runs: no build, no deploy.{" "}
+      <code>ruby/setup-ruby</code> reads <code>.ruby-version</code>, which{" "}
+      <code>rails new</code> wrote.
+    </li>
+    <li>
+      <strong>The freshness check</strong> compares the file the specs just
+      wrote with the committed one. It fails when someone changed the API or
+      the specs without running the task, or committed the file from a red or
+      dry run. <code>git diff</code> only compares files Git tracks, so commit{" "}
+      <code>openapi.yaml</code> before you add the check.
+    </li>
+    <li>
+      <strong>The docs build</strong> checks every link, including the ones
+      to operation pages, then builds the site from a spec the specs just
+      proved.
+    </li>
+    <li>
+      <strong>The deploy</strong> runs only for pushes to <code>main</code>,
+      and only once the <code>docs</code> job has passed.
+    </li>
+  </ul>
+  <p>
+    The swaggerize task runs only request specs. If your other specs should
+    gate the docs too, run <code>bundle exec rspec</code> in a job that{" "}
+    <code>docs</code> lists under <code>needs</code>.
+  </p>
+
+  <h3>When a pull request changes the API</h3>
+  <p>
+    Say a pull request lets projects be archived, with a new column:
+  </p>
+  <CodeBlock
+    code={`bin/rails generate migration AddArchivedAtToProjects archived_at:datetime
+bin/rails db:migrate`}
+    lang="bash"
+  />
+  <p>
+    <code>render json: project</code> now returns <code>archived_at</code>,
+    and nothing documents it. Run the task, and the strict schemas fail the
+    three specs that return a project:
+  </p>
+  <CodeBlock code={strictFailure} lang="txt" />
+  <p>Document the field in the <code>Project</code> schema:</p>
+  <CodeBlock code={schemaDiff} lang="diff" title="spec/swagger_helper.rb" />
+  <p>
+    The specs pass again. If the pull request stops there, with the migration
+    and the schema but not the file the task wrote, the freshness check
+    fails and prints what the commit is missing, starting with:
+  </p>
+  <CodeBlock code={staleDiff} lang="diff" title="docs-site/openapi.yaml" />
+  <p>
+    The other hunks add <code>archived_at</code> to the remaining project
+    examples and to the schema. Run the task and commit{" "}
+    <code>openapi.yaml</code> with the change. To also fail pull requests
+    that break existing clients, like a removed field or a new required one,
+    add oasdiff as shown in{" "}
+    <a href="/guides/openapi-documentation-ci">Keep API documentation in sync with backend changes in CI</a>.
+  </p>
+
+  <h2>Deploy</h2>
+  <p>
+    The workflow deploys to GitHub Pages. Before the first push to{" "}
+    <code>main</code>, set <strong>Source</strong> to{" "}
+    <strong>GitHub Actions</strong> in the repository's Pages settings, and
+    add <code>docs.acme.example</code> under <strong>Custom domain</strong>;{" "}
+    <a href="/guides/markdown-docs-github-pages">Deploy Markdown docs to GitHub Pages</a>{" "}
+    covers both and the DNS record. <code>include-hidden-files</code> keeps
+    the <code>.well-known/</code> folder Blume writes for agent discovery.
+  </p>
+  <p>
+    To deploy somewhere else, replace the <code>deploy</code> job with your
+    host's deploy step for <code>docs-site/dist</code>. If your host builds
+    from Git by itself, like Vercel or Netlify, set its root directory to{" "}
+    <code>docs-site</code> and its build command to{" "}
+    <code>npm run build</code>. It builds from the committed spec without
+    Ruby, and it doesn't wait for this workflow, so make the{" "}
+    <code>docs</code> check required on pull requests. The{" "}
+    <a href="/docs/deployment">deployment docs</a> cover each host.
+  </p>
+
+  <h2>Limitations</h2>
+  <ul>
+    <li>
+      <strong>One example per response.</strong> Each status code of each
+      operation gets the body of the one spec that tested it, and each request
+      body gets the body a successful spec sent. The helper's hook replaces
+      any examples you add with rswag's <code>request_body_example</code>, and
+      Blume shows only the first example of each media type, without its name,
+      so more named examples wouldn't show anyway.
+    </li>
+    <li>
+      <strong>URL values aren't recorded.</strong> Path and query parameter
+      examples are the ones you write on the <code>parameter</code>.
+    </li>
+    <li>
+      <strong>Stable output depends on the database.</strong> SQLite rolls
+      back IDs with each spec's transaction. PostgreSQL never hands a sequence
+      value back, so recorded IDs there depend on what earlier specs created,
+      and the file changes when you add a spec. This guide wasn't run on
+      PostgreSQL.
+    </li>
+    <li>
+      <strong>Written for OpenAPI 3.0.</strong> rswag checks every response
+      with JSON Schema draft 4 plus 3.0's <code>nullable</code>, whatever
+      version the document declares, so the schemas stay 3.0 schemas. Blume
+      upgrades the file to 3.1 as it reads it.
+    </li>
+    <li>
+      <strong>Rails below 8.2.</strong> rswag-specs 2.17 requires{" "}
+      <code>railties</code> and <code>activesupport</code> below 8.2, so check
+      its gemspec before you upgrade Rails.
+    </li>
+    <li>
+      <strong>Agents get the prose, not the examples.</strong> The Markdown
+      copy of each operation page, which <code>llms-full.txt</code> and the{" "}
+      <code>.md</code> URLs serve, has the summary, description, and
+      endpoint, without schemas or the recorded examples. Write the
+      descriptions so they stand on their own.
+    </li>
+    <li>
+      <strong>Sidebar order isn't spec order.</strong> Within a tag, the
+      sidebar sorts operations alphabetically by summary, and the overview
+      lists them by path. A <code>meta.ts</code> in the tag's folder can set
+      the sidebar order, as in{" "}
+      <a href="/guides/typespec-documentation-website#write-guides-beside-the-reference">the TypeSpec guide</a>.
+    </li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <h3>The examples disappeared from openapi.yaml</h3>
+  <p>
+    The task ran as a dry run, without <code>RSWAG_DRY_RUN=0</code>, which
+    writes no examples. Run it again with the variable, and check the
+    workflow step sets it too.
+  </p>
+  <h3>Specs fail with "contained undefined properties"</h3>
+  <p>
+    The response has a field its schema doesn't list, usually a new column
+    that <code>render json:</code> picked up. Add it to the schema in{" "}
+    <code>swagger_helper.rb</code>, or leave it out of the JSON on purpose.
+  </p>
+  <h3>NoMethodError: undefined method 'Authorization'</h3>
+  <p>
+    The operation requires the bearer scheme, so rswag looks for a{" "}
+    <code>let(:Authorization)</code> to send. Define one at the top of the
+    spec file, as both files here do.
+  </p>
+  <h3>undefined method 'path' for class RSpec::ExampleGroups</h3>
+  <p>
+    The <code>describe</code> block is missing <code>type: :request</code>,
+    so rswag's DSL isn't loaded for it.
+  </p>
+  <h3>Page URLs read post-projects instead of create-project</h3>
+  <p>
+    The operation has no <code>operationId</code>, so Blume used the method
+    and path. Add one, and if the old URLs are already public, add a redirect
+    for each in <code>blume.config.ts</code>.
+  </p>
+  <h3>The code samples call /projects/0</h3>
+  <p>
+    The path parameter has no <code>example</code>. Add one to its{" "}
+    <code>parameter</code> line.
+  </p>
+  <h3>openapi.yaml lost a whole resource</h3>
+  <p>
+    The task ran with <code>PATTERN</code> set to one spec file, and rswag
+    writes only the paths of the specs it ran. Run it without{" "}
+    <code>PATTERN</code> before you commit.
+  </p>
+  <h3>The build fails with BLUME_OPENAPI_UNAVAILABLE</h3>
+  <p>
+    Blume couldn't read <code>openapi.yaml</code>. <code>spec</code> resolves
+    from <code>docs-site/</code>, so check that the task wrote the file there
+    and that it's committed. In <code>blume dev</code> this is only a warning
+    and the reference is skipped, so a working dev server can hide it.
+  </p>
+</GuidePage>
