@@ -706,9 +706,9 @@ Replies to your number arrive as \`message.received\` webhook events.
     longer lands on a page:
   </p>
   <CodeBlock
-    code={`while read -r path; do
-  code=$(curl -sL -o /dev/null -w "%{http_code}" "http://localhost:4321$path")
-  [ "$code" = "200" ] || echo "$code $path"
+    code={`while read -r route; do
+  code=$(curl -sL -o /dev/null -w "%{http_code}" "http://localhost:4321$route")
+  [ "$code" = "200" ] || echo "$code $route"
 done < ../old-urls.txt`}
     lang="bash"
   />

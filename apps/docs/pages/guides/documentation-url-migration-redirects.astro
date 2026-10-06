@@ -154,9 +154,9 @@ import { guideById } from "../_guides/guides.ts";
     that no longer answers 200:
   </p>
   <CodeBlock
-    code={`while read -r path; do
-  code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:4321$path")
-  [ "$code" = "200" ] || echo "$path"
+    code={`while read -r route; do
+  code=$(curl -s -o /dev/null -w "%{http_code}" "http://localhost:4321$route")
+  [ "$code" = "200" ] || echo "$route"
 done < old-urls.txt`}
     lang="bash"
   />

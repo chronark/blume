@@ -310,9 +310,9 @@ Erstelle im Acme-Dashboard einen API-Schlüssel und sende dann eine Testnachrich
     terminal print the language tags of three pages:
   </p>
   <CodeBlock
-    code={`for path in /guides/install /de/guides/install /de/guides/configure; do
-  echo "== $path"
-  curl -s "http://localhost:4321$path" \\
+    code={`for route in /guides/install /de/guides/install /de/guides/configure; do
+  echo "== $route"
+  curl -s "http://localhost:4321$route" \\
     | grep -oE '<html[^>]*>|<link[^>]*(canonical|hreflang)[^>]*>'
 done`}
     lang="bash"

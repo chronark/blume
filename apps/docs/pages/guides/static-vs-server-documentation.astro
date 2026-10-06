@@ -278,8 +278,8 @@ node dist/server/entry.mjs`}
     </li>
   </ol>
   <CodeBlock
-    code={`for path in / /quickstart /quickstart.md /llms.txt /blume-search.json /api/docs/pages.json; do
-  printf '%s %s\\n' "$(curl -sL -o /dev/null -w '%{http_code}' "http://localhost:4321$path")" "$path"
+    code={`for route in / /quickstart /quickstart.md /llms.txt /blume-search.json /api/docs/pages.json; do
+  printf '%s %s\\n' "$(curl -sL -o /dev/null -w '%{http_code}' "http://localhost:4321$route")" "$route"
 done`}
     lang="bash"
   />
