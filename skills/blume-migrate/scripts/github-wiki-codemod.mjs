@@ -157,12 +157,11 @@ const HEADING_LEVELS = 6;
 // --- Patterns -----------------------------------------------------------------
 
 const ATX =
-  /^(?<prefix>(?: {0,3}>[ \t]?)* {0,3})(?<hashes>#{1,6})(?<rest>(?:[ \t].*)?)$/u;
+  /^(?<prefix> {0,3}(?:>(?:\t {0,3}| {0,4}))*)(?<hashes>#{1,6})(?<rest>(?:[ \t].*)?)$/u;
 const SETEXT = /^ {0,3}(?<marker>=+|-+)[ \t]*$/u;
 const LIST_ITEM =
   /^(?<indent>[ \t]*)(?<marker>[-*+]|\d{1,9}[.)])(?<gap>[ \t]+|$)(?<content>.*)$/u;
-const FENCE =
-  /^(?<prefix>(?:[ \t]*>[ \t]?)*[ \t]*)(?<marker>`{3,}|~{3,})(?<info>.*)$/u;
+const FENCE = /^(?<prefix>[ \t>]*)(?<marker>`{3,}|~{3,})(?<info>.*)$/u;
 // A backslash escapes the backtick after it (an even run of backslashes doesn't).
 const CODE_SPAN =
   /(?<=(?:^|[^\\])(?:\\\\)*)(?<ticks>`+)(?<code>[\s\S]*?[^`])\k<ticks>(?!`)/gu;
@@ -1495,7 +1494,7 @@ const convertDefinition = (ctx, line, index, lines, seen) => {
     previous.trim() === "" ||
     DEFINITION.test(previous) ||
     ATX.test(previous) ||
-    /^\s*<!--.*-->\s*$/u.test(previous) ||
+    /^\s*<!--[\s\S]*-->\s*$/u.test(previous) ||
     previous.includes("-->");
   if (definition === null || !startsBlock) {
     return { isDefinition: false, line };
@@ -1577,7 +1576,7 @@ const convertRawImageLine = (ctx, line, previous) => {
 const commentText = (text) =>
   text
     .replace(/^\s*<!--/u, "")
-    .replace(/-->\s*$/u, "")
+    .replace(/--!?>\s*$/u, "")
     .replaceAll("*/", "* /")
     .replaceAll(/\s+/gu, " ")
     .trim();

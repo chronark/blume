@@ -681,6 +681,22 @@ describe("github-wiki-codemod convert edge cases", () => {
     expect(report).toContain("found only in the page's folder (sub/)");
   });
 
+  it("reads lines of many quote markers in linear time", async () => {
+    // A pattern that could split the spaces around each `>` two ways doubled
+    // its work per marker, and these lines (neither heading nor fence) hung it.
+    const root = await wiki({
+      "Home.md": `>${" >".repeat(40)} text\n\n>${"\t>".repeat(40)} text\n`,
+    });
+    runCodemod(root, "routes", ...REPO, "--write");
+    const result = spawnSync("node", [CODEMOD, "convert", ...REPO, "--write"], {
+      cwd: root,
+      encoding: "utf-8",
+      timeout: 4000,
+    });
+    expect(result.stderr).toBe("");
+    expect(result.status).toBe(0);
+  });
+
   it("is idempotent when a page's folder shares its name", async () => {
     const root = await wiki(EDGE_WIKI);
     runCodemod(root, "routes", ...REPO, "--write");

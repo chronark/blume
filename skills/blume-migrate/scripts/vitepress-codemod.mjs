@@ -191,10 +191,20 @@ const vitepressSlug = (text) =>
     .replace(/^(?<digit>\d)/u, "_$<digit>")
     .toLowerCase();
 
+/** `text` without `pattern`'s matches, removed again until none is left. */
+const removeAll = (text, pattern) => {
+  let out = text;
+  let previous;
+  do {
+    previous = out;
+    out = out.replaceAll(pattern, "");
+  } while (out !== previous);
+  return out;
+};
+
 // The heading text markdown-it slugs: text and code, without HTML or markup.
 const headingText = (text) =>
-  text
-    .replaceAll(/<[^>]*>/gu, "")
+  removeAll(text, /<[^>]*>/gu)
     .replaceAll(/\[(?<label>[^\]]*)\]\([^)]*\)/gu, "$<label>")
     .replaceAll(/`|\*\*|__/gu, "")
     .trim();
@@ -858,7 +868,7 @@ const convertBody = (items, file, project, report) => {
       !inCodeGroup() ||
       trimmed === "" ||
       SNIPPET_RE.test(text) ||
-      /^<!--.*-->$/u.test(trimmed)
+      /^<!--[\s\S]*-->$/u.test(trimmed)
     ) {
       return;
     }
@@ -1184,10 +1194,13 @@ const mdxPass = (doc, apply, report) => {
         report.review(line, message);
       }
     }
-    const text2 = prose
-      .replaceAll("{{", "")
-      .replaceAll(/<!--.*?-->|\{\/\*.*?\*\/\}/gu, "")
-      .replaceAll(/<[^>]*>/gu, "");
+    const text2 = removeAll(
+      removeAll(
+        prose.replaceAll("{{", ""),
+        /<!--[\s\S]*?-->|\{\/\*[\s\S]*?\*\/\}/gu
+      ),
+      /<[^>]*>/gu
+    );
     if (/\{(?!\/\*)/u.test(text2)) {
       report.review(
         line,

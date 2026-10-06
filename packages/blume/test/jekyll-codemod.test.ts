@@ -458,6 +458,34 @@ describe("jekyll-codemod", () => {
     expect(out).toContain("Not pages (no front matter");
   });
 
+  it("drops <script> and <style> from an MDX page, end tags with spaces too", async () => {
+    const root = await tree("blume-jekyll-codemod-", {
+      "_config.yml": "title: Plain\npermalink: pretty\n",
+      "a.md": [
+        "---",
+        "title: A",
+        "---",
+        "",
+        "Math $$x$$ makes this page MDX.",
+        "",
+        "<script>",
+        "alert(1)",
+        "</script >",
+        '<style media="print">p {}</style',
+        ">",
+        "",
+        "After.",
+        "",
+      ].join("\n"),
+    });
+    const out = runCodemod(root, "--write", ".");
+    expect(await read(root, "a.mdx")).toBe(
+      "---\ntitle: A\n---\n\nMath $$x$$ makes this page MDX.\n\nAfter.\n"
+    );
+    expect(out).toContain("1 × <script> removed (MDX)");
+    expect(out).toContain("1 × <style> removed (MDX)");
+  });
+
   it("reads CRLF files, and converts the callouts --callouts names", async () => {
     const root = await tree("blume-jekyll-codemod-", {
       "_config.yml": "title: Plain\r\npermalink: pretty\r\n",

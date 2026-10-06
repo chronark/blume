@@ -191,14 +191,29 @@ const decodeEntities = (text, unknown = (match) => match) =>
     return Number.isInteger(code) ? String.fromCodePoint(code) : match;
   });
 
+/** `text` matched literally inside a `RegExp`. */
+const escapeRegExp = (text) => text.replaceAll(/[.*+?^${}()|[\]\\]/gu, "\\$&");
+
 /** The markup between the first `<tag …>` and the last `</tag>`, else all of it. */
 const scope = (html, tag) => {
-  const open = new RegExp(`<${tag}[\\s>]`, "iu").exec(html);
+  const open = new RegExp(`<${escapeRegExp(tag)}[\\s>]`, "iu").exec(html);
   const close = html.toLowerCase().lastIndexOf(`</${tag.toLowerCase()}>`);
   return open && close > open.index ? html.slice(open.index, close) : html;
 };
 
 const HIDDEN_MARKUP = /<(?<tag>script|style|svg)\b[\s\S]*?<\/\k<tag>>/giu;
+
+/** `html` without its script, style, and svg elements, removed until none is left. */
+const withoutHiddenMarkup = (html) => {
+  let out = html;
+  let previous;
+  do {
+    previous = out;
+    out = out.replaceAll(HIDDEN_MARKUP, "");
+  } while (out !== previous);
+  return out;
+};
+
 const ANCHOR = /<a\b(?<attributes>[^>]*)>(?<content>[\s\S]*?)<\/a\s*>/giu;
 // Permalinks that sit beside a heading's text, never around it: MkDocs and
 // Sphinx (`headerlink`), Docusaurus (`hash-link`), and Starlight.
@@ -231,7 +246,7 @@ const withoutPermalinks = (inner) =>
 /** Every heading with an id, in document order: `{ id, level, text }`. */
 const htmlHeadings = (html) => {
   const out = [];
-  for (const match of html.replaceAll(HIDDEN_MARKUP, "").matchAll(HEADING)) {
+  for (const match of withoutHiddenMarkup(html).matchAll(HEADING)) {
     const { attributes = "", inner, level } = match.groups;
     const id = ID_ATTRIBUTE.exec(attributes)?.groups;
     const value = decodeEntities(id?.double ?? id?.single ?? id?.bare ?? "");
@@ -715,7 +730,7 @@ const TITLE = /<h1(?<attributes>\s[^>]*)?>(?<inner>[\s\S]*?)<\/h1\s*>/iu;
  * Else -1.
  */
 const oldTitleIndex = (before, builtHtml) => {
-  const title = TITLE.exec(builtHtml.replaceAll(HIDDEN_MARKUP, ""))?.groups;
+  const title = TITLE.exec(withoutHiddenMarkup(builtHtml))?.groups;
   if (!title || ID_ATTRIBUTE.test(title.attributes ?? "")) {
     return -1;
   }

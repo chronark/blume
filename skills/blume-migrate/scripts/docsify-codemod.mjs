@@ -489,12 +489,21 @@ const markedInline = (source) => {
   return html + renderInlineChunk(text.slice(cursor));
 };
 
+/** `text` without `pattern`'s matches, removed again until none is left. */
+const removeAll = (text, pattern) => {
+  let out = text;
+  let previous;
+  do {
+    previous = out;
+    out = out.replaceAll(pattern, "");
+  } while (out !== previous);
+  return out;
+};
+
 /** Docsify 4.13's slugify, on marked's inline HTML. */
 const slugV4 = (html) =>
-  html
-    .trim()
+  removeAll(html.trim(), ANY_TAG)
     .replaceAll(UPPER, (upper) => upper.toLowerCase())
-    .replaceAll(ANY_TAG, "")
     .replaceAll(PUNCT, "")
     .replaceAll(WHITESPACE, "-")
     .replaceAll(DASH_RUN, "-")
@@ -502,22 +511,23 @@ const slugV4 = (html) =>
 
 /** Docsify 5's slugify, on the heading's raw text. */
 const slugV5 = (text) =>
-  text
-    .trim()
-    .normalize("NFC")
-    .replaceAll(MD_LINK_TEXT, "$<text>")
-    .replaceAll("\u{FE0F}", "")
-    .replaceAll(EMOJI_CHARS, "")
+  removeAll(
+    text
+      .trim()
+      .normalize("NFC")
+      .replaceAll(MD_LINK_TEXT, "$<text>")
+      .replaceAll("\u{FE0F}", "")
+      .replaceAll(EMOJI_CHARS, ""),
+    ANY_TAG
+  )
     .replaceAll(UPPER, (upper) => upper.toLowerCase())
-    .replaceAll(ANY_TAG, "")
     .replaceAll(PUNCT, "")
     .replaceAll(WHITESPACE, "-")
     .replace(LEADING_DIGIT, "_$<digit>");
 
 /** A heading's text with its Markdown and HTML markup gone. */
 const plainText = (source) =>
-  markedInline(source)
-    .replaceAll(ANY_TAG, "")
+  removeAll(markedInline(source), ANY_TAG)
     .replaceAll(NAMED_ENTITY, (_, name) => DECODE[name])
     .replaceAll("&#39;", "'")
     .replaceAll(WHITESPACE_RUN, " ")
@@ -553,8 +563,7 @@ const docsifyBaseId = (rawText, version) => {
 const readIndexHtml = (root) => {
   const index = path.join(root, "index.html");
   return existsSync(index)
-    ? readFileSync(index, "utf-8")
-        .replaceAll(HTML_COMMENTS, "")
+    ? removeAll(readFileSync(index, "utf-8"), HTML_COMMENTS)
         .replaceAll(BLOCK_COMMENTS, "")
         .replaceAll(LINE_COMMENTS, "")
     : "";

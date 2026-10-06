@@ -463,13 +463,26 @@ const yamlScalar = (value) =>
     ? JSON.stringify(value)
     : value;
 
+/** `text` without `pattern`'s matches, removed again until none is left. */
+const removeAll = (text, pattern) => {
+  let out = text;
+  let previous;
+  do {
+    previous = out;
+    out = out.replaceAll(pattern, "");
+  } while (out !== previous);
+  return out;
+};
+
 /** Strip inline Markdown from a heading so it reads as a plain title. */
 const plainTitle = (text) =>
-  text
-    .replace(/\s*\{:?[^}]*\}\s*$/u, "")
-    .replace(/\s*\[#[\w.-]+\]\s*$/u, "")
-    .replaceAll(/!?\[(?<label>[^\]]*)\]\([^)]*\)/gu, "$<label>")
-    .replaceAll(/<[^>]+>/gu, "")
+  removeAll(
+    text
+      .replace(/\s*\{:?[^}]*\}\s*$/u, "")
+      .replace(/\s*\[#[\w.-]+\]\s*$/u, "")
+      .replaceAll(/!?\[(?<label>[^\]]*)\]\([^)]*\)/gu, "$<label>"),
+    /<[^>]+>/gu
+  )
     .replaceAll(/`+(?<code>[^`]*)`+/gu, "$<code>")
     .replaceAll(/(?<mark>\*\*|__)(?<inner>.+?)\k<mark>/gu, "$<inner>")
     .replaceAll(/(?<![\w*])\*(?<inner>[^*\s][^*]*?)\*(?![\w*])/gu, "$<inner>")
@@ -1740,7 +1753,7 @@ const frontmatterModel = (entries, ctx) => ({
 const takeH1 = (body, ctx) => {
   for (const [i, line] of body.entries()) {
     const skip =
-      isBlank(line) || /^\s*(?:<!--.*-->|\{\/\*.*\*\/\})\s*$/u.test(line);
+      isBlank(line) || /^\s*(?:<!--[\s\S]*-->|\{\/\*.*\*\/\})\s*$/u.test(line);
     if (!skip) {
       const m = /^# +(?<text>.+?)(?: +#+)? *$/u.exec(line);
       // A setext H1: the text line, then a `===` underline.

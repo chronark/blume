@@ -2068,6 +2068,17 @@ const convertMagicBlocks = (text, file) => {
 
 // --- HTML and judgment ------------------------------------------------------------
 
+/** `text` without `pattern`'s matches, removed again until none is left. */
+const removeAll = (text, pattern) => {
+  let out = text;
+  let previous;
+  do {
+    previous = out;
+    out = out.replaceAll(pattern, "");
+  } while (out !== previous);
+  return out;
+};
+
 const htmlIsSafe = (html) =>
   !/<\s*(?:style|script)\b/iu.test(html) && !/\son[a-z]+\s*=/iu.test(html);
 
@@ -2085,8 +2096,7 @@ const unwrapHtmlBlocks = (text, file) =>
         return all;
       }
       count("<HTMLBlock> unwrapped");
-      const cleaned = html
-        .replaceAll(/<!--[\s\S]*?-->/gu, "")
+      const cleaned = removeAll(html, /<!--[\s\S]*?-->/gu)
         .replaceAll("{", "&#123;")
         .replaceAll("}", "&#125;")
         .replaceAll(VOID_TAGS, "<$<tag>$<rest> />")
@@ -2406,19 +2416,24 @@ const fixHeadings = (text, title) => {
   return out;
 };
 
+const commentCount = (text) => (text.match(/<!--[\s\S]*?-->/gu) ?? []).length;
+
 // A comment on lines of its own goes with its lines; one inside a line leaves
-// a space if it stood between words.
+// a space if it stood between words. Removing one can join the text around it
+// into another (`<!-<!-- x -->-`), so this repeats until none is left.
 const dropComments = (text) => {
-  const comments = (text.match(/<!--[\s\S]*?-->/gu) ?? []).length;
-  if (comments === 0) {
-    return text;
+  let out = text;
+  let comments = commentCount(out);
+  while (comments > 0) {
+    count("HTML comment deleted", comments);
+    out = out
+      .replaceAll(/^[ \t]*<!--(?:(?!-->)[\s\S])*-->[ \t]*(?:\n|$)/gmu, "")
+      .replaceAll(/[ \t]*<!--(?:(?!-->)[\s\S])*-->[ \t]*/gu, (comment) =>
+        /^[ \t]|[ \t]$/u.test(comment) ? " " : ""
+      );
+    comments = commentCount(out);
   }
-  count("HTML comment deleted", comments);
-  return text
-    .replaceAll(/^[ \t]*<!--(?:(?!-->)[\s\S])*-->[ \t]*(?:\n|$)/gmu, "")
-    .replaceAll(/[ \t]*<!--(?:(?!-->)[\s\S])*-->[ \t]*/gu, (comment) =>
-      /^[ \t]|[ \t]$/u.test(comment) ? " " : ""
-    );
+  return out;
 };
 
 const selfCloseVoidTags = (text) =>

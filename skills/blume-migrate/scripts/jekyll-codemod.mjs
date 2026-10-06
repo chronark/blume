@@ -891,6 +891,23 @@ const splitFrontmatter = (text) => {
 
 // --- Old build -----------------------------------------------------------------
 
+/**
+ * `text` without `pattern`'s matches, removed again until none is left;
+ * `removed`, if given, runs once per match.
+ */
+const removeAll = (text, pattern, removed) => {
+  let out = text;
+  let previous;
+  do {
+    previous = out;
+    out = out.replaceAll(pattern, () => {
+      removed?.();
+      return "";
+    });
+  } while (out !== previous);
+  return out;
+};
+
 const decodeEntities = (text) =>
   text
     .replaceAll(
@@ -952,7 +969,7 @@ const readOldNav = (oldDir) => {
             children: [],
             href: decodeEntities(token.groups.href),
             title: decodeEntities(
-              token.groups.label.replaceAll(/<[^>]+>/gu, "")
+              removeAll(token.groups.label, /<[^>]+>/gu)
             ).trim(),
           };
           (stack.at(-1) ?? root).children.push(last);
@@ -1086,8 +1103,7 @@ const restoreRaw = (text) => {
 /** A heading's Markdown as plain text, for a front matter `title`. */
 const plainText = (markdown) =>
   decodeEntities(
-    markdown
-      .replaceAll(/<[^>]+>/gu, "")
+    removeAll(markdown, /<[^>]+>/gu)
       .replaceAll(
         /!?\[(?<label>[^\]]*)\]\([^)]*\)/gu,
         byGroups(({ label }) => label)
@@ -2223,24 +2239,30 @@ const needsMdxText = (text) => {
 };
 
 /** Prose (inline code masked) made MDX-safe where the fix is exact. */
-const mdxSafeProse = (prose, report) =>
-  prose
-    .replaceAll(/<script\b[\s\S]*?<\/script>[ \t]*\n?/giu, () => {
+const mdxSafeProse = (prose, report) => {
+  const withoutScripts = removeAll(
+    prose,
+    /<script\b[\s\S]*?<\/script\b[^>]*>[ \t]*\n?/giu,
+    () => {
       edit(report, "<script> removed (MDX)");
       note(
         report,
         "a <script> was removed: rebuild what it did as an island, a PageFooter slot, or static content"
       );
-      return "";
-    })
-    .replaceAll(/<style\b[\s\S]*?<\/style>[ \t]*\n?/giu, () => {
+    }
+  );
+  const withoutStyles = removeAll(
+    withoutScripts,
+    /<style\b[\s\S]*?<\/style\b[^>]*>[ \t]*\n?/giu,
+    () => {
       edit(report, "<style> removed (MDX)");
       note(
         report,
         "a <style> block was removed: move the rules that still matter to theme.css"
       );
-      return "";
-    })
+    }
+  );
+  return withoutStyles
     .replaceAll(/<link\b[^>]*rel=["']stylesheet["'][^>]*>[ \t]*\n?/giu, () => {
       edit(report, "stylesheet <link> removed (MDX)");
       return "";
@@ -2273,6 +2295,7 @@ const mdxSafeProse = (prose, report) =>
       edit(report, "bare < → &lt;");
       return "&lt;";
     });
+};
 
 /** Make prose MDX-safe where the fix is exact; inline code stays as written. */
 const makeMdxSafe = (text, report) =>
@@ -2294,12 +2317,13 @@ const mdxHazards = (text, start) => {
       continue;
     }
     const prose = mapOutsideCode(line, (part) =>
-      part
-        .replaceAll(/\{\/\*.*?\*\/\}/gu, "")
-        .replaceAll(/\$\$.*?\$\$/gu, "")
-        .replaceAll(/\{\{\s*[\w-]+\s*\}\}/gu, "")
-        .replaceAll(/<[A-Za-z][^<>]*>/gu, "")
-        .replaceAll(/\\[{}<]/gu, "")
+      removeAll(
+        part
+          .replaceAll(/\{\/\*.*?\*\/\}/gu, "")
+          .replaceAll(/\$\$.*?\$\$/gu, "")
+          .replaceAll(/\{\{\s*[\w-]+\s*\}\}/gu, ""),
+        /<[A-Za-z][^<>]*>/gu
+      ).replaceAll(/\\[{}<]/gu, "")
     );
     if (/[{}]/u.test(prose)) {
       found.push({
