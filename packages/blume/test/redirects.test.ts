@@ -239,6 +239,10 @@ describe("a moved page's Markdown copies", () => {
       { from: "/c", status: 301 as const, to: "/new#setup" },
       // The page at `from` still serves its own copies.
       { from: "/docs", status: 301 as const, to: "/new" },
+      // An `.html` file from a migrated site had no copy to move:
+      // `/guide.html.md` was never a URL.
+      { from: "/guide.html", status: 301 as const, to: "/new" },
+      { from: "/docs/guide.html/", status: 308 as const, to: "/docs/new" },
     ];
     expect(withMirrorRedirects(kept, pages, unbased)).toStrictEqual(kept);
   });

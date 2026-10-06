@@ -192,7 +192,7 @@ redirects: [{ from: "/old", to: "/new", status: 301 }],
 
 `status` accepts `301`, `302`, `307`, or `308` (default `301`). Server builds answer redirects at request time with the configured status, and so does `blume dev`. Static builds emit redirect pages **and** the platform files your host reads, so it issues a real HTTP redirect: `_redirects` for `netlify()` and `cloudflare()`, `vercel.json` for `vercel()`, and — when no host is named — both of those plus `blume-redirects.json`, a structured manifest for anything else (nginx/Apache rules, an edge worker). A `_redirects` or `vercel.json` you ship in `public/` is left untouched.
 
-A redirect that moves one page to another moves the page's [raw Markdown](/docs/discoverability/markdown#raw-markdown) with it: `/old.md` and `/old.mdx` redirect to `/new.md` and `/new.mdx` with the same status, in `blume dev` and every build.
+A redirect that moves one page to another moves the page's [raw Markdown](/docs/discoverability/markdown#raw-markdown) with it: `/old.md` and `/old.mdx` redirect to `/new.md` and `/new.mdx` with the same status, in `blume dev` and every build. A redirect from an `.html` URL, like `/old.html` from a site you migrated, doesn't, since that URL never had a Markdown copy.
 
 Two hosts need more than the file:
 

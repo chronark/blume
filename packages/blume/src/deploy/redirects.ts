@@ -119,6 +119,13 @@ export const applyBaseToPlatformRedirects = (
 const MIRROR_EXTENSIONS = [".md", ".mdx"] as const;
 
 /**
+ * A path naming an `.html` file (`/guide.html`), the URL another generator
+ * served a page at. No Blume page was ever served there, so it had no
+ * Markdown copy (`/guide.html.md`) for a redirect to move.
+ */
+const HTML_FILE_PATH = /\.html$/u;
+
+/**
  * Where a page's Markdown copy is served, from the page's served path and the
  * deployment base that path carries: the endpoints name the root `index`.
  */
@@ -133,10 +140,11 @@ const mirrorPath = (path: string, base: string, extension: string): string => {
  * to one a page is, `/old.md` goes to `/new.md` (and `.mdx` alike), where it
  * would otherwise 404 for an agent still reading the old URL. A pattern gets
  * none; one that carries its capture over (`/beta/:slug*` → `/v2/:slug*`)
- * already moves `/beta/guide.md` along. `pages` are the served page routes
- * (carrying `basePath`, not `deployment.base`), and `bases` the deployment
- * base each end carries: Astro's config leaves it off `from` (see
- * {@link applyBaseToAstroRedirects}).
+ * already moves `/beta/guide.md` along. Nor does a redirect from an `.html`
+ * file (`/guide.html`, from a migrated site), which had no copy to move.
+ * `pages` are the served page routes (carrying `basePath`, not
+ * `deployment.base`), and `bases` the deployment base each end carries:
+ * Astro's config leaves it off `from` (see {@link applyBaseToAstroRedirects}).
  */
 export const withMirrorRedirects = (
   redirects: Redirect[],
@@ -148,6 +156,7 @@ export const withMirrorRedirects = (
     const to = normalizePath(redirect.to);
     const movesPage =
       !isPatternPath(redirect.from) &&
+      !HTML_FILE_PATH.test(from) &&
       servesRoute(pages, stripBasePath(bases.to, to)) &&
       !servesRoute(pages, stripBasePath(bases.from, from));
     return movesPage
