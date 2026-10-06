@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 
 import { createJiti } from "jiti";
 import type { Jiti, JitiOptions } from "jiti";
@@ -90,10 +91,18 @@ export const createModuleLoader = (): ((file: string) => Promise<unknown>) => {
  * exports `null`/`undefined`, resolves to `undefined` so the caller can say
  * so, instead of validating `{}` (a bare `defineConfig({…})` call) or
  * `{ config }` (a named export). jiti's default interop is off because it
- * throws on `export default null`.
+ * throws on `export default null`. Turning it off changes how jiti compiles
+ * every module the config reaches, Blume's own source included, but jiti keys
+ * its disk cache by file and source alone, so this loader keeps a cache of its
+ * own: sharing one, it would run code compiled for {@link createModuleLoader}
+ * (and that loader, code compiled for this one), whichever loaded the file
+ * first.
  */
 export const createDefaultExportLoader: typeof createModuleLoader = () => {
-  const jiti = lazyJiti({ interopDefault: false });
+  const jiti = lazyJiti({
+    fsCache: join(tmpdir(), "jiti-blume-default-export"),
+    interopDefault: false,
+  });
   return async (file: string) => {
     const loaded = await jiti().import<{ default?: unknown }>(file);
     return loaded.default ?? undefined;
