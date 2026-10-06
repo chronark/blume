@@ -1,6 +1,7 @@
 import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
 import { rewriteRelativeImages } from "../core/content-assets.ts";
 import matter from "../core/frontmatter.ts";
+import { isHiddenPage } from "../core/hidden-pages.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { absoluteUrl } from "../core/site-url.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
@@ -121,7 +122,7 @@ const eligiblePages = (
       !(
         page.meta.ai.exclude ||
         page.meta.draft ||
-        page.meta.sidebar.hidden ||
+        isHiddenPage(page, project.graph) ||
         (page.meta.seo.noindex && page.source.name !== "openapi") ||
         (options.versions === "current" && page.version !== "")
       ) &&

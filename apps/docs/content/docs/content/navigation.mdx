@@ -152,7 +152,9 @@ sidebar:
   hidden: true
 ```
 
-A folder's `index` page appears both as the group row's link and as the first row inside the group. Hide the index page to keep only the linked header: the group row still opens the landing page, and previous/next links still pass through it.
+A hidden page also stays out of the sitemap and `llms.txt`, and out of site search unless [`search.indexing.includeHiddenPages`](/docs/configuration/search#excluding-pages) is on.
+
+A folder's `index` page appears both as the group row's link and as the first row inside the group. Hide the index page to keep only the linked header: the group row still opens the landing page, and previous/next links still pass through it. Since the navigation still links the page, it isn't a hidden page anywhere else: it stays in the sitemap, site search, and `llms.txt`.
 
 ## Tabs
 

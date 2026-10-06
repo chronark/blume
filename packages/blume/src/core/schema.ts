@@ -305,10 +305,23 @@ const pageMetaBaseSchema = z.strictObject({
   type: z.string().optional(),
 });
 
-export const pageMetaSchema = pageMetaBaseSchema;
-
 export type PageMeta = z.infer<typeof pageMetaBaseSchema>;
 export type PageMetaInput = z.input<typeof pageMetaBaseSchema>;
+
+/**
+ * Fold the top-level `hidden`/`noindex` shorthands into the nested fields
+ * every consumer reads (`sidebar.hidden`, `seo.noindex`). It runs inside both
+ * page schemas, so the scan's `PageMeta` (the sitemap, llms.txt, search) and
+ * the content collections' `entry.data` (the page's robots tag) can't
+ * disagree about a page that uses the shorthand.
+ */
+const foldShorthands = <Meta extends PageMeta>(meta: Meta): Meta => ({
+  ...meta,
+  seo: { ...meta.seo, noindex: meta.seo.noindex || meta.noindex },
+  sidebar: { ...meta.sidebar, hidden: meta.sidebar.hidden || meta.hidden },
+});
+
+export const pageMetaSchema = pageMetaBaseSchema.transform(foldShorthands);
 
 /** The fully-defaulted front matter of a page that declares nothing. */
 const EMPTY_PAGE_META: PageMeta = pageMetaBaseSchema.parse({});
@@ -326,11 +339,12 @@ const EMPTY_PAGE_META: PageMeta = pageMetaBaseSchema.parse({});
  */
 export const pageCollectionSchema = pageMetaBaseSchema
   .loose()
+  .transform(foldShorthands)
   // oxlint-disable-next-line promise/prefer-await-to-then -- zod's catch, not a promise
   .catch(() => EMPTY_PAGE_META);
 
 /** Built-in page frontmatter keys; custom keys must never redeclare one. */
-const BUILT_IN_PAGE_META_KEYS = new Set<string>(
+export const BUILT_IN_PAGE_META_KEYS: ReadonlySet<string> = new Set<string>(
   pageMetaBaseSchema.keyof().options
 );
 

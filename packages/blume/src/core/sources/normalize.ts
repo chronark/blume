@@ -1686,17 +1686,9 @@ export const normalizeEntry = (
     return { diagnostics: parsed.diagnostics, pages: [] };
   }
 
+  // The schema has already folded the top-level `hidden`/`noindex` shorthands
+  // into `sidebar.hidden`/`seo.noindex` (see `foldShorthands`).
   const { meta } = parsed;
-
-  // Top-level `hidden`/`noindex` are accepted as shorthands for their nested
-  // equivalents — the schema declares them, so silently ignoring them would
-  // strand authors with no diagnostic.
-  if (meta.hidden) {
-    meta.sidebar.hidden = true;
-  }
-  if (meta.noindex) {
-    meta.seo.noindex = true;
-  }
 
   const {
     groups,

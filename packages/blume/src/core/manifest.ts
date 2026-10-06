@@ -1,4 +1,5 @@
 import { mountBasePath } from "./base-path.ts";
+import { isHiddenPage } from "./hidden-pages.ts";
 import { localizeRoute, resolveFallbackLocale } from "./i18n.ts";
 import type { ResolvedConfig } from "./schema.ts";
 import type {
@@ -52,10 +53,11 @@ export const MANIFEST_VERSION = 1;
  */
 export const contentIndexable = (
   page: PageRecord,
-  config: ResolvedConfig
+  config: ResolvedConfig,
+  graph: ContentGraph
 ): boolean =>
   !page.meta.search.exclude &&
-  (!page.meta.sidebar.hidden || config.search.indexing.includeHiddenPages);
+  (!isHiddenPage(page, graph) || config.search.indexing.includeHiddenPages);
 
 /**
  * Fallback materialization: render the fallback locale's content at the
@@ -126,7 +128,7 @@ const buildFallbackRoutes = (
         editUrl: source.editUrl,
         entryId: source.entryId ?? source.source.ref,
         fallback: true,
-        hidden: source.meta.sidebar.hidden,
+        hidden: isHiddenPage(source, graph),
         id: source.id,
         indexable: false,
         lastModified: source.lastModified,
@@ -191,9 +193,9 @@ export const buildManifest = (options: {
     draft: page.meta.draft,
     editUrl: page.editUrl,
     entryId: page.entryId ?? page.source.ref,
-    hidden: page.meta.sidebar.hidden,
+    hidden: isHiddenPage(page, graph),
     id: page.id,
-    indexable: searchEnabled && contentIndexable(page, config),
+    indexable: searchEnabled && contentIndexable(page, config, graph),
     lastModified: page.lastModified,
     locale: page.locale,
     monolingual: page.monolingual,

@@ -6,6 +6,7 @@ import {
 } from "../core/base-path.ts";
 import { CHANGELOG_INDEX_ROUTE } from "../core/changelog-index.ts";
 import { discoverPagesSync } from "../core/custom-pages.ts";
+import { isHiddenPage } from "../core/hidden-pages.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { absoluteUrl } from "../core/site-url.ts";
 import type { NavNode, PageRecord } from "../core/types.ts";
@@ -67,7 +68,7 @@ const mappedPages = (project: BlumeProject): PageRecord[] => {
       !(
         page.meta.ai.exclude ||
         page.meta.draft ||
-        page.meta.sidebar.hidden ||
+        isHiddenPage(page, project.graph) ||
         page.meta.seo.noindex ||
         page.version !== "" ||
         page.source.name === "openapi" ||

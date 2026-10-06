@@ -1093,7 +1093,6 @@ const seoFields = (page) => {
   if (fm.subtitle && fm.description && fm.description !== fm.subtitle) {
     seo.description = String(fm.description);
   }
-  // seo.noindex, not the top-level shorthand: only seo.noindex emits the robots meta.
   if (page.hidden || page.noindex || fm.noindex === true) {
     seo.noindex = true;
   }

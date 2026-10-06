@@ -86,7 +86,7 @@ Map only what's set:
 | `navigation.sections` | top-level sections stay Blume's default `flat` headers; set **`display: "group"` in the `meta.ts` of every second-level section**: Material renders those as collapsible, and a `flat` group lists its pages above its subgroups, reordering a section that interleaves them |
 | neither `sections` nor `tabs` | `navigation.sidebar.display: "group"` (Material's collapsible tree) |
 | `navigation.expand` | `collapsed: false` in those folders' `meta.ts` |
-| `navigation.indexes`, plugin `section-index` | a folder's `index` page links its group header. Blume also lists it as the group's first row, so the label shows twice — expected. **Don't hide it with `sidebar.hidden`**: a hidden page drops out of `sitemap.xml`, and a hidden index whose title differs from its folder's warns `BLUME_NAV_INDEX_TITLE_MISMATCH`, which fails `validate --strict` |
+| `navigation.indexes`, plugin `section-index` | a folder's `index` page links its group header. Blume also lists it as the group's first row, so the label shows twice. To show it once, as Material does, set `sidebar.hidden: true` on the index: that drops only the duplicate row, and the page stays in `sitemap.xml`, search, and `llms.txt`. A hidden index whose `title` differs from its folder's `meta.ts` `title` warns `BLUME_NAV_INDEX_TITLE_MISMATCH`, which fails `validate --strict`: match the two titles, or leave that index's row showing |
 | `content.tabs.link` | same-titled tabs sync within a page, not across pages |
 | `content.action.edit` / `.view` | `github` |
 | `announce.dismiss` | `banner.dismissible`; the text is `main.html`'s `{% block announce %}` → `banner.content` |

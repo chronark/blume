@@ -9,7 +9,7 @@ import { nextFenceState } from "../code-fences.ts";
 import type { FenceState } from "../code-fences.ts";
 import { BlumeError } from "../diagnostics.ts";
 import matter from "../frontmatter.ts";
-import { pageMetaSchema } from "../schema.ts";
+import { BUILT_IN_PAGE_META_KEYS } from "../schema.ts";
 import type { ResolvedI18nConfig, ResolvedVersionsConfig } from "../schema.ts";
 import type { Diagnostic } from "../types.ts";
 import { hashText } from "./cache.ts";
@@ -138,9 +138,6 @@ const OBSIDIAN_NATIVE_KEYS = new Set([
   "tag",
   "tags",
 ]);
-
-/** Every key Blume's page meta schema accepts. */
-const PAGE_META_KEYS = new Set<string>(pageMetaSchema.keyof().options);
 
 /**
  * A note's route input: its locale- and version-stripped path, slugged. Vault
@@ -759,7 +756,7 @@ const noteToEntry = (
     Object.entries(note.data).filter(
       ([key]) =>
         !OBSIDIAN_NATIVE_KEYS.has(key) &&
-        (PAGE_META_KEYS.has(key) || keep.has(key))
+        (BUILT_IN_PAGE_META_KEYS.has(key) || keep.has(key))
     )
   );
   const merged = title === undefined ? data : { ...data, title };

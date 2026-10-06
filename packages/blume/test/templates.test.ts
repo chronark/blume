@@ -64,6 +64,7 @@ import { TOC_HIDDEN_KEY } from "../src/core/heading-markers.ts";
 import { routeSetFor, servesRoute } from "../src/core/locale-links.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ProjectContext } from "../src/core/types.ts";
+import { getBlumeVersion } from "../src/core/version.ts";
 import { cloudflare, node, vercel } from "../src/deploy/adapters/index.ts";
 import {
   cloudflare as cloudflareRateLimit,
@@ -1890,6 +1891,10 @@ describe("contentConfigTemplate", () => {
       'import { pageCollectionSchema } from "blume/core/schema.ts";'
     );
     expect(out).toContain("schema: pageCollectionSchema,");
+    // Astro's content store re-parses an unchanged entry only when this
+    // config changes, so naming the version makes an upgrade re-parse every
+    // entry against the new page schema.
+    expect(out).toContain(`(${getBlumeVersion()})`);
   });
 
   it("adds a staged collection when staged sources materialize", () => {

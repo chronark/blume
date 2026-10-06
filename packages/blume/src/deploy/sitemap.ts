@@ -11,6 +11,7 @@ import {
   normalizeBasePath,
   normalizePath,
 } from "../core/base-path.ts";
+import { isHiddenPage } from "../core/hidden-pages.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { siteRoot } from "../core/site-url.ts";
 
@@ -163,7 +164,7 @@ export const buildSitemapFiles = (
     const served = mountBasePath(deployBase, page.route);
     if (
       page.meta.draft ||
-      page.meta.sidebar.hidden ||
+      isHiddenPage(page, project.graph) ||
       page.meta.seo.noindex ||
       ERROR_ROUTES.has(page.route) ||
       archivedExcluded(page) ||

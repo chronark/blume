@@ -117,7 +117,7 @@ lastModified: 2026-06-20 # pin the "last updated" date
 ---
 ```
 
-Also valid: `date`/`authors` (blog/changelog feeds), `changelog` (changelog metadata), `deprecated`, `hidden`, `noindex`. Write `seo: { noindex: true }`, not the top-level `noindex` shorthand: the shorthand drops the page from the sitemap but doesn't emit the robots meta tag.
+Also valid: `date`/`authors` (blog/changelog feeds), `changelog` (changelog metadata), `deprecated`, and the top-level shorthands `hidden` (for `sidebar.hidden`) and `noindex` (for `seo.noindex`).
 
 ### Authoring features (no imports needed in `.mdx`)
 

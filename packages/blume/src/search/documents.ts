@@ -504,7 +504,8 @@ export const buildSearchDocuments = async (
       return false;
     }
     const page = pageById.get(route.id);
-    return page ? contentIndexable(page, project.config) : false;
+    const { config, graph } = project;
+    return page ? contentIndexable(page, config, graph) : false;
   });
 
   // Built once — `downlevelComponents` rebuilds its registry per call

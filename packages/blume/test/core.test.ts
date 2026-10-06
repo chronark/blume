@@ -567,9 +567,37 @@ describe("page meta schema", () => {
     expect(meta.draft).toBeFalsy();
     expect(meta.sidebar.hidden).toBeFalsy();
   });
+
+  it("folds the top-level hidden/noindex shorthands into their nested fields", () => {
+    const meta = pageMetaSchema.parse({ hidden: true, noindex: true });
+    expect(meta.sidebar.hidden).toBeTruthy();
+    expect(meta.seo.noindex).toBeTruthy();
+    // A shorthand left off never unsets the nested field.
+    const nested = pageMetaSchema.parse({
+      seo: { noindex: true },
+      sidebar: { hidden: true },
+    });
+    expect(nested.sidebar.hidden).toBeTruthy();
+    expect(nested.seo.noindex).toBeTruthy();
+  });
 });
 
 describe("page collection schema", () => {
+  it("folds the shorthands into entry.data, which the page template reads", () => {
+    // The catch-all page emits its robots tag from `entry.data.seo.noindex`
+    // and the changelog index skips `entry.data.sidebar.hidden`, so the
+    // collection must fold the shorthands the way the scan does.
+    const data = pageCollectionSchema.parse({
+      hidden: true,
+      noindex: true,
+      product: "cli",
+      seo: { title: "Kept" },
+    });
+    expect(data.seo).toStrictEqual({ noindex: true, title: "Kept" });
+    expect(data.sidebar.hidden).toBeTruthy();
+    expect(data.product).toBe("cli");
+  });
+
   it("normalizes built-in keys and passes custom keys through", () => {
     const data = pageCollectionSchema.parse({
       date: new Date("2026-01-02T00:00:00.000Z"),

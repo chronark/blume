@@ -22,6 +22,7 @@ import { BLUME_IGNORE_DIRS } from "../core/sources/watch.ts";
 import { trimChar } from "../core/trim.ts";
 import type { ProjectContext } from "../core/types.ts";
 import { hasVariables } from "../core/variables.ts";
+import { getBlumeVersion } from "../core/version.ts";
 import { deployPassthrough } from "../deploy/adapters/types.ts";
 import { SVG_ASSET_HEADERS } from "../deploy/headers.ts";
 import { deployPlatform } from "../deploy/platforms/index.ts";
@@ -1118,6 +1119,10 @@ import { pageCollectionSchema } from "blume/core/schema.ts";
 // pageCollectionSchema is the scan's page front-matter schema, so entry.data
 // is typed and normalized the same way; it passes custom keys through and
 // falls back to defaults for a page the scan already dropped as invalid.
+//
+// Astro's content store re-parses an entry only when its file or this config
+// changes, so naming the Blume version (${getBlumeVersion()}) here re-parses
+// every entry after an upgrade: none keeps what an older schema produced.
 const docs = defineCollection({
   loader: withIncludeRefresh(glob({
     pattern: ${JSON.stringify(docsPattern)},
