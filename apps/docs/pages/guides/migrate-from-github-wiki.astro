@@ -1,0 +1,645 @@
+---
+// Migrate from a GitHub wiki: written from an end-to-end run of the
+// blume-migrate skill (SKILL.md and references/github-wiki.md) on a real
+// wiki: the microsoft/TypeScript wiki (CC BY 4.0), cloned from
+// github.com/microsoft/TypeScript.wiki.git at
+// 966988bcca7c835fd22ab066bb6a9ff4d5ba511d (78 page files and 77 served URLs,
+// since one README is shadowed by another; a _Sidebar.md with 6 groups over
+// 26 pages, 50 pages it doesn't list, a _Footer.md, 45 wiki links (13 in
+// served pages, 26 in the sidebar, 6 on the shadowed README), images stored
+// in the wiki, pages in subfolders, and a two-way sync with a mirror
+// repository), with Blume 2.1.3 (main). The agent read only the skill and the
+// Blume docs it points to, converted a copy of the wiki clone in place, and
+// wrote one-off scripts for the mechanical part. Outcome: `blume build`
+// passed with 61 pages and `blume validate --strict` passed (one
+// BLUME_ASSETS_UNCHECKED warning). All 77 old URLs were accounted for in the
+// route table: 62 to built pages (one of them to an anchor), 9 to the
+// external targets of moved notices, 6 left out on purpose (the mirror's
+// README and SECURITY files, a test page, a script fixture, two empty
+// deprecated pages), 0 misses. 71 link stubs were prepared locally and never
+// pushed; the inbound links in microsoft/TypeScript were listed, not edited.
+// After the run: the bundled codemod (scripts/github-wiki-codemod.mjs),
+// written from the run's script, was applied to a fresh copy with the run's
+// classification. It made the same mechanical edits (13 wiki links, 23 wiki
+// URLs, 4 bare URLs, the mirror link, 7 alerts, 26 fence languages, 7 named
+// anchors, heading demotion on 31 pages, 13 image references) and deleted 53
+// shadowed link definitions (the run deleted 49; the other 4 were https
+// duplicates CommonMark never used either). Its review list matched the
+// run's hand fixes; `blume build` passed; `validate --strict` reported only
+// those hand-fix items (5 glossary links, 2 missing pages, 3 anchors, and a
+// false positive on a fence inside a blockquote); a second pass changed
+// nothing; its `check` found 0 problems; and its `stubs` wrote the same 71
+// stubs. It also ran on seven other public wikis (microsoft/vscode, koreader,
+// MultiMC, qBittorrent, ruTorrent, gollum, Waybar) without errors, and six
+// of them built with no hand edits (not validated). The vscode result failed
+// to build on one page's `<details>` blocks inside list items, which
+// `convert` reports.
+// Review (after the above): the codemod was fixed for a second `convert`
+// that rewrote the meta.ts files when a page's folder shared its name, wiki
+// links inside HTML blocks (now `<a href>`) and `<code>`, image tags with
+// comma options or caption text, and raw `dir/Page.md` links. The TypeScript
+// copy then converted byte-identically to before, and `routes` plus
+// `convert` ran on all 23 surveyed public wikis with no errors, a second
+// `convert` changing nothing, and every fenced and inline code sample
+// unchanged apart from alert bodies losing their `> ` and dropped broken
+// images (not built). `check` over the 77 old URLs read from the saved
+// `_pages` HTML gave 62 ok, 9 moved, and 6 DROPPED, matching the run.
+// The Acme example is invented: a seven-page wiki, run through `routes`,
+// `convert`, `blume build`, `blume validate --strict`, `check`, and `stubs`
+// as shown. Every output below is real.
+// Not run: `npx blume migrate github-wiki` itself (2.1.3 has no github-wiki
+// source; the agent was pointed at the skill), pushing stubs to any wiki,
+// disabling a wiki, a deploy, or a lockfile regeneration. What a disabled
+// wiki's old URLs return is unverified, so this page doesn't say.
+import Callout from "blume/components/content/Callout.astro";
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const codemod = "node_modules/blume/skills/blume-migrate/scripts/github-wiki-codemod.mjs";
+
+const cloneWiki = [
+  "git clone https://github.com/acme/widget.wiki.git",
+  "cp -R widget.wiki widget-docs",
+  "cd widget-docs",
+  "git remote remove origin",
+].join("\n");
+
+const listPages = [
+  "curl -s https://github.com/acme/widget/wiki/_pages \\",
+  "  | grep -oE 'href=\"/acme/widget/wiki(/[^\"]*)?\"' \\",
+  "  | sed -e 's/^href=\"//' -e 's/\"$//' -e \"s/&#39;/'/g\" \\",
+  "  | grep -vE '/wiki/_(new|pages|history|compare)$' | sort -u > ../old-pages.txt",
+].join("\n");
+
+const beforePage = [
+  "# Getting started",
+  "",
+  "Install the CLI, then read [[Configuration]] or [[the FAQ|FAQ#install-errors]].",
+  "",
+  "> [!WARNING]",
+  "> Widget 1.x configs don't load in 2.0.",
+  "",
+  "![Dashboard](https://raw.githubusercontent.com/wiki/acme/widget/images/dashboard.png)",
+  "",
+  "# Next steps",
+  "",
+  "See [Plugins](https://github.com/acme/widget/wiki/Plugins).",
+].join("\n");
+
+const afterPage = [
+  "---",
+  "title: Getting Started",
+  "---",
+  "",
+  "Install the CLI, then read [Configuration](/configuration) or [the FAQ](/faq#install-errors).",
+  "",
+  ":::warning",
+  "Widget 1.x configs don't load in 2.0.",
+  ":::",
+  "",
+  "![Dashboard](../images/dashboard.png)",
+  "",
+  "## Next steps",
+  "",
+  "See [Plugins](/plugins).",
+].join("\n");
+
+const sidebar = [
+  "**Start**",
+  "* [[Getting Started]]",
+  "* [[Configuration]]",
+  "",
+  "**Reference**",
+  "* [[FAQ]]",
+  "* [[Plugins]]",
+  "* [Changelog](https://github.com/acme/widget/releases)",
+].join("\n");
+
+const tree = [
+  "docs/",
+  "├── index.md                 ← Home.md",
+  "├── meta.ts                  start, reference, more",
+  "├── (start)/",
+  "│   ├── meta.ts",
+  "│   ├── getting-started.mdx",
+  "│   └── configuration.md",
+  "├── (reference)/",
+  "│   ├── meta.ts",
+  "│   ├── faq.md",
+  "│   └── plugins.md",
+  "├── (more)/",
+  "│   ├── meta.ts              \"More pages\", collapsed",
+  "│   └── release-process.md",
+  "└── images/",
+  "    └── dashboard.png",
+].join("\n");
+
+const startMeta = [
+  'import { defineMeta } from "blume";',
+  "",
+  "export default defineMeta({",
+  '  title: "Start",',
+  "  pages: [",
+  '    "getting-started",',
+  '    "configuration",',
+  "  ],",
+  "});",
+].join("\n");
+
+const routesOutput = [
+  "7 page(s)",
+  "",
+  "Looks like a moved notice: set its entry to the target",
+  '  "Old-Setup": "/getting-started"',
+].join("\n");
+
+const routeTable = [
+  "{",
+  '  "Configuration": "/configuration",',
+  '  "FAQ": "/faq",',
+  '  "Getting-Started": "/getting-started",',
+  '  "Home": "/",',
+  '  "Old-Setup": "/getting-started",',
+  '  "Plugins": "/plugins",',
+  '  "Release-Process": "/release-process"',
+  "}",
+].join("\n");
+
+const pushStubs = [
+  "git clone https://github.com/acme/widget.wiki.git widget-stubs",
+  "cd widget-stubs",
+  "cp ../widget-docs/wiki-routes.json ../widget-docs/wiki-files.json .",
+  `node ../widget-docs/${codemod} \\`,
+  "  stubs --site https://docs.acme.dev --write",
+  "rm wiki-routes.json wiki-files.json",
+  "git add -A",
+  'git commit -m "Point every page at the new docs"',
+  "git push",
+].join("\n");
+
+const stubPage = "**This page has moved to <https://docs.acme.dev/getting-started>.**";
+
+const checkInbound = [
+  `node ${codemod} check \\`,
+  "  'https://github.com/acme/widget/wiki/FAQ#install-errors' \\",
+  "  'https://github.com/acme/widget/wiki/Getting-Started#setup' \\",
+  "  'https://github.com/acme/widget/wiki/Old-Setup'",
+].join("\n");
+
+const checkInboundOutput = [
+  "ok  https://github.com/acme/widget/wiki/FAQ#install-errors → /faq#install-errors",
+  "MISSING ANCHOR  https://github.com/acme/widget/wiki/Getting-Started#setup → /getting-started#setup",
+  "ok  https://github.com/acme/widget/wiki/Old-Setup → /getting-started",
+  "",
+  "1 problem(s).",
+].join("\n");
+
+const buildAndCheck = ["npm run build", `node ${codemod} check`].join("\n");
+
+const checkOldPages = `node ${codemod} check $(sed 's#^#https://github.com#' ../old-pages.txt)`;
+
+const checkTable = [
+  "ok  Configuration → /configuration",
+  "ok  FAQ → /faq",
+  "ok  Getting-Started → /getting-started",
+  "ok  Home → /",
+  "ok  Old-Setup → /getting-started",
+  "ok  Plugins → /plugins",
+  "ok  Release-Process → /release-process",
+  "",
+  "0 problem(s).",
+].join("\n");
+
+const quotedFence = [
+  "> Why is this an error?",
+  ">",
+  "> ```ts",
+  "> interface StringMap {",
+  ">   [key: string]: string;",
+  "> }",
+  "> ```",
+].join("\n");
+---
+
+<GuidePage guide={guideById("migrate-from-github-wiki")}>
+  <p>
+    By the end of this guide, your GitHub wiki is a Blume site: every page at a
+    clean URL, your <code>_Sidebar.md</code> rebuilt as the sidebar, wiki links
+    and GitHub alerts converted, the wiki's images moved beside the pages, and
+    a link stub ready for every old wiki page. A coding agent does the
+    conversion with a codemod that ships with Blume, and you review it.
+  </p>
+  <p>
+    It's written for wikis in Markdown. Pages in the other formats GitHub
+    renders, like MediaWiki and AsciiDoc, are converted to Markdown with
+    pandoc first.
+  </p>
+
+  <h2>What carries over</h2>
+  <p>
+    The run behind this guide migrated a real wiki: 77 pages, a sidebar with
+    six groups, pages in subfolders, images stored in the wiki, and a sync
+    with a mirror repository. Every content page carried over, and every old
+    URL is accounted for: a new page, the page a moved notice pointed to, or a
+    page left out on purpose and reported. Here's how the pieces map:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In the wiki</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>Home.md</code></td>
+        <td><code>docs/index.md</code></td>
+      </tr>
+      <tr>
+        <td>Every other page, in any folder</td>
+        <td>
+          A file in <code>docs/</code> at a flat, lowercase URL:{" "}
+          <code>/wiki/Getting-Started</code> becomes <code>/getting-started</code>
+        </td>
+      </tr>
+      <tr>
+        <td>The page name above each page</td>
+        <td>The page's <code>title</code></td>
+      </tr>
+      <tr>
+        <td><code>_Sidebar.md</code> groups</td>
+        <td>
+          <code>(group)/</code> folders with a <code>meta.ts</code>, which add a
+          sidebar group but no URL segment
+        </td>
+      </tr>
+      <tr>
+        <td>Pages the sidebar doesn't list</td>
+        <td>A collapsed "More pages" group</td>
+      </tr>
+      <tr>
+        <td>External links in the sidebar</td>
+        <td>
+          <a href="/docs/content/navigation#featured-links">Featured links</a>{" "}
+          above the sidebar
+        </td>
+      </tr>
+      <tr>
+        <td><code>[[Page Name]]</code> and <code>[[text|Page Name]]</code></td>
+        <td><code>[text](/page-name)</code></td>
+      </tr>
+      <tr>
+        <td>Links to <code>github.com/&lt;owner&gt;/&lt;repo&gt;/wiki/…</code></td>
+        <td>Links to the new page</td>
+      </tr>
+      <tr>
+        <td><code>&gt; [!NOTE]</code> and the other alerts</td>
+        <td><code>:::note</code> callouts, in <code>.mdx</code> pages</td>
+      </tr>
+      <tr>
+        <td>Images stored in the wiki</td>
+        <td>Files beside the pages, optimized by Blume</td>
+      </tr>
+      <tr>
+        <td><code>_Footer.md</code></td>
+        <td>Footer links, or dropped</td>
+      </tr>
+      <tr>
+        <td>Old wiki URLs</td>
+        <td>A route table, and a link stub for each page to push to the wiki</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Here's one page before and after:</p>
+  <CodeBlock code={beforePage} lang="md" title="Getting-Started.md (wiki)" />
+  <CodeBlock
+    code={afterPage}
+    lang="mdx"
+    title="docs/(start)/getting-started.mdx (Blume)"
+  />
+  <p>
+    GitHub showed the page name above every page and each <code>#</code>{" "}
+    heading below it, so a body H1 is a section. The H1 that repeated the page
+    name is gone, and the others moved down a level. Most heading anchors
+    keep their ids, since GitHub and Blume build them the same way.
+  </p>
+  <p>The sidebar becomes folders:</p>
+  <CodeBlock code={sidebar} lang="md" title="_Sidebar.md (wiki)" />
+  <CodeBlock code={tree} lang="txt" />
+  <CodeBlock code={startMeta} lang="ts" title="docs/(start)/meta.ts" />
+
+  <h2>Before you start</h2>
+  <p>
+    A wiki repository can't host the new site: GitHub runs no Actions in it
+    and serves no Pages from it. Decide where the docs will live, usually a
+    folder in your main repository or a repository of their own. The agent
+    converts a copy of the wiki clone in place, and you move it there
+    afterwards. Clone the wiki, copy it, and remove the copy's remote, so
+    nothing in it can be pushed to the wiki by mistake:
+  </p>
+  <CodeBlock code={cloneWiki} lang="bash" />
+  <p>
+    GitHub publishes only the wiki's default branch, which is what the clone
+    checks out. Then save the list of pages GitHub serves, from the wiki's own
+    page index:
+  </p>
+  <CodeBlock code={listPages} lang="bash" />
+  <p>
+    Use it at the end to confirm that every page is accounted for. While
+    you're in the repository settings, turn on{" "}
+    <strong>Restrict editing to collaborators only</strong> under Features, so
+    the wiki stops changing while you migrate it. You also need Node.js 22.12
+    or later, and Claude Code or Codex installed and signed in.
+  </p>
+
+  <h2>Run the migration</h2>
+  <p>From the copy, run:</p>
+  <CodeBlock code="npx blume migrate github-wiki --claude" lang="bash" />
+  <p>
+    To use Codex, swap <code>--claude</code> for <code>--codex</code>. Name the
+    source: a wiki has no config file, so Blume can't detect one.
+  </p>
+  <p>
+    <code>blume migrate</code> converts nothing itself. It opens the agent on the{" "}
+    <code>blume-migrate</code> skill inside the package, pointed at its GitHub
+    wiki reference. Following it, the agent:
+  </p>
+  <ol>
+    <li>
+      Asks where the docs will live, and converts the copy in place if you
+      don't say.
+    </li>
+    <li>
+      Runs the codemod's <code>routes</code> step, which lists the pages the
+      way GitHub serves them and writes the route table,{" "}
+      <code>wiki-routes.json</code>. It also flags the pages that only point
+      elsewhere and the ones that aren't content.
+    </li>
+    <li>
+      Classifies every page in the table: a page to keep, a moved notice
+      mapped to its target, or a page to leave out (a mirror repository's
+      README, a test page) set to <code>null</code>.
+    </li>
+    <li>
+      Runs the codemod's <code>convert</code> step, which moves each page into
+      place, writes its title, converts wiki links, alerts, headings, and
+      images, and writes every <code>meta.ts</code> from{" "}
+      <code>_Sidebar.md</code>.
+    </li>
+    <li>
+      Works through what the codemod reports: links that were already broken
+      on GitHub, uploaded images to download, MDX errors, image sizes, and the
+      files the conversion left behind.
+    </li>
+    <li>
+      Writes <code>blume.config.ts</code>, scaffolds <code>package.json</code>,
+      and runs <code>blume build</code>, <code>blume validate --strict</code>,
+      and the codemod's <code>check</code> until they pass.
+    </li>
+    <li>
+      Prepares the link stubs for the old wiki and lists the links to it in
+      your main repository.
+    </li>
+  </ol>
+  <p>
+    Here's the <code>routes</code> step on the Acme wiki, and the table after
+    classifying its one moved notice:
+  </p>
+  <CodeBlock code={routesOutput} lang="txt" />
+  <CodeBlock code={routeTable} lang="json" title="wiki-routes.json" />
+  <p>
+    The agent ends with a summary of what it migrated, dropped, and
+    approximated. Keep it for the review.
+  </p>
+  <Callout type="info">
+    Two runs on one wiki can differ, since classifying pages and fixing what
+    the codemod reports are judgment calls. Read the diff rather than trusting
+    it.
+  </Callout>
+
+  <h2>What happens to the old wiki</h2>
+  <p>
+    Your old wiki URLs stay on github.com, and nothing can redirect them.
+    GitHub has no redirect setting for wiki pages, and it strips scripts and
+    meta refreshes from them. Blume's redirects can't help either, since they
+    only match paths on your new site. Links in issues, pull requests,
+    bookmarks, and search results keep pointing at the wiki. Here's what you
+    can do instead, in this order.
+  </p>
+  <ol>
+    <li>
+      <strong>Restrict editing</strong> to collaborators, if you haven't, so
+      nobody edits pages that are about to move.
+    </li>
+    <li>
+      <strong>Stop anything that syncs the wiki.</strong> Look for a workflow
+      in your main repository that runs <code>on: gollum</code> (wiki edits),
+      a mirror repository whose workflow pushes to the wiki, and a copy of that
+      workflow inside the wiki itself. Left running, they revert your stubs or
+      copy them into the mirror. The agent lists every one it finds.
+    </li>
+    <li>
+      <strong>Replace each page with a link stub</strong> once the new site is
+      live. Each page keeps its name, so every old link still opens, now on a
+      one-line page that links to the new one. The agent only prepares the
+      stubs: it never commits or pushes to the wiki, so whether and when they
+      go live is your decision. When you're ready, in a fresh clone of the
+      wiki:
+    </li>
+  </ol>
+  <CodeBlock code={pushStubs} lang="bash" />
+  <CodeBlock code={stubPage} lang="md" title="Getting-Started.md (wiki)" />
+  <p>
+    The sidebar becomes a notice that the docs have moved, the footer goes, and
+    images stay for sites that link them. Pages you left out keep their
+    content, and the command lists them so you can decide. If you'd rather
+    keep the old pages readable, add <code>--notice-only</code>: it only puts
+    the notice at the top of <code>Home</code> and the sidebar.
+  </p>
+  <ol start={4}>
+    <li>
+      <strong>Update the links in your repository.</strong> Search your main
+      repository for the wiki's URL:{" "}
+      <code>git grep -n -i 'github.com/acme/widget/wiki'</code>. Issue templates,
+      the README, CONTRIBUTING, and code comments often link it. The
+      codemod's <code>check</code> prints each URL's new address and checks
+      its anchor against your build, including anchors that were already
+      broken on the wiki.
+    </li>
+  </ol>
+  <CodeBlock code={checkInbound} lang="bash" />
+  <CodeBlock code={checkInboundOutput} lang="txt" />
+  <p>
+    For a missing anchor it suggests the ids on that page with the same words,
+    when there are some. Point the link at a real heading, or drop the anchor.
+    Also set the repository's About website to the new site if it pointed at
+    the wiki.
+  </p>
+  <ol start={5}>
+    <li>
+      <strong>Disable the wiki</strong> under Features in the repository
+      settings, if you want, once your own links point at the new site. GitHub
+      hides every page, stubs included, without deleting them, and turning the
+      wiki back on restores them.
+    </li>
+  </ol>
+  <p>
+    To see whether search engines show your wiki, run{" "}
+    <code>curl -sI https://github.com/acme/widget/wiki | grep -i x-robots-tag</code>.
+    If it prints <code>x-robots-tag: none</code>, they don't. If it prints
+    nothing, search results keep sending readers to the old pages for a while,
+    and the stubs are what they find.
+  </p>
+
+  <h2>Review the changes</h2>
+  <p>
+    In the copy, run <code>git add -A</code>, then start with{" "}
+    <code>git diff --cached --stat -M</code>, which pairs each page's old file
+    with its new one. Run <code>npm run dev</code>, and work through these,
+    which are where a wiki migration most often needs a second look.
+  </p>
+  <ul>
+    <li>
+      <strong>The route table.</strong> Check each moved notice's target and
+      each page set to <code>null</code>. A page that only links somewhere else
+      without saying it moved is content, so the agent keeps it.
+    </li>
+    <li>
+      <strong>Navigation.</strong> Click through the sidebar against the old
+      one. A page listed twice keeps its first place. A page with pages nested
+      under it in the sidebar is now a collapsible group, listed as its own
+      first row. The "More pages" group holds everything the sidebar didn't
+      list, sorted by title, so move pages out of it where they belong.
+    </li>
+    <li>
+      <strong>Links that were already broken.</strong> The codemod leaves a
+      link to a page the wiki didn't have as it was and reports it. These
+      often point at pages that moved to another repository, so retarget them
+      or remove the link.
+    </li>
+    <li>
+      <strong>Images.</strong> Images uploaded through GitHub's editor are
+      hosted outside the wiki. The agent downloads them next to the pages
+      unless you object; for a private repository it has to, since they need a
+      GitHub login. Widths and heights from raw <code>&lt;img&gt;</code> tags
+      are gone, and an image that pointed at nothing on GitHub is dropped.
+    </li>
+    <li>
+      <strong>Leftover files.</strong> Converting in place leaves the moved
+      notices, the pages you left out, and images nothing uses where they
+      were. They don't publish, but delete them so they don't confuse later
+      edits: the wiki keeps them. Delete wiki tooling that no page needs any
+      more too, like a sync script.
+    </li>
+    <li>
+      <strong>Leftover wiki links.</strong> Blume shows <code>[[Page]]</code>{" "}
+      as text and doesn't warn about it. <code>grep -rn '\[\[' docs</code>{" "}
+      should print only code samples.
+    </li>
+    <li>
+      <strong>The lockfile.</strong> A mirror repository's{" "}
+      <code>.gitignore</code> often ignores <code>package-lock.json</code> or{" "}
+      <code>yarn.lock</code>. Remove those lines so the lockfile is committed.
+    </li>
+  </ul>
+
+  <h2>Check the route table</h2>
+  <p>
+    Build the site, then check that every page in the route table exists in
+    the build, with its anchor where it has one. From the folder holding{" "}
+    <code>blume.config.ts</code>:
+  </p>
+  <CodeBlock code={buildAndCheck} lang="bash" />
+  <CodeBlock code={checkTable} lang="txt" />
+  <p>
+    Then check every URL in the page list you saved, the same way:
+  </p>
+  <CodeBlock code={checkOldPages} lang="bash" />
+  <p>
+    Each old URL should come back <code>ok</code> with its new address,{" "}
+    <code>moved</code> with a moved notice's outside target, or{" "}
+    <code>DROPPED</code> for a page you left out on purpose, which counts as a
+    problem so it stays visible. A <code>MISSING</code> line is a page the
+    table doesn't have. Run <code>npx blume validate --strict</code> too, which
+    checks every link and anchor on the new site.
+  </p>
+
+  <h2>Deploy</h2>
+  <p>
+    Many projects publish their docs on GitHub Pages, and a Blume site can go
+    there.{" "}
+    <a href="/guides/markdown-docs-github-pages">Deploy Markdown docs to GitHub Pages</a>{" "}
+    has a complete workflow. Blume can't detect your URL there, so set it, with
+    the repository name as the base for a project site:
+  </p>
+  <CodeBlock
+    code={`deployment: { site: "https://acme.github.io", base: "/widget" },`}
+    lang="ts"
+    title="blume.config.ts"
+  />
+  <p>
+    On Vercel or Netlify, Blume detects the URL. For other hosts, see{" "}
+    <a href="/docs/deployment">Deployment</a>. With a base, Blume prefixes it
+    to Markdown links but not to raw HTML ones, and{" "}
+    <code>blume validate</code> doesn't flag those, so add it by hand to any{" "}
+    <code>&lt;a href&gt;</code> the codemod reports, such as a wiki link it
+    found inside an HTML block. Once the site is live, run the stubs command
+    with its real address, push the stubs if you've decided to, and rewrite
+    the links in your repository.
+  </p>
+
+  <h2>What doesn't carry over</h2>
+  <ul>
+    <li>
+      <strong>Editing in the browser.</strong> Anyone with access could edit a
+      wiki page on GitHub. Changes now go through the repository. Set{" "}
+      <code>github</code> in <code>blume.config.ts</code> once the docs live in
+      one, and every page gets an <strong>Edit on GitHub</strong> link.
+    </li>
+    <li>
+      <strong>Page history.</strong> The revisions list, history, and compare
+      views stay on the wiki. If you bring the wiki's history into your
+      repository with <code>git subtree add</code>, <code>git log --follow</code>{" "}
+      still finds it. If you turn on <code>lastModified: "git"</code>, though,
+      every page's date starts at the migration, since every page was renamed
+      and Blume's dates don't follow renames.
+    </li>
+    <li>
+      <strong>Redirects.</strong> Old wiki URLs never redirect, as above. The
+      stubs are the closest you get.
+    </li>
+    <li>
+      <strong>Wiki chrome.</strong> The Pages list, the clone box, footer text,
+      sidebar prose, and links to headings in the sidebar.
+    </li>
+    <li>
+      <strong>Some rendering.</strong> Image sizes, GeoJSON maps and 3D
+      models, and light and dark image pairs. Raw HTML that GitHub stripped,
+      like inline styles and scripts, would now work, so the agent removes it or
+      asks you about it.
+    </li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <h3>The build fails with an MDX error on a .mdx page</h3>
+  <p>
+    The page became <code>.mdx</code> for an alert, and it has raw HTML with
+    Markdown inside, like a <code>&lt;details&gt;</code> block in a list. MDX
+    reads Markdown inside HTML only with blank lines around it. Add them, or
+    turn the block into Markdown.
+  </p>
+  <h3>validate reports a broken link to string;</h3>
+  <p>
+    A code block inside a quote, like this one, is misread as a link
+    definition:
+  </p>
+  <CodeBlock code={quotedFence} lang="md" />
+  <p>Move the code block out of the quote; the rest of the quote can stay.</p>
+  <h3>validate reports an anchor that exists</h3>
+  <p>
+    Anchors are case-sensitive in Blume and weren't on GitHub. Match the case
+    of the heading's id, like <code>#TsDeclFiles</code> for a link written{" "}
+    <code>#TSDeclFiles</code>.
+  </p>
+</GuidePage>

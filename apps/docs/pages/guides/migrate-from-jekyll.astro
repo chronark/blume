@@ -1,0 +1,660 @@
+---
+// Migrate from Just the Docs (Jekyll): written from an end-to-end run of the
+// blume-migrate skill (SKILL.md and references/jekyll.md) on a real Just the
+// Docs site: the Flair docs, github.com/artineering-io/flair-docs at
+// 36e1cff865ca4868dfdef88ae2b49a23ce7c0fe8 (Jekyll 4.4.1 with the
+// just-the-docs 0.12.0 gem and jekyll-redirect-from 0.17.0, `permalink:
+// pretty`, published on GitHub Pages at a custom domain: 61 pages under a
+// three-level `parent`/`grand_parent` sidebar, 26 Markdown partials, 70
+// includes, 124 callout blocks from three configured callout names, 2
+// `redirect_from` pages, custom theme hooks and SCSS), with Blume 2.1.3
+// (main, plus 2a23248a). The old site was built locally with Ruby 4.0.7 and a
+// project-local bundle; its heading ids matched the live site on the pages
+// compared. The agent read only the skill and the Blume docs it points to,
+// and wrote a one-off script for the mechanical part. Outcome: `blume build`
+// passed with 61 pages, `blume validate --strict` passed, `blume audit --only
+// redirects` passed, and all 63 old URLs (61 pages, 2 redirects) were
+// covered, checked by script against `dist/`. Callout blocks matched the old
+// build page by page (124 to 124), and 36 heading ids were pinned.
+// After the run: the bundled codemod (scripts/jekyll-codemod.mjs), written
+// from the run's script, was applied to a fresh copy of the same docs with
+// `--old` pointing at the old build. Its counts matched the run's script on
+// every transform both made (114 callouts, 49 TOC blocks, 38 includes, 54
+// relative links, 11 badges), and it wrote the same 11 meta.ts files. Its
+// build failed only on what it had reported: with the HTML includes and one
+// `{% if %}` deleted as stand-ins for the hand work, the build passed with 61
+// pages, and `validate --strict` reported the anchors the run then pinned and
+// one link inside a commented-out paragraph, but no index title mismatch.
+// pin-heading-ids.mjs then paired 755 headings and found 39 to pin.
+// Review pass: adversarial Jekyll 4.4.1 + just-the-docs 0.12.0 sites built
+// locally (IALs on lists, tables, and list items; nested and parameterless
+// includes; `{% raw %}`; Liquid in H1s; a `baseurl`; `.html` and `defaults`
+// permalinks; two parents with one title), and 5G-MAG/Getting-Started at
+// 53a0b7ef792e273344c70e200a4971718f24f98a (147 pages, built with its own
+// Gemfile; the codemod ran on it, Blume didn't build it), turned up silent
+// changes the codemod now avoids or reports, and showed a second `--write`
+// took each page's next H1 as its title, so it now refuses a folder it
+// already converted. Re-run on Flair after the fixes: the same files as
+// before, except that the home page stays listed (hidden, it left the
+// sitemap and search). The Acme example below is invented: a six-page Just
+// the Docs site with a `baseurl`, built with Jekyll 4.4.1 and just-the-docs
+// 0.12.0. Its before/after, codemod report, and folders are the codemod's
+// real output, unchanged by the fixes (the YouTube before/after is the
+// reference's hand mapping, as the run used it); `blume build`, `validate
+// --strict`, the redirect audit, the anchor script (nothing to pin), and
+// check-urls.mjs (every old URL under the base) all passed on it, before and
+// after the fixes. Not run: `npx blume migrate jekyll` itself (the agent was
+// pointed at the skill directly, and 2.1.3 has no jekyll source), a deploy,
+// the lockfile regeneration, or a site built by GitHub Pages' own Jekyll 3
+// (its differences come from GitHub's docs and the jekyll source). Flair's
+// own content isn't quoted.
+import Callout from "blume/components/content/Callout.astro";
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const fence = "```";
+
+const buildOld = [
+  "rsync -a --exclude .git --exclude _site ./ ../jekyll-old/src/",
+  "cd ../jekyll-old/src",
+  "bundle config set --local path vendor/bundle",
+  "bundle install",
+  "JEKYLL_ENV=production bundle exec jekyll build -d ../site",
+  "cd ../site",
+  "find . -name '*.html' -not -path './assets/*' \\",
+  "  | sed 's|^\\.||; s|/index\\.html$|/|' | sort > ../old-urls.txt",
+].join("\n");
+
+const beforePage = [
+  "---",
+  "title: Install",
+  "parent: Getting started",
+  "nav_order: 1",
+  "redirect_from:",
+  "  - /setup/",
+  "---",
+  "",
+  "# Install the SDK",
+  "{: .no_toc }",
+  "",
+  '<details open markdown="block">',
+  "  <summary>Table of contents</summary>",
+  "  {: .text-delta }",
+  "1. TOC",
+  "{:toc}",
+  "</details>",
+  "",
+  '{% include requirements.md version="22" %}',
+  "",
+  "## Install with npm",
+  "",
+  `${fence}sh`,
+  "npm install @acme/sdk",
+  fence,
+  "",
+  "{: .warning }",
+  "Keep your API key out of the browser.",
+  "",
+  "## Next steps",
+  "",
+  "Read [Configure](../configure/) next.",
+].join("\n");
+
+const afterPage = [
+  "---",
+  "title: Install the SDK",
+  "sidebar:",
+  "  label: Install",
+  "seo:",
+  "  title: Install",
+  "---",
+  "",
+  '<include version="22">/_includes/requirements.md</include>',
+  "",
+  "## Install with npm",
+  "",
+  `${fence}sh`,
+  "npm install @acme/sdk",
+  fence,
+  "",
+  ":::warning",
+  "Keep your API key out of the browser.",
+  ":::",
+  "",
+  "## Next steps",
+  "",
+  "Read [Configure](/docs/configure) next.",
+].join("\n");
+
+const beforePartial = [
+  "{: .note }",
+  "You need Node.js {{ include.version }} or later.",
+].join("\n");
+
+const afterPartial = [
+  ":::note",
+  "You need Node.js {{version}} or later.",
+  ":::",
+].join("\n");
+
+const codemodRun = [
+  "node node_modules/blume/skills/blume-migrate/scripts/jekyll-codemod.mjs \\",
+  "  --old ../jekyll-old/site .",
+].join("\n");
+
+const codemodReport = [
+  "docs/getting-started.md → docs/(getting-started)/index.md",
+  "  1 × body H1 → title",
+  "  1 × front matter has_children removed",
+  "  1 × front matter nav_order removed",
+  "  1 × section index row hidden (the group row links it)",
+  "  1 × slug pins the old URL",
+  "",
+  "docs/install.md → docs/(getting-started)/install.mdx",
+  "  1 × {: .warning } → :::warning",
+  "  1 × {% include %} → <include>",
+  "  1 × body H1 → title",
+  "  1 × front matter nav_order removed",
+  "  1 × front matter parent removed",
+  "  1 × old title → sidebar.label + seo.title",
+  "  1 × redirect_from → redirects",
+  "  1 × relative link → route",
+  "  1 × TOC <details> block removed",
+  "",
+  "meta.ts: docs/meta.ts, docs/(getting-started)/meta.ts, docs/api/meta.ts",
+  "",
+  "Notes",
+  "  docs/ isn't a section in the old sidebar: it becomes one group, kept open (collapsed: false)",
+].join("\n");
+
+const folders = [
+  "docs/",
+  "  meta.ts                  collapsed: false",
+  "  (getting-started)/",
+  "    meta.ts                title, directory, pages",
+  "    index.md               slug: docs/getting-started",
+  "    install.mdx            still /docs/install",
+  "    configure.mdx          still /docs/configure",
+  "  api/",
+  "    meta.ts                directory",
+  "    index.md",
+  "    clients.mdx",
+].join("\n");
+
+const config = [
+  'import { defineConfig } from "blume";',
+  "",
+  'import migration from "./jekyll-migration.json" with { type: "json" };',
+  "",
+  "export default defineConfig({",
+  '  title: "Acme Docs",',
+  '  description: "Documentation for the Acme SDK.",',
+  "  content: {",
+  '    root: ".",',
+  '    include: ["*.{md,mdx}", "docs/**/*.{md,mdx}"],',
+  '    exclude: ["**/_*", "**/.*", "README.md", "node_modules/**", "vendor/**"],',
+  "  },",
+  "  navigation: {",
+  '    sidebar: { display: "group" },',
+  '    actions: [{ label: "Acme on GitHub", href: "https://github.com/acme/acme" }],',
+  "  },",
+  '  deployment: { site: "https://acme.github.io", base: "/acme-docs" },',
+  "  redirects: migration.redirects,",
+  "  variables: migration.variables,",
+  "});",
+].join("\n");
+
+const leftovers = [
+  "grep -rnE '\\{:[ .#a-z:]|\\{%|\\{\\{|^\\*\\[|^: |markdown=\"|<i class=\"fa|\\.html[)#\"]|\\]\\(\\.\\.?/[^).]*\\)|\\]\\(/[^)]*/(#[^)]*)?\\)' \\",
+  "  --include='*.md' --include='*.mdx' --exclude-dir={node_modules,vendor,_site,.blume,dist} .",
+].join("\n");
+
+const checkUrls = [
+  'import { existsSync, readFileSync } from "node:fs";',
+  "",
+  'const [list, base = ""] = process.argv.slice(2);',
+  'const urls = readFileSync(list, "utf8").split("\\n").filter(Boolean);',
+  'const unbase = (url) => (base && url.startsWith(base) ? url.slice(base.length) || "/" : url);',
+  'const rules = existsSync("dist/blume-redirects.json")',
+  '  ? JSON.parse(readFileSync("dist/blume-redirects.json", "utf8"))',
+  "  : [];",
+  "const redirects = new Map(rules.map(({ from, to }) => [unbase(from), unbase(to)]));",
+  'const routeOf = (url) => url.replace(/(?:\\/index)?\\.html$|\\/$/, "") || "/";',
+  "const isPage = (route) => {",
+  '  const file = `dist${route === "/" ? "" : route}/index.html`;',
+  '  return existsSync(file) && !readFileSync(file, "utf8").includes(\'http-equiv="refresh"\');',
+  "};",
+  "",
+  "let missing = 0;",
+  "for (const url of urls) {",
+  "  const target = redirects.get(url) ?? redirects.get(routeOf(url)) ?? routeOf(url);",
+  "  if (!isPage(routeOf(target))) {",
+  "    console.log(`MISSING ${url} -> ${target}`);",
+  "    missing += 1;",
+  "  }",
+  "}",
+  'console.log(missing === 0 ? "Every old URL reaches a page." : `${missing} old URL(s) don\'t.`);',
+].join("\n");
+
+const runCheck = [
+  "npx blume build",
+  "node check-urls.mjs ../jekyll-old/old-urls.txt /acme-docs",
+].join("\n");
+
+const pinAnchors = [
+  "npx blume build",
+  "node node_modules/blume/skills/blume-migrate/scripts/pin-heading-ids.mjs --old ../jekyll-old/site",
+].join("\n");
+
+const youtube = [
+  '{% include youtube.html url="https://www.youtube.com/embed/aqz-KE-bpKQ" caption="Install in 3 minutes" %}',
+].join("\n");
+
+const youtubeAfter = [
+  '<Frame caption="Install in 3 minutes">',
+  '  <YouTube url="https://www.youtube.com/embed/aqz-KE-bpKQ" />',
+  "</Frame>",
+].join("\n");
+
+const baseConfig = [
+  "deployment: {",
+  '  site: "https://acme.github.io",',
+  '  base: "/acme-docs",',
+  "},",
+].join("\n");
+---
+
+<GuidePage guide={guideById("migrate-from-jekyll")}>
+  <p>
+    By the end of this guide, your Jekyll docs are a Blume project: your Just
+    the Docs sidebar rebuilt as folders without moving a page, your Kramdown
+    callouts turned into callout blocks, your includes and Liquid converted,
+    and every old URL, redirect, and heading anchor still working. A coding
+    agent does the conversion, starting with a codemod for the mechanical
+    part, and you review it.
+  </p>
+  <p>
+    It's written for sites on the <strong>Just the Docs</strong> theme, as a
+    gem or a <code>remote_theme</code>, on Jekyll 4 or the Jekyll 3 GitHub
+    Pages builds with. Sites on other Jekyll themes (Minimal Mistakes, the
+    Documentation Theme for Jekyll, minima) get the same content conversion,
+    but their sidebars are declared elsewhere, so the agent rebuilds them by
+    hand.
+  </p>
+
+  <h2>What carries over</h2>
+  <p>
+    The run behind this guide migrated a real Just the Docs site: 61 pages
+    under a three-level sidebar, with 26 partials and 124 callouts. Every page
+    carried over, all 63 old URLs reached a page, and every callout came
+    through. Here's how the pieces map:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In Jekyll</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>_config.yml</code></td>
+        <td><code>blume.config.ts</code></td>
+      </tr>
+      <tr>
+        <td><code>parent</code>, <code>grand_parent</code>, <code>nav_order</code></td>
+        <td>
+          Folders with a <code>meta.ts</code>; <code>(group)</code> folders and{" "}
+          <code>slug</code> where a page's URL doesn't follow its folder
+        </td>
+      </tr>
+      <tr>
+        <td><code>{"{: .note }"}</code> and the other names under <code>callouts:</code></td>
+        <td><code>:::note</code> and the other callouts, in <code>.mdx</code> pages</td>
+      </tr>
+      <tr>
+        <td><code>{"{% include x.md key=\"value\" %}"}</code></td>
+        <td><code>{"<include key=\"value\">/_includes/x.md</include>"}</code></td>
+      </tr>
+      <tr>
+        <td><code>{"{{ site.title }}"}</code></td>
+        <td><code>{"{{title}}"}</code>, a variable</td>
+      </tr>
+      <tr>
+        <td><code>1. TOC</code> + <code>{"{:toc}"}</code></td>
+        <td>The outline beside every page</td>
+      </tr>
+      <tr>
+        <td>The page's <code># H1</code></td>
+        <td>Its frontmatter <code>title</code></td>
+      </tr>
+      <tr>
+        <td><code>{"{: .label .label-green }"}</code></td>
+        <td><code>{'<Badge color="green">'}</code></td>
+      </tr>
+      <tr>
+        <td><code>redirect_from</code></td>
+        <td><code>redirects</code></td>
+      </tr>
+      <tr>
+        <td><code>/docs/install/</code></td>
+        <td><code>/docs/install</code>; the old spelling keeps working on static hosts</td>
+      </tr>
+      <tr>
+        <td><code>baseurl</code></td>
+        <td><code>deployment.base</code></td>
+      </tr>
+      <tr>
+        <td><code>aux_links</code>, <code>nav_external_links</code></td>
+        <td><code>navigation.actions</code>, <code>navigation.featured</code></td>
+      </tr>
+      <tr>
+        <td>Lunr search</td>
+        <td>Built-in search</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Here's one page and the partial it includes, before and after the codemod:</p>
+  <CodeBlock code={beforePage} lang="md" title="docs/install.md (Jekyll)" />
+  <CodeBlock code={beforePartial} lang="md" title="_includes/requirements.md (Jekyll)" />
+  <CodeBlock code={afterPage} lang="mdx" title="docs/(getting-started)/install.mdx (Blume)" />
+  <CodeBlock code={afterPartial} lang="md" title="_includes/requirements.md (Blume)" />
+  <p>
+    The page moved into a <code>(getting-started)</code> folder, which adds the
+    sidebar group without adding a URL segment, so it's still at{" "}
+    <code>/docs/install</code>. Its H1 became the title, and the old nav label
+    stayed as the sidebar label.
+  </p>
+
+  <h2>Before you start</h2>
+  <p>
+    The agent edits your repository in place, so start on a new branch with a
+    clean working tree:
+  </p>
+  <CodeBlock code="git switch -c migrate-to-blume" lang="bash" />
+  <p>
+    Then build your Jekyll site once, outside the repository. The build is your
+    list of old URLs, the sidebar the codemod rebuilds, the record of what your
+    pages showed, and the source of their heading anchors. Build a copy with a
+    project-local bundle, so nothing touches your Ruby setup, and with{" "}
+    <code>JEKYLL_ENV=production</code>, as your CI does. From the folder that
+    holds <code>_config.yml</code>:
+  </p>
+  <CodeBlock code={buildOld} lang="bash" />
+  <p>
+    A site with no <code>Gemfile</code>, built by GitHub Pages from a{" "}
+    <code>remote_theme</code>, needs one with{" "}
+    <code>gem "github-pages", group: :jekyll_plugins</code> in the copy. If an
+    older Jekyll fails to load <code>csv</code>, <code>base64</code>,{" "}
+    <code>bigdecimal</code>, or <code>logger</code> on a recent Ruby, add that
+    gem to the copy's <code>Gemfile</code> too.
+  </p>
+  <p>
+    Keep <code>../jekyll-old</code> until you're done; if your Jekyll files are
+    in a <code>docs/</code> folder, it lands in your repository's root, so
+    keep it out of your commits. You also need Node.js 22.12 or later, and
+    Claude Code or Codex installed and signed in.
+  </p>
+
+  <h2>Run the migration</h2>
+  <p>From the folder that holds <code>_config.yml</code>, run:</p>
+  <CodeBlock code="npx blume migrate jekyll --claude" lang="bash" />
+  <p>
+    To use Codex, swap <code>--claude</code> for <code>--codex</code>. Leave out{" "}
+    <code>jekyll</code> and Blume detects the source from a{" "}
+    <code>_config.yml</code> at the root or in <code>docs/</code>, after
+    checking for every other framework it detects.
+  </p>
+  <p>
+    <code>blume migrate</code> converts nothing itself. It opens the agent on the{" "}
+    <code>blume-migrate</code> skill inside the package, pointed at its Jekyll
+    reference. Following it, the agent:
+  </p>
+  <ol>
+    <li>
+      Runs the bundled Jekyll codemod over your pages and partials, against
+      your old build. It converts callouts, the in-page TOC, H1s, front matter,
+      Markdown includes, Liquid links and variables, and relative links, and
+      rebuilds the sidebar as folders and <code>meta.ts</code> files without
+      moving a URL.
+    </li>
+    <li>
+      Works through the codemod's report: HTML includes, Liquid logic, CSS
+      rules that hid or added content, and the theme's custom files.
+    </li>
+    <li>
+      Writes <code>blume.config.ts</code> from <code>_config.yml</code>: title,
+      logo, base path, header links, edit links, analytics, and the redirects
+      and variables the codemod collected.
+    </li>
+    <li>
+      Moves your images and other served files into <code>public/</code>, pins
+      the old heading anchors, and swaps the Jekyll build for Blume's in{" "}
+      <code>package.json</code> and your workflow.
+    </li>
+    <li>
+      Runs <code>blume build</code>, <code>blume validate --strict</code>, and{" "}
+      <code>blume audit --only redirects</code> until they pass, then
+      summarizes what it migrated, dropped, and approximated.
+    </li>
+  </ol>
+  <p>The codemod runs like this, and its report has one block per file:</p>
+  <CodeBlock code={codemodRun} lang="bash" />
+  <CodeBlock code={codemodReport} lang="txt" />
+  <p>
+    On the Acme site, a parent page whose children sat beside it became a{" "}
+    <code>(group)</code> folder, and the <code>docs/</code> folder, which Just
+    the Docs never showed, became one sidebar group:
+  </p>
+  <CodeBlock code={folders} lang="txt" />
+  <p>
+    The redirects from <code>redirect_from</code> and the values behind{" "}
+    <code>{"{{ site.x }}"}</code> land in <code>jekyll-migration.json</code>,
+    which the config imports:
+  </p>
+  <CodeBlock code={config} lang="ts" title="blume.config.ts" />
+  <Callout type="info">
+    The codemod is deterministic, but the rest of the agent's work is judgment,
+    so two runs on one repository can differ. Read the diff rather than
+    trusting it.
+  </Callout>
+
+  <h2>Review the changes</h2>
+  <p>
+    Start with <code>git diff --stat</code>, run <code>npx blume dev</code>, and
+    work through these, which are where a Just the Docs migration most often
+    needs a second look.
+  </p>
+  <ul>
+    <li>
+      <strong>Callouts.</strong> Just the Docs only styled the names listed
+      under <code>callouts:</code> in <code>_config.yml</code>. A misspelled
+      marker, or a class the config doesn't name, showed as a plain paragraph,
+      so the codemod drops it rather than boxing text readers never saw. Check
+      the ones it lists.
+    </li>
+    <li>
+      <strong>HTML includes.</strong> Blume splices Markdown partials, but an{" "}
+      <code>.html</code> include needs a replacement at each use: a figure
+      becomes a Markdown image or <code>{"<Frame>"}</code>, a video embed{" "}
+      <code>{"<YouTube>"}</code>, a jQuery accordion{" "}
+      <code>{"<Accordion>"}</code>. Then the partial can go.
+    </li>
+    <li>
+      <strong>Custom CSS.</strong> Rules in <code>_sass/custom</code> that hid a
+      section or added text with <code>::before</code> changed what readers
+      saw. The codemod lists each one: delete content a rule hid, and write
+      added text into the page.
+    </li>
+    <li>
+      <strong>Titles.</strong> Just the Docs showed each page's H1 and used its
+      frontmatter <code>title</code> for the sidebar, so a page whose two
+      differed now has the H1 as its title and the old one as its sidebar
+      label. A page that took its heading from an include needs its title
+      moved by hand.
+    </li>
+    <li>
+      <strong>Navigation.</strong> Click through the sidebar. Each section's
+      page is its group's link, and the codemod hid the page's duplicate row
+      under it. Pages Just the Docs listed under their parent now list there
+      too, from <code>directory: "accordion"</code>. Pages your old sidebar
+      left out are hidden, which in Blume also takes them out of search and
+      the sitemap. The home page is the exception: it stays listed.
+    </li>
+    <li>
+      <strong>Liquid logic.</strong> <code>{"{% if %}"}</code>,{" "}
+      <code>{"{% for %}"}</code> over <code>_data</code>, and values that
+      aren't plain config become the content your old build shows. Liquid
+      inside a code block ran in Jekyll too, unless it was wrapped in{" "}
+      <code>{"{% raw %}"}</code>.
+    </li>
+    <li>
+      <strong>Media.</strong> Folders your site served by path, like{" "}
+      <code>/media/</code>, move whole to <code>public/</code>. Keep files no
+      page uses until you know nothing else links to them.
+    </li>
+  </ul>
+  <p>
+    Run from the folder that holds <code>blume.config.ts</code>, this prints
+    Kramdown attribute lists, Liquid, and old-style links left in your pages.
+    It should print only code samples and the variables and include props you
+    meant to keep:
+  </p>
+  <CodeBlock code={leftovers} lang="bash" />
+  <p>An HTML include for a video, and what it becomes in an <code>.mdx</code> page:</p>
+  <CodeBlock code={youtube} lang="md" title="Before" />
+  <CodeBlock code={youtubeAfter} lang="mdx" title="After" />
+  <p>
+    A YouTube playlist URL (<code>/embed/videoseries?list=…</code>) stays a
+    plain <code>{"<iframe>"}</code>: <code>{"<YouTube>"}</code> doesn't play
+    playlists.
+  </p>
+
+  <h2>Check every old URL</h2>
+  <p>
+    Build the site, then check that each URL in your saved list is either a
+    page Blume built or a redirect to one. Save this beside{" "}
+    <code>blume.config.ts</code>:
+  </p>
+  <CodeBlock code={checkUrls} lang="js" title="check-urls.mjs" />
+  <p>
+    Run it after a build, passing your old <code>baseurl</code> if the site
+    had one:
+  </p>
+  <CodeBlock code={runCheck} lang="bash" />
+  <p>
+    It reads <code>dist/blume-redirects.json</code>, which a build writes when
+    no host adapter is set, and treats Blume's redirect pages as redirects,
+    not pages. Add a redirect for each URL it prints and run it again until it
+    prints nothing. Index URLs need none: <code>/docs/api/</code> already
+    serves the page Blume writes at <code>docs/api/index.html</code>.{" "}
+    <code>npx blume preview</code> serves the build too, but it answers a
+    slashed URL like <code>/docs/install/</code> with a 404, where GitHub
+    Pages serves the page.
+  </p>
+
+  <h2>Check the heading anchors</h2>
+  <p>
+    Jekyll and Blume build heading ids almost the same way, except inside an
+    HTML block marked <code>markdown="1"</code>, where Jekyll keeps only
+    letters, digits, and hyphens: <code>## f_position</code> there is{" "}
+    <code>#fposition</code> in Jekyll and <code>#f_position</code> in Blume. On
+    the run's site, about one heading in twenty changed. The agent pins each old id with a script that compares
+    every heading in your old build with the new one. To check its work, run
+    it from the same folder:
+  </p>
+  <CodeBlock code={pinAnchors} lang="bash" />
+  <p>
+    After the agent's pass it should find nothing to pin. If it finds some,
+    add <code>--write</code>, rebuild, and run it again until it reports 0.
+    Then run <code>npx blume validate --strict</code>, which checks every link
+    to an anchor, including ones that were already broken on your old site.
+  </p>
+
+  <h2>Deploy to GitHub Pages</h2>
+  <p>
+    Most Just the Docs sites live on GitHub Pages, and a Blume site can stay
+    there. Blume can't detect your URL on GitHub Pages, so set it as{" "}
+    <code>deployment.site</code>. A project site's <code>baseurl</code>{" "}
+    becomes <code>deployment.base</code>. A site on a custom domain serves at
+    the root and needs no base: GitHub's Pages workflow passes the base from
+    the Pages settings, whatever <code>_config.yml</code> says.
+  </p>
+  <CodeBlock code={baseConfig} lang="ts" title="blume.config.ts" />
+  <p>
+    Blume adds the base to Markdown links and images, not to raw HTML, so a
+    root path in an <code>{"<img src>"}</code> or <code>{"<a href>"}</code>{" "}
+    needs it written in.
+  </p>
+  <p>
+    Replace your Jekyll workflow with the one in{" "}
+    <a href="/guides/markdown-docs-github-pages">Deploy Markdown docs to GitHub Pages</a>,
+    and commit the <code>package-lock.json</code> from{" "}
+    <code>npm install</code> with it, since the workflow installs from it. In
+    your repository's settings, set Pages to deploy from GitHub Actions; a
+    custom domain stays there too, so <code>CNAME</code> and{" "}
+    <code>.nojekyll</code> can go. For other hosts, see{" "}
+    <a href="/docs/deployment">Deployment</a>.
+  </p>
+  <p>
+    Before switching your domain, deploy a preview and open a few old URLs on
+    it, slashed and unslashed. Keep the old deployment until the new one
+    passes, so rolling back is a settings change.
+  </p>
+
+  <h2>What doesn't carry over</h2>
+  <ul>
+    <li>
+      <strong>The theme.</strong> Just the Docs' layouts, custom color schemes
+      beyond the accent color, <code>_sass</code> rules with no Blume
+      equivalent, the footer text, and the back-to-top link.
+    </li>
+    <li>
+      <strong>Callout labels.</strong> Just the Docs printed each callout's
+      configured title above it. Blume shows an icon instead, so a title that
+      only names the type is dropped.
+    </li>
+    <li>
+      <strong>Kramdown extras.</strong> Abbreviations, definition-list styling,
+      and line numbers on every code block (Blume sets them per block). The
+      in-page TOC listed every heading level, where Blume's outline shows two
+      and three unless you raise <code>toc.maxHeadingLevel</code>.
+    </li>
+    <li>
+      <strong>Liquid and plugins.</strong> Logic, loops, and filters become
+      static content, and plugins with no Blume equivalent are removed. Page
+      scripts and jQuery widgets become islands, layout slots, or static
+      content.
+    </li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <h3>A page shows <code>{"{: .note }"}</code> or <code>{"{% include %}"}</code> as text</h3>
+  <p>
+    It's a <code>.md</code> page, which shows leftover Kramdown and Liquid as
+    text without an error. Convert it, and rename the page{" "}
+    <code>.mdx</code> if it now has a callout.
+  </p>
+  <h3>The build fails with "Could not parse expression"</h3>
+  <p>
+    An <code>.mdx</code> page, or a partial it includes, still has a{" "}
+    <code>{"{"}</code> in its text: leftover Liquid or a Kramdown attribute
+    list, or a brace in prose. Convert it, or escape a brace as{" "}
+    <code>{"\\{"}</code>. When the error names only the page, look in the
+    partials it includes.
+  </p>
+  <h3>Validate fails with BLUME_NAV_INDEX_TITLE_MISMATCH</h3>
+  <p>
+    A section's hidden page has a title different from its folder's{" "}
+    <code>meta.ts</code> title. Make the two titles match, set the page's{" "}
+    <code>sidebar.label</code> to the folder's title to keep its own title, or
+    remove its <code>sidebar.hidden</code> to show its row again.
+  </p>
+  <h3>An image shows locally but not on GitHub Pages</h3>
+  <p>
+    It's a raw <code>{"<img>"}</code> with a root path on a site with a{" "}
+    <code>deployment.base</code>. Add the base to its <code>src</code>, or
+    write it as a Markdown image.
+  </p>
+</GuidePage>

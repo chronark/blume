@@ -31,12 +31,16 @@ Name the framework you're migrating from, or leave it out and Blume detects it f
 | `nextra` | `nextra` in `package.json` | [Migrate from Nextra](/guides/migrate-from-nextra) |
 | `vitepress` | `.vitepress/config.ts` (or `.mts`, `.js`, `.mjs`) at the root or in `docs/`, or `vitepress` in `package.json` | [Migrate from VitePress](/guides/migrate-from-vitepress) |
 | `vuepress` | `.vuepress/config.ts` (or `.js`, `.mjs`, `.yml`, `.toml`) at the root or in `docs/`, `vuepress.config.*`, or `vuepress` (or `vuepress-vite`, `vuepress-webpack`) in `package.json` | [Migrate from VuePress](/guides/migrate-from-vuepress) |
+| `docus` | `docus` (Docus 3 and later) or `@nuxt-themes/docus` (Docus 1) in `package.json`; run it from the docs package in a workspace | [Migrate from Docus](/guides/migrate-from-docus) |
 | `mkdocs` | `mkdocs.yml`, `mkdocs.yaml`, `zensical.toml`, `properdocs.yml`, or `properdocs.yaml` | [Migrate from MkDocs Material](/guides/migrate-from-mkdocs-material) |
+| `mdbook` | `book.toml` at the root or in `docs/` or `book/` | [Migrate from mdBook](/guides/migrate-from-mdbook) |
 | `fern` | `fern/docs.yml` | [Migrate from Fern](/guides/migrate-from-fern) |
 | `gitbook` | `.gitbook.yaml`, `.gitbook.yml`, or `gitbook-docs.yaml`, or `honkit` or `gitbook-cli` in `package.json`; never `SUMMARY.md` alone | [Migrate from GitBook](/guides/migrate-from-gitbook) |
 | `redocly` | `sidebars.yaml`, or `@redocly/realm` or another Realm-family package in `package.json`; never `redocly.yaml` alone | [Migrate from Redocly](/guides/migrate-from-redocly) |
 | `readme` | `_order.yaml` in `docs/`, `reference/`, `recipes/`, or `custom_pages/`; a repository that uploads with `rdme` needs the source named | [Migrate from ReadMe](/guides/migrate-from-readme) |
 | `docsify` | `docsify-cli` or `docsify` in `package.json`; a site without a `package.json` needs the source named | [Migrate from Docsify](/guides/migrate-from-docsify) |
+| `jekyll` | `_config.yml` at the root or in `docs/`, checked after every other source Blume detects | [Migrate from Just the Docs](/guides/migrate-from-jekyll) |
+| `github-wiki` | Never detected: a wiki has no config file, so name the source | [Migrate from a GitHub wiki](/guides/migrate-from-github-wiki) |
 
 Detection checks the folder you run the command in. Each source has its own mapping reference in the playbook, and several also have a codemod the agent runs first for the mechanical rewrites, so its own effort goes to the judgment calls. A site built with anything else still migrates: run the command without a source, and the agent inventories the repo first, then works from the playbook's general rules.
 
@@ -47,7 +51,7 @@ The agent follows the playbook's workflow from the source's config to a passing 
 1. Writes `blume.config.ts`, mapping only what your source declares and leaving Blume's defaults to cover the rest.
 2. Restructures content into [filesystem navigation](/docs/content/navigation), converting per-folder ordering files (Fumadocs `meta.json`, Nextra `_meta`) to `meta.ts`.
 3. Rewrites pages: frontmatter to Blume's schema, callout components to [directives](/docs/content/syntax), icons to Lucide, and snippets inlined.
-4. Adds a [redirect](/docs/deployment#redirects) for every URL that moves, so no link breaks. Docsify's `#/` URLs never reach the server, so for those it adds a small script that sends each one to its new page.
+4. Adds a [redirect](/docs/deployment#redirects) for every URL that moves, so no link breaks. Docsify's `#/` URLs never reach the server, so for those it adds a small script that sends each one to its new page. A GitHub wiki's URLs stay on github.com, which can't redirect, so the agent maps each page to its new route and prepares link stubs you can push to the old wiki.
 5. Points your `package.json` scripts at `blume dev` and `blume build`, and swaps the old framework's dependencies for `blume`.
 6. Runs `blume build` and `blume validate` until both pass.
 

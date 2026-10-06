@@ -1,0 +1,687 @@
+---
+// Migrate from Docus: written from an end-to-end run of the blume-migrate
+// skill (SKILL.md and references/docus.md) on a real Docus site: the Nuxt MCP
+// Toolkit docs, github.com/nuxt-modules/mcp-toolkit `apps/docs/` at
+// 2a31848dcc6d3cf4c251055ce28b8f866fdb5c61 (MIT; Docus 5.13.0 on Nuxt 4.5.2,
+// Nuxt Content 3.16.0, and Nuxt UI 4.11.3, in a pnpm 12 and Turborepo
+// workspace, deployed on Vercel with the Docus assistant and MCP server on:
+// 51 pages, 8 sections with `.navigation.yml` and header sub-navigation, 198
+// MDC blocks, 21 `routeRules` redirects, a landing page built from custom
+// components), with Blume 2.1.3 (main). The agent read only the skill and the
+// Blume docs it points to, and wrote one-off scripts for the MDC conversion.
+// The old site was built with `nuxt generate` for its URL list and heading
+// ids. Outcome, with `deployment: vercel()`: `blume build` passed (51 pages),
+// `blume validate --strict` and `blume audit --only redirects` passed, all 72
+// old URLs and all 50 `/raw/*.md` URLs were covered, and 34 heading ids were
+// pinned. The build passed only after a workaround for the probe's symlinked
+// Blume (Vercel's function-bundle check couldn't follow the symlinks); a real
+// install wasn't tested. In `blume dev`, the MCP server answered `initialize`,
+// `tools/list`, and a `search_docs` call, and the assistant route answered
+// (no key was set, so no answer was generated).
+// After the run: the bundled codemod (scripts/docus-codemod.mjs) was written
+// from the run's scripts, then revised in review (code spans holding
+// backticks, CRLF pages, multi-line HTML tags, `$$` math, blocks with slots it
+// can't map, card descriptions, kebab-case props, `links` past `related`'s
+// limit, case-sensitive tag names). The revised codemod, applied to a fresh
+// copy of the same content, gave the same output as before: 82 callouts, 27
+// cards, 27 fields, 25 code groups (4 to package-install), 18 prompts, 2 steps
+// blocks, 247 fence labels, and the 8 `.navigation.yml` files converted, the
+// prose hazards escaped, and the 7 install buttons and the landing page left
+// for review; a second pass changed nothing. That output built with Blume (51
+// pages), `blume validate --strict` reported only an anchor already dead on
+// the old site, and pin-heading-ids.mjs paired 460 headings and found the same
+// 34 to pin. On the run's `vercel()` project, the script with no `--dist` read
+// dist/client by itself and paired the same 460. The codemod also converted
+// the Docus docs (docus.dev, English; built once a malformed frontmatter key in
+// the source was removed) and a second Docus 5 site, evloghq/evlog `apps/docs`
+// at a2cfccadc23c8a85ab2165705c4b9a74cb724a9d (Docus ^5.13.0, 111 pages),
+// which built with Blume once the one `related` list it flagged was trimmed; a
+// second pass changed nothing on either. The leftover greps below ran on those
+// outputs. check-urls.mjs below ran against `blume dev` on the run's project
+// (72 of 72, and 50 of 50). The sitemap command ran against the live site and
+// matched the old build's sitemap. The Acme page and the prompt sample are the
+// codemod's output; both built and passed `blume validate --strict`, and the
+// prompt's copy text matched its Docus source.
+// Not run: `npx blume migrate docus` itself (the agent was pointed at the
+// skill directly), a Vercel deploy (the `vercel.json` below is the run's, not
+// deployed), a live assistant answer, or the lockfile regeneration. The
+// reference was revised after the run (codemod, live-site component check,
+// escaping, `vercel()` deploy notes); those revisions weren't rerun end to
+// end. Examples are invented (Acme).
+import Callout from "blume/components/content/Callout.astro";
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const fence = "```";
+
+const saveSitemap = [
+  "curl -s -A 'Mozilla/5.0' https://docs.acme.example/sitemap.xml \\",
+  "  | grep -o '<loc>[^<]*' \\",
+  "  | sed -e 's#<loc>https://docs.acme.example##' -e 's#^$#/#' \\",
+  "  > ../old-urls.txt",
+].join("\n");
+
+const saveBuild = [
+  "npx nuxt generate",
+  "cp -R .output/public ../old-site",
+].join("\n");
+
+const beforePage = [
+  "---",
+  "title: Install Acme",
+  "description: Add the Acme SDK to your project.",
+  "navigation:",
+  "  title: Installation",
+  "  icon: i-lucide-download",
+  "links:",
+  "  - label: Configuration",
+  "    icon: i-lucide-settings",
+  "    to: /getting-started/configuration",
+  "---",
+  "",
+  "::tip",
+  "You need Node.js 22 or later.",
+  "::",
+  "",
+  "::code-group",
+  `${fence}bash [pnpm]`,
+  "pnpm add @acme/sdk",
+  fence,
+  `${fence}bash [npm]`,
+  "npm install @acme/sdk",
+  fence,
+  "::",
+  "",
+  '::callout{icon="i-lucide-key-round" color="warning"}',
+  "Keep your API key out of the browser.",
+  "::",
+  "",
+  `${fence}ts [acme.config.ts]`,
+  'export default defineAcmeConfig({ region: "eu" })',
+  fence,
+  "",
+  "::card-group",
+  '  :::card{icon="i-lucide-settings" title="Configuration" to="/getting-started/configuration"}',
+  "  Set the region and retries.",
+  "  :::",
+  "::",
+].join("\n");
+
+const afterPage = [
+  "---",
+  "title: Install Acme",
+  "description: Add the Acme SDK to your project.",
+  "sidebar:",
+  "  label: Installation",
+  "  icon: download",
+  "related:",
+  '  - "Configuration": /getting-started/configuration',
+  "---",
+  "",
+  ":::tip",
+  "You need Node.js 22 or later.",
+  ":::",
+  "",
+  `${fence}package-install`,
+  "npm install @acme/sdk",
+  fence,
+  "",
+  '<Callout type="warning" icon="key-round">',
+  "",
+  "Keep your API key out of the browser.",
+  "",
+  "</Callout>",
+  "",
+  `${fence}ts acme.config.ts`,
+  'export default defineAcmeConfig({ region: "eu" })',
+  fence,
+  "",
+  "<CardGroup>",
+  "",
+  '<Card title="Configuration" href="/getting-started/configuration" icon="settings">',
+  "",
+  "Set the region and retries.",
+  "",
+  "</Card>",
+  "",
+  "</CardGroup>",
+].join("\n");
+
+const codemodReport = [
+  "1.getting-started/2.installation.md → 1.getting-started/2.installation.mdx",
+  "  1 × callout → :::tip",
+  "  1 × callout → <Callout> with its icon",
+  "  1 × card → <Card>",
+  "  1 × card-group → <CardGroup>",
+  "  1 × code-group → package-install fence",
+  "  1 × fence [label] → title",
+  "  1 × links → related",
+  "  1 × navigation.icon → sidebar.icon",
+  "  1 × navigation.title → sidebar.label",
+  "",
+  "2.guides/1.playground.md",
+  "  1 × navigation.icon → sidebar.icon",
+  "  REVIEW line 12: `::acme-playground` isn't a Nuxt UI prose component: read its SFC (app/components/content/ or a module) and convert it by hand. It's left as written",
+  "",
+  "index.md",
+  "  REVIEW line 8: `::u-page-hero` is a Nuxt UI page component: rebuild it by hand (references/docus.md, Landing page). It's left as written",
+].join("\n");
+
+const hazardsBefore = [
+  "::prompt",
+  "---",
+  "description: Add a tool",
+  "---",
+  "Call defineTool({ name }) and useTool<Input>() in under <50 ms.",
+  "::",
+].join("\n");
+
+const hazardsAfter = [
+  '<Prompt description="Add a tool">',
+  "",
+  "Call defineTool(\\{ name \\}) and useTool&lt;Input>() in under &lt;50 ms.",
+  "",
+  "</Prompt>",
+].join("\n");
+
+const serverConfig = `import { defineConfig } from "blume";
+import { gateway } from "blume/ai";
+import { vercel } from "blume/deploy";
+
+export default defineConfig({
+  title: "Acme",
+  content: { root: "content" },
+  ai: {
+    assistant: {
+      enabled: true,
+      provider: gateway({ model: "google/gemini-3-flash" }),
+      suggestions: [{ label: "How do I install the SDK?" }],
+    },
+  },
+  agents: {
+    mcp: { enabled: true, name: "Acme" },
+    skills: "./skills",
+  },
+  deployment: vercel(),
+});`;
+
+const routeRules = `routeRules: {
+  '/guide': { redirect: { to: '/guide/overview', statusCode: 301 } },
+  '/old-page': { redirect: '/new-page' },
+},`;
+
+const blumeRedirects = `redirects: [
+  { from: "/guide", to: "/guide/overview" },
+  { from: "/old-page", to: "/new-page", status: 307 },
+  { from: "/raw/:path*", to: "/:path*" },
+],`;
+
+const leftovers = [
+  "grep -rnE '^[[:space:]]*:{2,}[a-z]' content --include='*.md' --include='*.mdx' \\",
+  "  | grep -vE ':{3,}(note|tip|warning|danger|info|success)$'",
+  "grep -rnE '(^|[^[:alnum:]_:/]):[a-z][a-z-]*(\\[[^]]*\\])?\\\\?\\{' content --include='*.mdx'",
+  "grep -rnE '\"i-[a-z]+-|: i-[a-z]+-' content --include='*.md' --include='*.mdx'",
+].join("\n");
+
+const checkUrls = [
+  'import { readFileSync } from "node:fs";',
+  "",
+  'const [list, origin = "http://localhost:4321"] = process.argv.slice(2);',
+  'const urls = readFileSync(list, "utf8").split("\\n").filter(Boolean);',
+  "",
+  "let missing = 0;",
+  "for (const url of urls) {",
+  "  // fetch follows redirects, so a moved page passes when its target loads.",
+  "  const response = await fetch(new URL(url, origin));",
+  "  if (!response.ok) {",
+  "    console.log(`${response.status} ${url}`);",
+  "    missing += 1;",
+  "  }",
+  "}",
+  "console.log(",
+  "  missing === 0",
+  "    ? `All ${urls.length} old URLs reach a page.`",
+  "    : `${missing} of ${urls.length} old URLs don't.`",
+  ");",
+].join("\n");
+
+const pinAnchors = [
+  "npx blume build",
+  "node node_modules/blume/skills/blume-migrate/scripts/pin-heading-ids.mjs \\",
+  "  --old ../old-site",
+].join("\n");
+
+const vercelJson = `{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": null,
+  "installCommand": "cd ../.. && pnpm install --frozen-lockfile",
+  "buildCommand": "pnpm run build"
+}`;
+---
+
+<GuidePage guide={guideById("migrate-from-docus")}>
+  <p>
+    By the end of this guide, your Docus docs are a Blume project: your MDC
+    components converted to Blume's callouts and components, your
+    <code>.navigation.yml</code> files turned into folder settings, your
+    sections into header tabs, and every old URL still reaching its page. A
+    coding agent does the conversion, starting with a codemod for the
+    mechanical part, and you review it.
+  </p>
+  <p>
+    It's written for Docus 3 and later, the <code>docus</code> package on
+    Nuxt Content and Nuxt UI. Docus is the Nuxt docs theme, not Docusaurus,
+    which has <a href="/guides/migrate-from-docusaurus">its own guide</a>.
+    Older <code>@nuxt-themes/docus</code> sites migrate too, with more of the
+    work left to the agent.
+  </p>
+
+  <h2>What carries over</h2>
+  <p>
+    The run behind this guide migrated a real Docus site: 51 pages with eight
+    sections, nearly 200 MDC components, an AI assistant, and an MCP server.
+    Every page carried over, and every old URL reached a page. Here's how the
+    pieces map:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In Docus</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>app.config.ts</code> and <code>nuxt.config.ts</code></td>
+        <td><code>blume.config.ts</code></td>
+      </tr>
+      <tr>
+        <td><code>content/1.getting-started/2.installation.md</code></td>
+        <td>The same file, at the same URL, as <code>.mdx</code> when it uses components</td>
+      </tr>
+      <tr>
+        <td><code>.navigation.yml</code> in a folder</td>
+        <td><code>meta.ts</code> in the same folder</td>
+      </tr>
+      <tr>
+        <td>Sub-navigation sections</td>
+        <td>Header tabs</td>
+      </tr>
+      <tr>
+        <td><code>::note</code>, <code>::tip</code>, <code>::warning</code>, <code>::caution</code>, <code>::callout</code></td>
+        <td><code>:::note</code>, <code>:::tip</code>, <code>:::warning</code>, <code>:::danger</code>, or <code>&lt;Callout&gt;</code> with its icon</td>
+      </tr>
+      <tr>
+        <td><code>::card-group</code>, <code>::steps</code>, <code>::tabs</code>, <code>::accordion</code></td>
+        <td><code>&lt;CardGroup&gt;</code>, <code>&lt;Steps&gt;</code>, <code>&lt;Tabs&gt;</code>, <code>&lt;Accordion&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>::code-group</code></td>
+        <td><code>&lt;CodeGroup&gt;</code>, or one <code>package-install</code> block for an install command</td>
+      </tr>
+      <tr>
+        <td><code>::field</code>, <code>::prompt</code>, <code>:kbd</code>, <code>:icon</code></td>
+        <td><code>&lt;ResponseField&gt;</code>, <code>&lt;Prompt&gt;</code>, <code>&lt;kbd&gt;</code>, <code>&lt;Icon /&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>```ts [nuxt.config.ts]</code></td>
+        <td><code>```ts nuxt.config.ts</code></td>
+      </tr>
+      <tr>
+        <td><code>i-lucide-download</code> icons</td>
+        <td><code>download</code></td>
+      </tr>
+      <tr>
+        <td><code>links</code> buttons in a page's header</td>
+        <td>Related-page cards at its foot</td>
+      </tr>
+      <tr>
+        <td><code>routeRules</code> redirects</td>
+        <td><code>redirects</code> in <code>blume.config.ts</code></td>
+      </tr>
+      <tr>
+        <td>The AI assistant and MCP server</td>
+        <td>Blume's assistant and MCP server, on server output</td>
+      </tr>
+      <tr>
+        <td><code>content/index.md</code> landing page</td>
+        <td>A full-width <code>index.mdx</code> page you rebuild from cards and links</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Here's one page before and after the codemod:</p>
+  <CodeBlock code={beforePage} lang="md" title="content/1.getting-started/2.installation.md (Docus)" />
+  <CodeBlock code={afterPage} lang="mdx" title="content/1.getting-started/2.installation.mdx (Blume)" />
+
+  <h2>Before you start</h2>
+  <p>
+    The agent edits your repository in place, so start on a new branch with a
+    clean working tree:
+  </p>
+  <CodeBlock code="git switch -c migrate-to-blume" lang="bash" />
+  <p>
+    Then save your old site's URLs. Docus publishes a sitemap, so from the
+    folder whose <code>package.json</code> depends on <code>docus</code>, list
+    it, with your own domain:
+  </p>
+  <CodeBlock code={saveSitemap} lang="bash" />
+  <p>
+    Add each redirect source from <code>routeRules</code> in{" "}
+    <code>nuxt.config.ts</code> to the list. The browser user agent matters:
+    some Docus deployments answer <code>curl</code> with Markdown.
+  </p>
+  <p>
+    A local build is better still: it also records your heading anchors and
+    what each page rendered. With your dependencies installed, generate the
+    site and copy it outside the folders the agent will delete (add{" "}
+    <code>--extends docus</code> if your scripts pass it):
+  </p>
+  <CodeBlock code={saveBuild} lang="bash" />
+  <p>
+    You also need Node.js 22.12 or later, and Claude Code or Codex installed
+    and signed in.
+  </p>
+
+  <h2>Run the migration</h2>
+  <p>From the same folder, run:</p>
+  <CodeBlock code="npx blume migrate docus --claude" lang="bash" />
+  <p>
+    To use Codex, swap <code>--claude</code> for <code>--codex</code>. Leave out{" "}
+    <code>docus</code> and Blume detects the source from a <code>docus</code>{" "}
+    dependency in that folder's <code>package.json</code>.
+  </p>
+  <p>
+    <code>blume migrate</code> converts nothing itself. It opens the agent on the{" "}
+    <code>blume-migrate</code> skill inside the package, pointed at its Docus
+    reference. Following it, the agent:
+  </p>
+  <ol>
+    <li>
+      Runs the bundled Docus codemod over <code>content/</code>. It converts
+      the Nuxt UI components, fence labels, icons, frontmatter, and{" "}
+      <code>.navigation.yml</code> files, renames the pages that now need MDX,
+      and reports everything it leaves.
+    </li>
+    <li>
+      Works through that report: your own components, the landing page, icons
+      outside Lucide, and frontmatter keys Blume rejects.
+    </li>
+    <li>
+      Writes <code>blume.config.ts</code> from <code>app.config.ts</code> and{" "}
+      <code>nuxt.config.ts</code>: title, logo, edit links, social links,
+      analytics, a header tab per section, and your redirects.
+    </li>
+    <li>Pins each heading's old anchor, using your old build.</li>
+    <li>
+      Swaps Docus and Nuxt for Blume in <code>package.json</code>, deletes the
+      Nuxt files, and runs <code>blume build</code>,{" "}
+      <code>blume validate --strict</code>, and{" "}
+      <code>blume audit --only redirects</code> until they pass.
+    </li>
+  </ol>
+  <p>The codemod's report looks like this, one block per file:</p>
+  <CodeBlock code={codemodReport} lang="txt" />
+  <p>
+    It ends with totals and the number of items left to review. The agent
+    works through them, and its own report lists what it migrated, dropped,
+    and approximated. Keep both for the review.
+  </p>
+  <Callout type="info">
+    The codemod is deterministic, but the rest of the agent's work is judgment,
+    so two runs on one repository can differ. Read the diff rather than
+    trusting it.
+  </Callout>
+
+  <h2>MDC to MDX</h2>
+  <p>
+    Docus pages are written in MDC, Nuxt Content's Markdown with components:
+    a block opens with <code>::name</code> and closes with a line of colons,
+    and inline components look like <code>:kbd{"{value=\"K\"}"}</code>. Blume
+    pages are Markdown or MDX, and components need MDX. Blume reads MDC as
+    plain text, so an unconverted <code>::note</code> shows on the page as{" "}
+    <code>::note</code>, with no error.
+  </p>
+  <p>The conversion follows three rules:</p>
+  <ul>
+    <li>
+      <strong>Callouts become directives.</strong> <code>::note</code> becomes{" "}
+      <code>:::note</code>, with three colons. Docus's red{" "}
+      <code>::caution</code> becomes <code>:::danger</code>, since Blume
+      reads <code>:::caution</code> as a warning.
+    </li>
+    <li>
+      <strong>Other components become JSX.</strong> Cards, steps, tabs, and the
+      rest become Blume components with the same content, and their props
+      move to attributes.
+    </li>
+    <li>
+      <strong>Prose gets MDX-safe.</strong> MDX reads <code>{"{"}</code> as
+      the start of code and <code>&lt;</code> as the start of a tag, so text
+      like <code>{"{ data }"}</code>, <code>useTool&lt;Input&gt;()</code>, or{" "}
+      <code>&lt;50 ms</code> stops the build. The codemod escapes them in
+      every page it turns into MDX.
+    </li>
+  </ul>
+  <p>Prompt bodies are where those hazards gather:</p>
+  <CodeBlock code={hazardsBefore} lang="md" title="Docus" />
+  <CodeBlock code={hazardsAfter} lang="mdx" title="Blume" />
+  <p>
+    MDC pairs blocks by exact colon count: a <code>::</code> line closes the
+    nearest block opened with two colons, and everything still open inside it.
+    The codemod pairs them the same way and reports blocks that were never
+    closed, which MDC ran to the end of the page, and closers that matched
+    nothing, which the live site showed as text. Pages with no components stay{" "}
+    <code>.md</code>, and MDC examples inside code blocks stay as written.
+  </p>
+
+  <h2>Keep the AI assistant and MCP server</h2>
+  <p>
+    Docus turns on its assistant when the build has an AI Gateway key, and
+    serves an MCP server at <code>/mcp</code>. Blume has both, but they run on
+    a server, so the site switches from static files to server output. If
+    your live site shows the assistant, the agent keeps it with the same
+    model:
+  </p>
+  <CodeBlock code={serverConfig} lang="ts" title="blume.config.ts" />
+  <p>
+    <code>deployment: vercel()</code> builds for Vercel; Blume also has{" "}
+    <code>node()</code>, <code>netlify()</code>, and{" "}
+    <code>cloudflare()</code>. The assistant reads{" "}
+    <code>AI_GATEWAY_API_KEY</code>, or Vercel's own token when it's deployed
+    there. Blume's MCP server has a fixed set of tools for searching and
+    reading your docs, so tools and prompts your site added in{" "}
+    <code>server/mcp/</code> don't carry over. Your <code>skills/</code>{" "}
+    folder does, published under <code>/.well-known/agent-skills/</code>.
+    See <a href="/docs/configuration/assistant">Assistant</a> and{" "}
+    <a href="/docs/discoverability/mcp">MCP server</a>.
+  </p>
+  <p>
+    <code>blume preview</code> can't serve a <code>vercel()</code> build, so
+    try the assistant and <code>/mcp</code> in <code>npx blume dev</code>, then
+    on a preview deployment.
+  </p>
+
+  <h2>Review the changes</h2>
+  <p>
+    Start with <code>git diff --stat</code>, run <code>npx blume dev</code>, and
+    work through these, which are where a Docus migration most often needs a
+    second look.
+  </p>
+  <ul>
+    <li>
+      <strong>Your own components.</strong> Components in{" "}
+      <code>app/components/content/</code>, and ones a Nuxt module provides,
+      stay as written for the agent to rebuild as Markdown, a Blume component,
+      or a Vue island. Compare each with your live site: a local build can
+      miss a module's component that production renders.
+    </li>
+    <li>
+      <strong>The landing page.</strong> Nuxt UI's page sections become a
+      full-width page of headings, links, and cards. Animations and decorative
+      backgrounds don't carry over.
+    </li>
+    <li>
+      <strong>Callouts that were links.</strong> In Docus a whole callout can
+      link somewhere. In Blume the link goes in its text.
+    </li>
+    <li>
+      <strong>Card descriptions.</strong> Nuxt UI's prose card shows no{" "}
+      <code>description</code>, so text you put there never appeared on your
+      site. The codemod moves it into the card's body and flags it: keep it
+      or delete it.
+    </li>
+    <li>
+      <strong>Icons.</strong> Lucide icons carry over by name. Brand icons
+      like <code>i-simple-icons-github</code> don't, so the agent picks a
+      Lucide icon or saves the SVG. Lucide's <code>x</code> is a close icon,
+      not the X logo.
+    </li>
+    <li>
+      <strong>Navigation.</strong> Click through each tab. Docus sorted{" "}
+      <code>10.faq.md</code> before <code>2.setup.md</code>; Blume sorts by
+      the number, so long sections may reorder.
+    </li>
+    <li>
+      <strong>The theme.</strong> Docus is green by default. Blume isn't, so
+      set <code>theme.accent</code> if the green was your brand.
+    </li>
+    <li>
+      <strong>Pages about the old site.</strong> Look for prose that describes
+      dropped features: MCP prompts your server no longer offers, Nuxt Studio,
+      or Docus itself.
+    </li>
+    <li>
+      <strong>The repository.</strong> Nuxt's <code>tsconfig.json</code> and
+      its <code>postinstall: nuxt prepare</code> script are gone, and{" "}
+      <code>.gitignore</code> lists <code>.blume</code> and <code>dist</code>.
+      In a pnpm workspace with a release-age guard, <code>blume</code> is
+      excluded from it, and the lockfile is regenerated.
+    </li>
+  </ul>
+  <p>
+    Run from the folder that holds <code>blume.config.ts</code>, these print
+    MDC blocks and inline components left in your pages, and Iconify icon
+    names. Matches inside code blocks are examples, not leftovers:
+  </p>
+  <CodeBlock code={leftovers} lang="bash" />
+
+  <h2>Check every old URL</h2>
+  <p>
+    Docus and Blume both drop the number prefixes from file names, so your
+    pages keep their URLs. What moves are your redirects and Docus's Markdown
+    copies of each page, which it served at <code>/raw/…</code> and Blume
+    serves at the page's URL plus <code>.md</code>. The agent ports{" "}
+    <code>routeRules</code> like this:
+  </p>
+  <CodeBlock code={routeRules} lang="ts" title="nuxt.config.ts (Docus)" />
+  <CodeBlock code={blumeRedirects} lang="ts" title="blume.config.ts" />
+  <p>
+    A string redirect in <code>routeRules</code> is temporary (307), so it
+    keeps that status. To check every old URL, start{" "}
+    <code>npx blume dev</code> and save this beside{" "}
+    <code>blume.config.ts</code>:
+  </p>
+  <CodeBlock code={checkUrls} lang="js" title="check-urls.mjs" />
+  <p>Run it with your URL list while the dev server is up:</p>
+  <CodeBlock code="node check-urls.mjs ../old-urls.txt" lang="bash" />
+  <p>
+    It follows each redirect and prints every URL that doesn't end on a page.
+    Add a redirect for each one and run it again until it reports that every
+    old URL reaches a page.
+  </p>
+
+  <h2>Check the heading anchors</h2>
+  <p>
+    Docus builds heading ids almost like Blume, but collapses repeated dashes
+    and prefixes a leading digit with an underscore: <code>## 1. Install</code>{" "}
+    is <code>#_1-install</code> in Docus and <code>#1-install</code> in Blume.
+    The agent pins each old id with a script that compares every heading in
+    your old build with the new one. To check its work, run it from the same
+    folder:
+  </p>
+  <CodeBlock code={pinAnchors} lang="bash" />
+  <p>
+    Server output keeps its pages in <code>dist/client</code>, and the script
+    reads them there by itself. After the agent's pass it should find nothing
+    to pin. If it finds some, add <code>--write</code>, rebuild, and run it
+    again until it reports 0. Then run{" "}
+    <code>npx blume validate --strict</code>, which checks every link to an
+    anchor, including ones that were already broken on your old site.
+  </p>
+
+  <h2>Deploy and switch over</h2>
+  <p>
+    Many Docus sites deploy to Vercel. With <code>vercel()</code>, the build
+    writes Vercel's <code>.vercel/output</code> folder rather than{" "}
+    <code>dist/</code>, so the project's <code>vercel.json</code> sets no
+    output directory. In a workspace, it installs from the root:
+  </p>
+  <CodeBlock code={vercelJson} lang="json" title="apps/docs/vercel.json" />
+  <p>
+    <code>"framework": null</code> overrides the Nuxt preset your project was
+    created with. In the Vercel dashboard, keep the Root Directory on your
+    docs package and set Node.js to 22.12 or later. With Turborepo, add{" "}
+    <code>".vercel/output/**"</code> to the docs' build outputs. The{" "}
+    <a href="/guides/monorepo-documentation-site">monorepo guide</a> covers
+    the rest of a workspace setup, and{" "}
+    <a href="/docs/deployment">Deployment</a> covers other hosts.
+  </p>
+  <p>
+    Before switching your domain, deploy a preview and open a few old URLs, an
+    old <code>/raw/…</code> address, and <code>/mcp</code> on it. Keep the old
+    deployment until the new one passes, so rolling back is a promotion away.
+    Then submit the new <code>sitemap.xml</code> in Google Search Console.
+  </p>
+
+  <h2>What doesn't carry over</h2>
+  <ul>
+    <li>
+      <strong>The Nuxt app.</strong> Pages in <code>app/pages/</code>, server
+      routes, layout overrides, and Nuxt modules. Your own content components
+      become Blume components, Markdown, or islands.
+    </li>
+    <li>
+      <strong>Some components.</strong> The file browser of{" "}
+      <code>::code-tree</code> (its files become tabs), the live rendering of{" "}
+      <code>::code-preview</code> (now Preview and Code tabs), and the Windsurf
+      and Claude buttons on prompts.
+    </li>
+    <li>
+      <strong>Site settings.</strong> A custom title template, Nuxt UI's theme
+      overrides, a forced color mode (Blume always shows the toggle), Nuxt
+      Studio, and Vercel Speed Insights.
+    </li>
+    <li>
+      <strong>Your MCP server's own tools and prompts.</strong> Blume's server
+      offers search and page reading only.
+    </li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <h3>A page shows <code>::note</code> as text</h3>
+  <p>
+    The block wasn't converted. Rewrite it as <code>:::note</code> with three
+    colons, and make sure the page is <code>.mdx</code>.
+  </p>
+  <h3>The build fails with "Could not parse expression"</h3>
+  <p>
+    The page has a <code>{"{"}</code> or a <code>[text]{"{.class}"}</code>{" "}
+    span in its prose. Escape the brace as <code>\{"{"}</code>, or drop the
+    span's attributes.
+  </p>
+  <h3>The build fails with "Tsconfig not found"</h3>
+  <p>
+    Nuxt's <code>tsconfig.json</code> points into <code>.nuxt/</code>, which
+    no longer exists. Delete the file, or replace it.
+  </p>
+  <h3>The anchor script pairs no headings</h3>
+  <p>
+    It warns when no page turned up in both builds. Point{" "}
+    <code>--old</code> at the folder <code>nuxt generate</code> wrote, with
+    one <code>.html</code> file per page, and run{" "}
+    <code>npx blume build</code> first. For pages outside{" "}
+    <code>dist</code> or <code>dist/client</code>, pass the folder with{" "}
+    <code>--dist</code>.
+  </p>
+</GuidePage>

@@ -1,0 +1,602 @@
+---
+// Migrate from mdBook: written from an end-to-end run of the blume-migrate
+// skill (SKILL.md and references/mdbook.md) on a real mdBook: the Linera
+// manual, github.com/linera-io/linera-protocol (Apache-2.0) at
+// 672d97bb2fce3127db351069df72f1d225d8f263, book root `mdbook/` with
+// `src = "../docs"`, built with mdBook 0.4.48, mdbook-admonish 1.19.0, and
+// mdbook-mermaid 0.15.0 as its CI pins (39 chapters in parts, 43 old URLs,
+// 52 `{{#include}}`s, 25 hidden Rust lines, 5 admonish blocks, 11 mermaid
+// diagrams, 3 `[output.html.redirect]` entries), with Blume 2.1.3 (main).
+// The agent read only the skill and the Blume docs it points to, with the
+// old book prebuilt by the reference's commands. Outcome: `blume build`
+// passed with 38 pages (one chapter was a meta-refresh page, now a redirect),
+// `blume validate --strict` passed after the agent retargeted 3 fragments
+// that were already dead on the old site, `blume audit --only redirects`
+// passed, all 43 old URLs were covered (1 page, 41 redirects to pages, 1
+// off-site), and all 102 old heading ids exist on the new pages
+// (pin-heading-ids.mjs paired 96 and pinned 0). Of the 52 includes, 26 became
+// variables and 26 were code; 22 of the 25 anchored ones named anchors that
+// no longer existed, so the old site showed empty blocks (or only a mixed
+// block's own lines) there. The run filled 19 with line-range excerpts, froze
+// 2 mixed blocks as snippets, and dropped 1; the excerpt manifest has 23
+// entries. Every meta.ts first failed with BLUME_META_LOAD_FAILED (the content
+// root is outside the project), which Blume fixed after 2.1.3 (caf4d219); the
+// run used plain-object meta.ts files.
+// After the run: the excerpt script became the shared
+// scripts/include-excerpts.mjs (literal lines, regions, every missing anchor
+// in one pass, deletes only what it wrote). Rerun at review on the run's
+// 23-entry manifest, it wrote byte-identical excerpts; on the original 26
+// code includes it reported all 22 missing anchors at once. Its selectors
+// match mdBook's expansion for every form that selects lines (all forms
+// checked on 0.4.48; Unicode anchor names and line 0 on 0.5.4 too); a range
+// past the end or with no lines is reported instead. pin-heading-ids.mjs now
+// pairs a heading that repeats the page title with its own old id; at review
+// it gave the same pins as before on the mkdocs, vuepress, gitbook, jekyll,
+// docus, and Linera builds.
+// The Acme example is invented. It was built with mdBook 0.4.48 and
+// mdbook-admonish 1.19.0, converted by hand as shown, and run through this
+// guide's commands, again at review with the revised scripts:
+// include-excerpts.mjs (the missing-anchor output below is its real output
+// on a broken manifest), `blume build`, `blume validate --strict`,
+// `blume audit --only redirects`, the anchor script (1 paired, 0 to pin),
+// and check-urls.mjs (3/3); the same check-urls.mjs found 43/43 on the
+// Linera run's build. Without generated excerpts, `blume validate` fails
+// with BLUME_INCLUDE_NOT_FOUND (checked), hence the GitHub Pages advice.
+// Not run: `npx blume migrate mdbook` itself (the agent was pointed at the
+// skill directly), a deploy, the GitHub Pages workflow, or a lockfile
+// regeneration. How GitHub Pages serves the `.html` redirect pages is
+// unverified. The reference was revised after the run (the shared excerpt
+// script, the missing-anchor advice, the `admonish warn` default, defineMeta
+// outside the project); those revisions weren't rerun on Linera end to end.
+import Callout from "blume/components/content/Callout.astro";
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const fence = "```";
+
+const buildOld = [
+  "cd book",
+  "mdbook build -d ../old-book",
+  `MDBOOK_OUTPUT='{"markdown": {}}' mdbook build -d ../old-md`,
+  "(cd ../old-book && find . -name '*.html' ! -name print.html ! -name toc.html ! -name 404.html \\",
+  "  | sed 's|^\\.||' | sort) > ../old-urls.txt",
+].join("\n");
+
+const beforePage = [
+  "# Connecting to Acme",
+  "",
+  "Every program starts with a client:",
+  "",
+  `${fence}rust,ignore`,
+  "{{#include ../../../examples/hello/src/main.rs:connect}}",
+  fence,
+  "",
+  "Then call it from `main`:",
+  "",
+  `${fence}rust`,
+  "# use acme::Client;",
+  "# fn connect() -> Client { unimplemented!() }",
+  "fn main() {",
+  "    let client = connect();",
+  "}",
+  fence,
+  "",
+  `${fence}admonish tip title="Keep it running"`,
+  "Reuse one client for the whole program.",
+  fence,
+  "",
+  "## Next steps",
+  "",
+  "Read [the introduction](../README.md).",
+].join("\n");
+
+const afterPage = [
+  "---",
+  "title: Connecting to Acme",
+  "sidebar:",
+  "  label: Connecting",
+  "---",
+  "",
+  "Every program starts with a client:",
+  "",
+  '<include lang="rust">/_excerpts/hello/connect.rs</include>',
+  "",
+  "Then call it from `main`:",
+  "",
+  `${fence}rust`,
+  "fn main() {",
+  "    let client = connect();",
+  "}",
+  fence,
+  "",
+  ":::tip[Keep it running]",
+  "Reuse one client for the whole program.",
+  ":::",
+  "",
+  "## Next steps",
+  "",
+  "Read [the introduction](../index.md).",
+].join("\n");
+
+const excerptsJson = [
+  "{",
+  '  "out": "src/_excerpts",',
+  '  "excerpts": {',
+  '    "hello/connect.rs": "../examples/hello/src/main.rs:connect"',
+  "  }",
+  "}",
+].join("\n");
+
+const mixedExcerpt = [
+  '"hello/client.rs": [',
+  '  { "text": "impl Client {" },',
+  '  "../src/client.rs:ping",',
+  '  { "text": "}" }',
+  "]",
+].join("\n");
+
+const packageScripts = [
+  '"scripts": {',
+  '  "dev": "node include-excerpts.mjs && blume dev",',
+  '  "build": "node include-excerpts.mjs && blume build",',
+  '  "preview": "blume preview",',
+  '  "validate": "node include-excerpts.mjs && blume validate --strict"',
+  "}",
+].join("\n");
+
+const missingAnchors = [
+  'excerpts.json: "hello/retry.rs": no "ANCHOR: retry" line in ../examples/hello/src/main.rs',
+  'excerpts.json: "hello/shutdown.rs": lines 20-31 run past the end of ../examples/hello/src/main.rs (12 lines)',
+  "include-excerpts: 2 problem(s); nothing written.",
+].join("\n");
+
+const anchorComments = [
+  "// ANCHOR: retry",
+  "fn retry(client: &Client) -> Result<(), Error> {",
+  "    client.ping().or_else(|_| client.ping())",
+  "}",
+  "// ANCHOR_END: retry",
+].join("\n");
+
+const checkUrls = [
+  'import { existsSync, readFileSync, statSync } from "node:fs";',
+  "",
+  'const lines = (file) => readFileSync(file, "utf8").split("\\n").filter(Boolean);',
+  "const isFile = (file) => existsSync(file) && statSync(file).isFile();",
+  "const isPage = (route) =>",
+  "  /^https?:\\/\\//.test(route) ||",
+  '  isFile(`dist${route.replace(/#.*/, "").replace(/\\/$/, "")}/index.html`);',
+  'const rules = isFile("dist/_redirects") ? lines("dist/_redirects") : [];',
+  "const redirects = new Map(rules.map((rule) => rule.split(/\\s+/)));",
+  "",
+  "let missing = 0;",
+  "for (const url of lines(process.argv[2])) {",
+  "  // /x/index.html is the page itself; every other old URL needs a redirect.",
+  '  const target = url.endsWith("/index.html")',
+  '    ? url.slice(0, -"index.html".length)',
+  "    : redirects.get(url);",
+  "  if (!(target && isPage(target))) {",
+  '    console.log(`MISSING ${url}${target ? ` -> ${target}` : " (no redirect)"}`);',
+  "    missing += 1;",
+  "  }",
+  "}",
+  'console.log(missing === 0 ? "Every old URL reaches a page." : `${missing} old URL(s) don\'t.`);',
+].join("\n");
+
+const pinAnchors = [
+  "npm run build",
+  "node node_modules/blume/skills/blume-migrate/scripts/pin-heading-ids.mjs --old ../old-book",
+].join("\n");
+
+const plainMeta = [
+  "export default {",
+  '  title: "Developers",',
+  '  display: "flat",',
+  '  pages: ["getting-started", "core-concepts", "backend"],',
+  "};",
+].join("\n");
+---
+
+<GuidePage guide={guideById("migrate-from-mdbook")}>
+  <p>
+    By the end of this guide, your mdBook is a Blume site: your{" "}
+    <code>SUMMARY.md</code> rebuilt as folders that keep each chapter's path,
+    every old <code>.html</code> address redirecting to its page, your admonitions
+    and diagrams converted, and the code your chapters pull in with{" "}
+    <code>{"{{#include}}"}</code> still generated from the source on every
+    build. A coding agent does the conversion, and you review it.
+  </p>
+  <p>
+    It's written for mdBook 0.4 and 0.5 books on the built-in HTML renderer,
+    with plugins like mdbook-admonish and mdbook-mermaid. The Markdown carries
+    over; the runnable Rust examples and <code>mdbook test</code> don't.
+  </p>
+
+  <h2>What carries over</h2>
+  <p>
+    The run behind this guide migrated a real mdBook: 39 chapters in parts,
+    with 52 includes and code pulled from the crate's examples. Every chapter
+    carried over (one that only sent readers to another site became a
+    redirect), all 43 old URLs reached a page, and every old heading anchor
+    still works. Here's how the pieces map:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In mdBook</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>book.toml</code></td>
+        <td><code>blume.config.ts</code>, in the same folder</td>
+      </tr>
+      <tr>
+        <td><code>SUMMARY.md</code> parts and nested chapters</td>
+        <td>
+          Folders with a <code>meta.ts</code>; a parent chapter becomes its
+          folder's <code>index</code> page
+        </td>
+      </tr>
+      <tr>
+        <td><code>README.md</code> chapters</td>
+        <td><code>index.md</code></td>
+      </tr>
+      <tr>
+        <td><code>/guide/setup.html</code></td>
+        <td><code>/guide/setup</code>, with a redirect from the old URL</td>
+      </tr>
+      <tr>
+        <td><code>{"{{#include file.rs:anchor}}"}</code> and line ranges</td>
+        <td>
+          <code>&lt;include&gt;</code> of an excerpt generated from the source
+          before each build
+        </td>
+      </tr>
+      <tr>
+        <td>An included one-line file, like a version</td>
+        <td>A <code>{"{{variable}}"}</code> read from that file</td>
+      </tr>
+      <tr>
+        <td><code>```rust,ignore</code> and the other Rust attributes</td>
+        <td><code>```rust</code></td>
+      </tr>
+      <tr>
+        <td>Hidden <code>#</code> lines in Rust blocks</td>
+        <td>Removed: readers only saw them through the eye toggle</td>
+      </tr>
+      <tr>
+        <td><code>```admonish tip</code></td>
+        <td><code>:::tip</code>, in <code>.mdx</code> pages</td>
+      </tr>
+      <tr>
+        <td><code>```mermaid</code></td>
+        <td>The same fence, rendered natively in <code>.mdx</code></td>
+      </tr>
+      <tr>
+        <td><code>[output.html.redirect]</code></td>
+        <td><code>redirects</code> in <code>blume.config.ts</code></td>
+      </tr>
+      <tr>
+        <td><code>[output.linkcheck]</code></td>
+        <td><code>blume validate --strict</code></td>
+      </tr>
+      <tr>
+        <td>Built-in search</td>
+        <td>Blume's built-in search</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Here's one chapter before and after:</p>
+  <CodeBlock code={beforePage} lang="md" title="src/guide/connect.md (mdBook)" />
+  <CodeBlock code={afterPage} lang="mdx" title="src/guide/connect.mdx (Blume)" />
+
+  <h2>Before you start</h2>
+  <p>
+    The agent edits your repository in place, so start on a new branch with a
+    clean working tree:
+  </p>
+  <CodeBlock code="git switch -c migrate-to-blume" lang="bash" />
+  <p>
+    Then build the book once with the mdBook version your CI pins and the same
+    plugins, into folders outside it. The build is your list of old URLs and
+    the source of its heading anchors. The second command writes each chapter
+    as Markdown after mdBook ran its includes, which is the only record of
+    what each <code>{"{{#include}}"}</code> showed. From the folder holding{" "}
+    <code>book.toml</code> (<code>book</code> here):
+  </p>
+  <CodeBlock code={buildOld} lang="bash" />
+  <p>
+    If <code>book.toml</code> also has an <code>[output.linkcheck]</code> or
+    another output table, the HTML lands in <code>../old-book/html</code>: use
+    that folder in the last command, and wherever this guide says{" "}
+    <code>../old-book</code>. Keep these folders until you're done, and
+    don't commit them. You also need Node.js 22.12 or later, and Claude Code
+    or Codex installed and signed in.
+  </p>
+
+  <h2>Run the migration</h2>
+  <p>From the folder holding <code>book.toml</code>, run:</p>
+  <CodeBlock code="npx blume migrate mdbook --claude" lang="bash" />
+  <p>
+    To use Codex, swap <code>--claude</code> for <code>--codex</code>. Leave out{" "}
+    <code>mdbook</code> and Blume detects the source from a{" "}
+    <code>book.toml</code> in that folder, or in <code>docs/</code> or{" "}
+    <code>book/</code> below it.
+  </p>
+  <p>
+    <code>blume migrate</code> converts nothing itself. It opens the agent on the{" "}
+    <code>blume-migrate</code> skill inside the package, pointed at its mdBook
+    reference. Following it, the agent:
+  </p>
+  <ol>
+    <li>
+      Writes <code>blume.config.ts</code> beside <code>book.toml</code>, with
+      your book's <code>src</code> as the content root, from{" "}
+      <code>book.toml</code> and your theme: title, edit links, colors,
+      analytics, and the site URL.
+    </li>
+    <li>
+      Rebuilds <code>SUMMARY.md</code> as folders and <code>meta.ts</code>{" "}
+      files. A parent chapter like <code>guide.md</code> moves to{" "}
+      <code>guide/index.md</code>, which keeps its URL. Each part becomes a
+      sidebar heading.
+    </li>
+    <li>
+      Converts every <code>{"{{#include}}"}</code>: code becomes a generated
+      excerpt, a one-line file becomes a variable, and a Markdown file becomes
+      an <code>&lt;include&gt;</code>.
+    </li>
+    <li>
+      Cleans up the code blocks and converts admonish blocks to callouts,
+      renaming the pages that now need MDX to <code>.mdx</code>.
+    </li>
+    <li>
+      Adds a redirect from every old <code>.html</code> URL, carries over your{" "}
+      <code>[output.html.redirect]</code> entries, and pins any heading anchor
+      that changed.
+    </li>
+    <li>
+      Scaffolds <code>package.json</code>, replaces the mdBook steps in CI, and
+      runs <code>blume build</code>, <code>blume validate --strict</code>, and{" "}
+      <code>blume audit --only redirects</code> until they pass.
+    </li>
+  </ol>
+  <p>
+    It ends with a summary of what it migrated, dropped, and approximated.
+    Keep it for the review. If it asks for the old build, point it at{" "}
+    <code>../old-book</code> and <code>../old-md</code>.
+  </p>
+  <Callout type="info">
+    Two runs on one repository can differ, since most of the work is judgment.
+    Read the diff rather than trusting it.
+  </Callout>
+
+  <h2>Includes and excerpts</h2>
+  <p>
+    mdBook can include part of any file in the repository, by an{" "}
+    <code>ANCHOR</code> name or a line range. Blume's{" "}
+    <code>&lt;include&gt;</code> takes whole files, and only from inside your
+    content folder. Pasting the code into each page would freeze it, while
+    the real code keeps changing and passing its tests. So the agent copies a
+    small script into your book folder, <code>include-excerpts.mjs</code>,
+    which writes each excerpt to a file before every build, and the pages
+    include those files.
+  </p>
+  <p>
+    Each excerpt is one line in <code>excerpts.json</code>: the file to write,
+    and what goes in it, in mdBook's own syntax with the path relative to{" "}
+    <code>excerpts.json</code>:
+  </p>
+  <CodeBlock code={excerptsJson} lang="json" title="book/excerpts.json" />
+  <p>
+    The script writes the excerpts to <code>src/_excerpts/</code>. Blume
+    doesn't publish a folder whose name starts with <code>_</code>, and the
+    folder is generated, so it's in <code>.gitignore</code>. A code block that
+    mixed an include with lines written in the page keeps both, joined in
+    order:
+  </p>
+  <CodeBlock code={mixedExcerpt} lang="json" />
+  <p>
+    The script runs first in your <code>package.json</code> scripts, so{" "}
+    <code>npm run dev</code>, <code>npm run build</code>, and your host's build
+    all start from current code. Run it again after you edit a source file
+    while <code>npm run dev</code> is running.
+  </p>
+  <CodeBlock code={packageScripts} lang="json" title="book/package.json" />
+  <p>
+    Before it writes anything, the script checks every excerpt and lists every
+    problem it finds. The usual one is an anchor that no longer exists:
+  </p>
+  <CodeBlock code={missingAnchors} lang="txt" />
+  <p>
+    mdBook showed a missing anchor as an empty code block, with no warning, so
+    your book may already have some. For each one the agent finds where the
+    code went and lists what it chose. If your team owns that code, the best
+    fix is to put the anchor back around it, and the excerpt follows the code
+    from then on:
+  </p>
+  <CodeBlock code={anchorComments} lang="rust" title="examples/hello/src/main.rs" />
+  <p>
+    The alternative is a line range like{" "}
+    <code>"../examples/hello/src/main.rs:4:6"</code>. It keeps working until
+    lines are added above it, and then it quietly selects the wrong code.
+    Code that now fills a block that used to be empty can also contradict the
+    prose around it, so read those pages.
+  </p>
+
+  <h2>Review the changes</h2>
+  <p>
+    Start with <code>git diff --stat</code>, run <code>npm run dev</code>, and
+    work through these, which are where an mdBook migration most often needs a
+    second look.
+  </p>
+  <ul>
+    <li>
+      <strong>Excerpts.</strong> Read the agent's list of missing anchors and
+      what it did with each, and compare a few excerpts with the old build.
+    </li>
+    <li>
+      <strong>Navigation.</strong> Click through the sidebar against your old
+      table of contents. Parts are headings, and parent chapters are
+      collapsible groups whose first row is the chapter itself. Section
+      numbers, separators, and draft chapters are gone. A chapter listed after
+      the parts, or between parent chapters in a book without parts, now sits
+      at the top of the sidebar unless the agent grouped it.
+    </li>
+    <li>
+      <strong>Titles.</strong> Each page's title is its old H1. Where your{" "}
+      <code>SUMMARY.md</code> gave it another name, that name is now its
+      sidebar label.
+    </li>
+    <li>
+      <strong>Callouts.</strong> An admonish block with a type mdbook-admonish
+      didn't know, like <code>warn</code>, showed as a plain note, so it's a
+      note now. Change the ones that should warn.
+    </li>
+    <li>
+      <strong>Git.</strong> Run <code>git status --ignored</code> on your
+      content folder. A <code>.gitignore</code> rule that covers it hides every
+      new <code>meta.ts</code> from <code>git add</code>, even though your old
+      pages stay tracked.
+    </li>
+    <li>
+      <strong>The repository.</strong> CI that ran <code>mdbook build</code>{" "}
+      and <code>mdbook test</code> now runs <code>npm run build</code> and{" "}
+      <code>npm run validate</code>, and <code>.gitignore</code> lists{" "}
+      <code>dist</code>, <code>.blume</code>, and the excerpts folder. A deploy
+      that runs from another repository needs the same change.
+    </li>
+  </ul>
+
+  <h2>Check every old URL</h2>
+  <p>
+    Build the site, then check that each URL in your saved list is a page
+    Blume built or an old <code>.html</code> address with a redirect to one.
+    Save this in the folder holding <code>blume.config.ts</code>:
+  </p>
+  <CodeBlock code={checkUrls} lang="js" title="check-urls.mjs" />
+  <p>Run it after a build:</p>
+  <CodeBlock
+    code={`npm run build
+node check-urls.mjs ../old-urls.txt`}
+    lang="bash"
+  />
+  <p>
+    It reads <code>dist/_redirects</code>, which a static build writes when you
+    name no host or name Netlify or Cloudflare. Add a redirect for each URL it
+    prints and run it again until it prints nothing. Don't add one for an
+    index page like <code>/guide/index.html</code>: that URL already serves
+    the page, and a redirect from it fails the build.{" "}
+    <code>print.html</code> and <code>toc.html</code> aren't in the list,
+    since they have no Blume equivalent.
+  </p>
+  <p>
+    Heading anchors usually match already, since mdBook and Blume build them
+    almost the same way. To check, run the script the agent used, which
+    compares every heading in your old build with the new one:
+  </p>
+  <CodeBlock code={pinAnchors} lang="bash" />
+  <p>
+    It should report <code>0 heading line(s) need a pin</code>. If it finds
+    some, add <code>--write</code>, rebuild, and run it again until it reports
+    0. Then run <code>npm run validate</code>, which checks every link to an
+    anchor, including ones that were already broken on your old site.
+  </p>
+
+  <h2>Deploy and switch over</h2>
+  <p>
+    Many mdBooks are on GitHub Pages, and a Blume site can stay there. Blume
+    can't detect your URL on GitHub Pages, so set it as{" "}
+    <code>deployment.site</code>, and turn an mdBook <code>site-url</code> into{" "}
+    <code>deployment.base</code>:
+  </p>
+  <CodeBlock
+    code={`deployment: { site: "https://docs.acme.example" },`}
+    lang="ts"
+    title="blume.config.ts"
+  />
+  <p>
+    <a href="/guides/markdown-docs-github-pages">Deploy Markdown docs to GitHub Pages</a>{" "}
+    has a complete workflow. Run its steps from your book folder, with{" "}
+    <code>defaults.run.working-directory: book</code> on the job, and use{" "}
+    <code>npm run validate</code> and <code>npm run build</code> in place of
+    its <code>npx blume validate</code> and <code>npm run docs:build</code>{" "}
+    so the excerpts are generated. Then upload <code>book/dist</code>. If your
+    deploy pushes the build to a branch instead, it needs a{" "}
+    <code>.nojekyll</code> file, or GitHub drops Blume's <code>_astro</code>{" "}
+    folder.{" "}
+    <code>peaceiris/actions-gh-pages</code> adds one for you.
+  </p>
+  <p>
+    On Netlify, name the host even for a static build:{" "}
+    <code>{'deployment: netlify({ output: "static" })'}</code>, with{" "}
+    <code>netlify</code> imported from <code>blume/deploy</code>, so an old{" "}
+    <code>.html</code> URL gets a real 301 instead of a redirect page. For
+    other hosts, see <a href="/docs/deployment">Deployment</a>.
+  </p>
+  <p>
+    Before switching your domain, deploy a preview and open a few old{" "}
+    <code>.html</code> URLs on it, since hosts differ in how they serve
+    redirects. Keep the old deployment until the new one passes.
+  </p>
+
+  <h2>What doesn't carry over</h2>
+  <ul>
+    <li>
+      <strong>Running code.</strong> The playground's Run button, editable
+      examples, and <code>mdbook test</code>. Excerpts stay tested wherever
+      cargo compiles their source, but code written only in a page isn't
+      compiled any more, so move examples you care about into the crate.
+    </li>
+    <li>
+      <strong>The print page.</strong> <code>print.html</code> showed the whole
+      book on one page. <code>{"export: { pdf: true }"}</code> lets readers
+      print one page at a time.
+    </li>
+    <li>
+      <strong>Book structure.</strong> Chapter numbers, separators, and draft
+      chapters, and the hidden-line toggle in Rust examples.
+    </li>
+    <li>
+      <strong>The theme.</strong> mdBook's theme switcher and themes, a custom{" "}
+      <code>index.hbs</code>, and admonish title bars, icons, and anchors. Your
+      colors and fonts carry over as Blume theme settings.
+    </li>
+    <li>
+      <strong>Some plugins.</strong> Anything without a Blume equivalent, like
+      mdbook-quiz or a custom preprocessor, is listed in the agent's summary
+      with what it did.
+    </li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <h3>The build fails with BLUME_META_LOAD_FAILED</h3>
+  <p>
+    If it says <code>Cannot find module 'blume'</code>, your content folder is
+    outside the book folder (<code>src = "../docs"</code>), and Blume 2.1.3
+    and earlier can't resolve <code>blume</code> from a <code>meta.ts</code>{" "}
+    there. Update Blume, or export a plain object instead of calling{" "}
+    <code>defineMeta</code>:
+  </p>
+  <CodeBlock code={plainMeta} lang="ts" title="docs/developers/meta.ts" />
+  <h3>A Rust block isn't highlighted</h3>
+  <p>
+    Its fence still says <code>```rust,ignore</code> or another attribute
+    after a comma. Blume reads the whole word as the language: keep only{" "}
+    <code>rust</code>.
+  </p>
+  <h3>The build fails with BLUME_INCLUDE_NOT_FOUND on an excerpt</h3>
+  <p>
+    The excerpts weren't generated. Build with <code>npm run build</code>,
+    which runs <code>include-excerpts.mjs</code> first, or run{" "}
+    <code>node include-excerpts.mjs</code> yourself.
+  </p>
+  <h3>The build fails with EISDIR on an index.html</h3>
+  <p>
+    A redirect starts at an index URL like <code>/guide/index.html</code>.
+    Remove it: that URL already serves the page.
+  </p>
+</GuidePage>

@@ -2942,6 +2942,40 @@ export const guides: Guide[] = [
     author: "hayden",
     docs: [
       { href: "/docs/migrating", label: "Migrating" },
+      { href: "/docs/content/includes", label: "Includes" },
+      { href: "/docs/content/variables", label: "Variables" },
+      { href: "/docs/content/meta", label: "Folder meta" },
+      { href: "/docs/deployment#redirects", label: "Redirects" },
+    ],
+    id: "migrate-from-mdbook",
+    image: { src: "/guides/migrate-from-mdbook.webp" },
+    meta: {
+      description:
+        "Move an mdBook to Blume with a coding agent: rebuild SUMMARY.md as folders, keep every .html URL working, and generate included code from your source.",
+      title: "How to migrate from mdBook to Blume",
+    },
+    nextStep: {
+      body: "Run it in the folder holding book.toml, on a clean branch, after building your old book. Then work through the review above.",
+      command: "npx blume migrate mdbook --claude",
+      link: { href: "/docs/migrating", label: "Read the migration reference" },
+      title: "Migrate your book",
+    },
+    prerequisites: [
+      "An mdBook 0.4 or 0.5 book's repository",
+      "The mdBook version and plugins your CI uses",
+      "Node.js 22.12 or later",
+      "Claude Code or Codex, signed in",
+    ],
+    published: "2026-10-06",
+    summary:
+      "Hand your mdBook to a coding agent, rebuild SUMMARY.md as folders that keep each chapter's path, redirect every old .html page, and keep included code generated from your source on every build.",
+    title: "Migrate your docs from mdBook",
+    topic: "migrate",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/migrating", label: "Migrating" },
       { href: "/docs/content/navigation", label: "Navigation" },
       { href: "/docs/content/includes", label: "Includes" },
       { href: "/docs/deployment#redirects", label: "Redirects" },
@@ -3134,6 +3168,38 @@ export const guides: Guide[] = [
     author: "hayden",
     docs: [
       { href: "/docs/migrating", label: "Migrating" },
+      { href: "/docs/content/syntax", label: "Syntax" },
+      { href: "/docs/discoverability/mcp", label: "MCP server" },
+      { href: "/docs/deployment#redirects", label: "Redirects" },
+    ],
+    id: "migrate-from-docus",
+    image: { src: "/guides/migrate-from-docus.webp" },
+    meta: {
+      description:
+        "Move a Docus site to Blume with a coding agent and a codemod: convert MDC components, keep every URL and anchor, and keep the assistant and MCP server.",
+      title: "How to migrate from Docus to Blume",
+    },
+    nextStep: {
+      body: "Run it in the folder whose package.json depends on docus, on a clean branch, after saving your old site's URLs. Then work through the review above.",
+      command: "npx blume migrate docus --claude",
+      link: { href: "/docs/migrating", label: "Read the migration reference" },
+      title: "Migrate your docs",
+    },
+    prerequisites: [
+      "A Docus 3 or later site's repository",
+      "Node.js 22.12 or later",
+      "Claude Code or Codex, signed in",
+    ],
+    published: "2026-10-06",
+    summary:
+      "Hand your Docus site to a coding agent, convert its MDC components with a codemod, turn sections into tabs without moving a URL, and keep your assistant, MCP server, redirects, and heading anchors.",
+    title: "Migrate your docs from Docus",
+    topic: "migrate",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/migrating", label: "Migrating" },
       { href: "/docs/content/navigation", label: "Navigation" },
       { href: "/docs/content/includes", label: "Includes" },
       { href: "/docs/deployment#redirects", label: "Redirects" },
@@ -3160,6 +3226,71 @@ export const guides: Guide[] = [
     summary:
       "Hand your Docsify site to a coding agent, convert its callouts, tabs, and includes with a codemod, rebuild its sidebar as folders, and keep every old #/ link and heading anchor working.",
     title: "Migrate your docs from Docsify",
+    topic: "migrate",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/migrating", label: "Migrating" },
+      { href: "/docs/content/navigation", label: "Navigation" },
+      { href: "/docs/content/includes", label: "Includes" },
+      { href: "/docs/deployment#redirects", label: "Redirects" },
+    ],
+    id: "migrate-from-jekyll",
+    image: { src: "/guides/migrate-from-jekyll.webp" },
+    meta: {
+      description:
+        "Move a Just the Docs site on Jekyll to Blume with a coding agent and a codemod: rebuild the sidebar as folders, convert callouts and includes, keep every URL.",
+      title: "How to migrate from Just the Docs (Jekyll) to Blume",
+    },
+    nextStep: {
+      body: "Run it in the folder that holds _config.yml, on a clean branch, after building your old site. Then work through the review above.",
+      command: "npx blume migrate jekyll --claude",
+      link: { href: "/docs/migrating", label: "Read the migration reference" },
+      title: "Migrate your docs",
+    },
+    prerequisites: [
+      "A Jekyll site on the Just the Docs theme",
+      "Ruby and Bundler, to build the old site once",
+      "Node.js 22.12 or later",
+      "Claude Code or Codex, signed in",
+    ],
+    published: "2026-10-06",
+    summary:
+      "Hand your Just the Docs site to a coding agent, convert its Kramdown callouts, includes, and Liquid with a codemod, rebuild its front-matter sidebar as folders, and keep every old URL, redirect, and heading anchor working.",
+    title: "Migrate your docs from Just the Docs",
+    topic: "migrate",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/migrating", label: "Migrating" },
+      { href: "/docs/content/navigation", label: "Navigation" },
+      { href: "/docs/content/meta", label: "meta.ts" },
+      { href: "/docs/deployment", label: "Deployment" },
+    ],
+    id: "migrate-from-github-wiki",
+    image: { src: "/guides/migrate-from-github-wiki.webp" },
+    meta: {
+      description:
+        "Move a GitHub wiki to a Blume docs site with a coding agent and a codemod: convert wiki links and the sidebar, and prepare a link stub for every old wiki page.",
+      title: "How to migrate a GitHub wiki to Blume",
+    },
+    nextStep: {
+      body: "Run it in a copy of your wiki clone with its remote removed, after saving the old page list. Then work through the review above.",
+      command: "npx blume migrate github-wiki --claude",
+      link: { href: "/docs/migrating", label: "Read the migration reference" },
+      title: "Migrate your wiki",
+    },
+    prerequisites: [
+      "A GitHub wiki, cloned",
+      "Node.js 22.12 or later",
+      "Claude Code or Codex, signed in",
+    ],
+    published: "2026-10-06",
+    summary:
+      "Hand your GitHub wiki to a coding agent, convert its wiki links, alerts, and images with a codemod, rebuild _Sidebar.md as folders, and prepare a link stub for every old wiki page, ready for you to push.",
+    title: "Migrate your docs from a GitHub wiki",
     topic: "migrate",
   },
 ];
