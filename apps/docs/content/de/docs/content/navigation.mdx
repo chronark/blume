@@ -47,7 +47,13 @@ export default defineMeta({
 
 Unter [Ordner-Meta](/docs/content/meta) findest du alle Felder sowie Informationen zur Berechnung von Meta-Daten während des Scans.
 
-Das `meta.title` eines Ordners und das Frontmatter-`title` seiner eigenen `index`-Seite werden unabhängig voneinander aufgelöst – übersetzt du unter i18n das eine und vergisst das andere, entsteht eine korrekte Seitenleiste mit einem veralteten `<title>` bzw. einer veralteten Überschrift auf der Landing-Page selbst. Blume meldet eine `BLUME_NAV_INDEX_TITLE_MISMATCH`-Warnung, wenn beide auf einer Index-Seite voneinander abweichen, die ihre eigene Zeile in der Seitenleiste ausblendet (`sidebar.hidden: true`) – dort ist der Ordnertitel die einzige Beschriftung, die die Seite in der Seitenleiste hat. Ist die Index-Zeile sichtbar, zeigt die Seitenleiste bereits beide Titel, sodass du einen Ordnertitel problemlos mit einem anderen Seitentitel kombinieren kannst („CLI“ über „Übersicht“). Nicht übersetzte Seiten, die aus der Fallback-Sprache ergänzt werden, sind davon ausgenommen – ihr Titel gehört zur Fallback-Sprache, und die Lösung besteht darin, die Seite zu übersetzen, nicht ihr Frontmatter zu bearbeiten.
+Das `meta.title` eines Ordners und das Frontmatter-`title` seiner eigenen `index`-Seite werden unabhängig voneinander aufgelöst – übersetzt du unter i18n das eine und vergisst das andere, entsteht eine korrekte Seitenleiste mit einer veralteten Überschrift auf der Landing-Page selbst. Blume meldet eine `BLUME_NAV_INDEX_TITLE_MISMATCH`-Warnung, wenn beide auf einer Index-Seite voneinander abweichen, die ihre eigene Zeile in der Seitenleiste ausblendet (`sidebar.hidden: true`) – dort ist der Ordnertitel die einzige Beschriftung, die die Seite in der Seitenleiste hat. Die Prüfung liest `title`, das in der Überschrift der Seite angezeigt wird; `seo.title` ersetzt nur den `<title>` und zählt daher nicht. Nicht übersetzte Seiten, die aus der Fallback-Sprache ergänzt werden, sind davon ausgenommen – ihr Titel gehört zur Fallback-Sprache, und die Lösung besteht darin, die Seite zu übersetzen, nicht ihr Frontmatter zu bearbeiten.
+
+Wie jede Warnung lässt sie [`blume validate --strict`](/docs/cli/validate) fehlschlagen. Jede dieser Maßnahmen behebt sie:
+
+- Ändere das `title` der Seite oder das `meta.title` des Ordners, sodass beide übereinstimmen.
+- Behalte den Titel der Seite bewusst bei, indem du ihr `sidebar.label` auf den Ordnertitel setzt – so, wie jede Seite eine Beschriftung in der Seitenleiste setzt, die von ihrem Titel abweicht.
+- Blende die Index-Zeile wieder ein. Die Seitenleiste zeigt dann beide Titel, sodass du einen Ordnertitel problemlos mit einem anderen Seitentitel kombinieren kannst („CLI“ über „Übersicht“).
 
 Um Seiten zu gruppieren, _ohne_ ein URL-Segment hinzuzufügen, verwende einen in Klammern gesetzten Ordnernamen – siehe [Seiten](/docs/content#group-folders).
 
@@ -155,7 +161,9 @@ sidebar:
   hidden: true
 ```
 
-Die `index`-Seite eines Ordners erscheint sowohl als Link der Gruppenzeile als auch als erste Zeile innerhalb der Gruppe. Blende die Index-Seite aus, um nur die verlinkte Überschrift zu behalten: Die Gruppenzeile öffnet weiterhin die Landing-Page, und die Zurück-/Weiter-Links führen weiterhin durch sie hindurch.
+Eine ausgeblendete Seite taucht außerdem weder in der Sitemap noch in `llms.txt` auf und auch nicht in der Website-Suche, es sei denn, [`search.indexing.includeHiddenPages`](/docs/configuration/search#excluding-pages) ist aktiviert.
+
+Die `index`-Seite eines Ordners erscheint sowohl als Link der Gruppenzeile als auch als erste Zeile innerhalb der Gruppe. Blende die Index-Seite aus, um nur die verlinkte Überschrift zu behalten: Die Gruppenzeile öffnet weiterhin die Landing-Page, und die Zurück-/Weiter-Links führen weiterhin durch sie hindurch. Da die Navigation weiterhin auf die Seite verlinkt, gilt sie nirgendwo sonst als ausgeblendete Seite: Sie bleibt in der Sitemap, in der Website-Suche und in `llms.txt`.
 
 ## Tabs
 

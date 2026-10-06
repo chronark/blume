@@ -683,6 +683,8 @@ Commit `blume.config.ts`, not `.blume/`.
 ::::
 ```
 
+Escreva o nome logo depois dos dois-pontos. `::: tip`, com um espaço (a grafia que o VitePress, o VuePress e o Docusaurus v2 usam), não é uma diretiva, então a página mostra a linha como texto, e o Blume alerta sobre um nome de aviso escrito dessa forma como `BLUME_DIRECTIVE_SPACED_NAME`. Dentro de um contêiner, uma cerca de fechamento com texto depois dos dois-pontos ainda o fecha, e o texto é descartado: uma linha `::: card` dentro de um `:::warning` encerra o aviso ali, e `card` nunca aparece. O Blume alerta sobre essa linha como `BLUME_DIRECTIVE_CLOSING_TEXT`. Para mantê-la dentro do aviso como texto, dê ao aviso uma cerca mais longa, como acima, ou remova o texto depois dos dois-pontos.
+
 ## Matemática [#math]
 
 Renderize LaTeX com o KaTeX, útil para documentação científica ou com muita matemática. Coloque `$$…$$` em linhas próprias para um bloco centralizado:

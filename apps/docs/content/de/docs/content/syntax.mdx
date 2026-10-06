@@ -683,6 +683,8 @@ Commit `blume.config.ts`, not `.blume/`.
 ::::
 ```
 
+Schreibe den Namen direkt hinter die Doppelpunkte. `::: tip` mit Leerzeichen (die Schreibweise, die VitePress, VuePress und Docusaurus v2 verwenden) ist keine Direktive, die Seite zeigt die Zeile also als Text an, und Blume warnt vor einem so geschriebenen Callout-Namen als `BLUME_DIRECTIVE_SPACED_NAME`. Innerhalb eines Containers schließt ein schließender Fence mit Text nach seinen Doppelpunkten diesen trotzdem, und der Text wird verworfen: Eine `::: card`-Zeile innerhalb eines `:::warning` beendet das Callout an dieser Stelle, und `card` wird nie angezeigt. Blume warnt vor dieser Zeile als `BLUME_DIRECTIVE_CLOSING_TEXT`. Um die Zeile als Text im Callout zu behalten, gib dem Callout wie oben einen längeren Fence oder entferne den Text nach den Doppelpunkten.
+
 ## Mathematik [#math]
 
 Rendere LaTeX mit KaTeX — nützlich für mathematik- oder naturwissenschaftslastige Dokumentation. Setze `$$…$$` in eigene Zeilen, um einen zentrierten Block zu erhalten:

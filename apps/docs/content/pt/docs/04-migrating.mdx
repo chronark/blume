@@ -32,12 +32,16 @@ Informe o framework do qual você está migrando, ou deixe de fora e o Blume o d
 | `nextra` | `nextra` no `package.json` | [Migre do Nextra](/guides/migrate-from-nextra) |
 | `vitepress` | `.vitepress/config.ts` (ou `.mts`, `.js`, `.mjs`) na raiz ou em `docs/`, ou `vitepress` no `package.json` | [Migre do VitePress](/guides/migrate-from-vitepress) |
 | `vuepress` | `.vuepress/config.ts` (ou `.js`, `.mjs`, `.yml`, `.toml`) na raiz ou em `docs/`, `vuepress.config.*`, ou `vuepress` (ou `vuepress-vite`, `vuepress-webpack`) no `package.json` | [Migre do VuePress](/guides/migrate-from-vuepress) |
+| `docus` | `docus` (Docus 3 em diante) ou `@nuxt-themes/docus` (Docus 1) no `package.json`; em um workspace, rode o comando a partir do pacote de documentação | [Migre do Docus](/guides/migrate-from-docus) |
 | `mkdocs` | `mkdocs.yml`, `mkdocs.yaml`, `zensical.toml`, `properdocs.yml` ou `properdocs.yaml` | [Migre do MkDocs Material](/guides/migrate-from-mkdocs-material) |
+| `mdbook` | `book.toml` na raiz ou em `docs/` ou `book/` | [Migre do mdBook](/guides/migrate-from-mdbook) |
 | `fern` | `fern/docs.yml` | [Migre do Fern](/guides/migrate-from-fern) |
 | `gitbook` | `.gitbook.yaml`, `.gitbook.yml` ou `gitbook-docs.yaml`, ou `honkit` ou `gitbook-cli` no `package.json`; nunca só o `SUMMARY.md` | [Migre do GitBook](/guides/migrate-from-gitbook) |
 | `redocly` | `sidebars.yaml`, ou `@redocly/realm` ou outro pacote da família Realm no `package.json`; nunca só o `redocly.yaml` | [Migre do Redocly](/guides/migrate-from-redocly) |
 | `readme` | `_order.yaml` em `docs/`, `reference/`, `recipes/` ou `custom_pages/`; um repositório que faz upload com `rdme` precisa que a origem seja informada | [Migre do ReadMe](/guides/migrate-from-readme) |
 | `docsify` | `docsify-cli` ou `docsify` no `package.json`; um site sem `package.json` precisa que a origem seja informada | [Migre do Docsify](/guides/migrate-from-docsify) |
+| `jekyll` | `_config.yml` na raiz ou em `docs/`, verificado depois de todas as outras origens que o Blume detecta | [Migre do Just the Docs](/guides/migrate-from-jekyll) |
+| `github-wiki` | Nunca detectado: uma wiki não tem arquivo de config, então informe a origem | [Migre de uma wiki do GitHub](/guides/migrate-from-github-wiki) |
 
 A detecção verifica a pasta em que você roda o comando. Cada origem tem sua própria referência de mapeamento no playbook, e várias também têm um codemod que o agente roda primeiro para fazer as reescritas mecânicas, assim o esforço dele fica para as decisões que exigem julgamento. Um site feito com qualquer outra ferramenta também pode ser migrado: rode o comando sem informar uma origem, e o agente primeiro faz um inventário do repositório e depois trabalha a partir das regras gerais do playbook.
 
@@ -48,7 +52,7 @@ O agente segue o fluxo de trabalho do playbook, da config da origem até um buil
 1. Escreve o `blume.config.ts`, mapeando só o que a sua origem declara e deixando os padrões do Blume cobrirem o resto.
 2. Reestrutura o conteúdo em [navegação baseada no sistema de arquivos](/docs/content/navigation), convertendo os arquivos de ordenação por pasta (`meta.json` do Fumadocs, `_meta` do Nextra) para `meta.ts`.
 3. Reescreve as páginas: frontmatter para o schema do Blume, componentes de callout para [diretivas](/docs/content/syntax), ícones para Lucide e snippets incorporados diretamente no conteúdo.
-4. Adiciona um [redirect](/docs/deployment#redirects) para cada URL que muda de lugar, para que nenhum link quebre. As URLs com `#/` do Docsify nunca chegam ao servidor, então, nesses casos, ele adiciona um pequeno script que leva cada uma para a nova página.
+4. Adiciona um [redirect](/docs/deployment#redirects) para cada URL que muda de lugar, para que nenhum link quebre. As URLs com `#/` do Docsify nunca chegam ao servidor, então, nesses casos, ele adiciona um pequeno script que leva cada uma para a nova página. As URLs de uma wiki do GitHub continuam no github.com, que não permite redirects, então o agente mapeia cada página para a nova rota dela e prepara páginas stub com links que você pode enviar para a wiki antiga.
 5. Aponta os scripts do seu `package.json` para `blume dev` e `blume build`, e troca as dependências do framework antigo por `blume`.
 6. Roda `blume build` e `blume validate` até que os dois passem.
 

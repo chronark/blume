@@ -32,12 +32,16 @@ npx blume migrate fumadocs --codex
 | `nextra` | `package.json` 内の `nextra` | [Nextra からの移行](/guides/migrate-from-nextra) |
 | `vitepress` | ルートまたは `docs/` 内の `.vitepress/config.ts`(または `.mts`、`.js`、`.mjs`)、または `package.json` 内の `vitepress` | [VitePress からの移行](/guides/migrate-from-vitepress) |
 | `vuepress` | ルートまたは `docs/` 内の `.vuepress/config.ts`(または `.js`、`.mjs`、`.yml`、`.toml`)、`vuepress.config.*`、または `package.json` 内の `vuepress`(または `vuepress-vite`、`vuepress-webpack`) | [VuePress からの移行](/guides/migrate-from-vuepress) |
+| `docus` | `package.json` 内の `docus`(Docus 3 以降)または `@nuxt-themes/docus`(Docus 1)。ワークスペースではドキュメントパッケージ内で実行してください | [Docus からの移行](/guides/migrate-from-docus) |
 | `mkdocs` | `mkdocs.yml`、`mkdocs.yaml`、`zensical.toml`、`properdocs.yml`、または `properdocs.yaml` | [MkDocs Material からの移行](/guides/migrate-from-mkdocs-material) |
+| `mdbook` | ルート、`docs/`、または `book/` 内の `book.toml` | [mdBook からの移行](/guides/migrate-from-mdbook) |
 | `fern` | `fern/docs.yml` | [Fern からの移行](/guides/migrate-from-fern) |
 | `gitbook` | `.gitbook.yaml`、`.gitbook.yml`、または `gitbook-docs.yaml`、あるいは `package.json` 内の `honkit` または `gitbook-cli`。`SUMMARY.md` だけでは検出されません | [GitBook からの移行](/guides/migrate-from-gitbook) |
 | `redocly` | `sidebars.yaml`、または `package.json` 内の `@redocly/realm` やその他の Realm 系パッケージ。`redocly.yaml` だけでは検出されません | [Redocly からの移行](/guides/migrate-from-redocly) |
 | `readme` | `docs/`、`reference/`、`recipes/`、または `custom_pages/` 内の `_order.yaml`。`rdme` でアップロードしているリポジトリでは移行元の指定が必要です | [ReadMe からの移行](/guides/migrate-from-readme) |
 | `docsify` | `package.json` 内の `docsify-cli` または `docsify`。`package.json` のないサイトでは移行元の指定が必要です | [Docsify からの移行](/guides/migrate-from-docsify) |
+| `jekyll` | ルートまたは `docs/` 内の `_config.yml`。Blume が検出する他のすべての移行元の後に確認されます | [Just the Docs からの移行](/guides/migrate-from-jekyll) |
+| `github-wiki` | 検出されません。Wiki には設定ファイルがないため、移行元を指定してください | [GitHub Wiki からの移行](/guides/migrate-from-github-wiki) |
 
 検出は、コマンドを実行したフォルダーを対象に行われます。各移行元には、プレイブック内に専用のマッピングリファレンスがあります。また、いくつかの移行元には、機械的な書き換えのためにエージェントが最初に実行する codemod も用意されているため、エージェント自身は判断が必要な作業に注力できます。これら以外で構築されたサイトも移行できます。移行元を指定せずにコマンドを実行すると、エージェントはまずリポジトリの内容を洗い出し、その後プレイブックの一般的なルールに沿って作業します。
 
@@ -48,7 +52,7 @@ npx blume migrate fumadocs --codex
 1. `blume.config.ts` を作成します。移行元で宣言されている項目のみをマッピングし、それ以外は Blume のデフォルトに任せます。
 2. コンテンツを[ファイルシステムナビゲーション](/docs/content/navigation)に合わせて再構成し、フォルダーごとの並び順ファイル(Fumadocs の `meta.json`、Nextra の `_meta`)を `meta.ts` に変換します。
 3. ページを書き換えます。フロントマターを Blume のスキーマに、コールアウトコンポーネントを[ディレクティブ](/docs/content/syntax)に、アイコンを Lucide に変換し、スニペットはインライン化します。
-4. 移動するすべての URL に[リダイレクト](/docs/deployment#redirects)を追加し、リンク切れを防ぎます。Docsify の `#/` URL はサーバーに届かないため、それらについては各 URL を新しいページへ転送する小さなスクリプトを追加します。
+4. 移動するすべての URL に[リダイレクト](/docs/deployment#redirects)を追加し、リンク切れを防ぎます。Docsify の `#/` URL はサーバーに届かないため、それらについては各 URL を新しいページへ転送する小さなスクリプトを追加します。GitHub Wiki の URL は github.com 上に残り、そこではリダイレクトを設定できないため、エージェントは各ページを新しいルートに対応付け、旧 Wiki にプッシュできるリンクスタブを用意します。
 5. `package.json` のスクリプトを `blume dev` と `blume build` に向け、旧フレームワークの依存関係を `blume` に置き換えます。
 6. `blume build` と `blume validate` の両方が成功するまで実行を繰り返します。
 

@@ -32,12 +32,16 @@ Gib das Framework an, von dem du migrierst. Wenn du es weglässt, erkennt Blume 
 | `nextra` | `nextra` in `package.json` | [Von Nextra migrieren](/guides/migrate-from-nextra) |
 | `vitepress` | `.vitepress/config.ts` (oder `.mts`, `.js`, `.mjs`) im Stammverzeichnis oder in `docs/` oder `vitepress` in `package.json` | [Von VitePress migrieren](/guides/migrate-from-vitepress) |
 | `vuepress` | `.vuepress/config.ts` (oder `.js`, `.mjs`, `.yml`, `.toml`) im Stammverzeichnis oder in `docs/`, `vuepress.config.*` oder `vuepress` (oder `vuepress-vite`, `vuepress-webpack`) in `package.json` | [Von VuePress migrieren](/guides/migrate-from-vuepress) |
+| `docus` | `docus` (Docus 3 und neuer) oder `@nuxt-themes/docus` (Docus 1) in `package.json`; in einem Workspace führst du den Befehl im Docs-Paket aus | [Von Docus migrieren](/guides/migrate-from-docus) |
 | `mkdocs` | `mkdocs.yml`, `mkdocs.yaml`, `zensical.toml`, `properdocs.yml` oder `properdocs.yaml` | [Von MkDocs Material migrieren](/guides/migrate-from-mkdocs-material) |
+| `mdbook` | `book.toml` im Stammverzeichnis oder in `docs/` oder `book/` | [Von mdBook migrieren](/guides/migrate-from-mdbook) |
 | `fern` | `fern/docs.yml` | [Von Fern migrieren](/guides/migrate-from-fern) |
 | `gitbook` | `.gitbook.yaml`, `.gitbook.yml` oder `gitbook-docs.yaml` oder `honkit` oder `gitbook-cli` in `package.json`; niemals nur anhand von `SUMMARY.md` | [Von GitBook migrieren](/guides/migrate-from-gitbook) |
 | `redocly` | `sidebars.yaml` oder `@redocly/realm` oder ein anderes Paket der Realm-Familie in `package.json`; niemals nur anhand von `redocly.yaml` | [Von Redocly migrieren](/guides/migrate-from-redocly) |
 | `readme` | `_order.yaml` in `docs/`, `reference/`, `recipes/` oder `custom_pages/`; bei einem Repository, das mit `rdme` hochlädt, musst du die Quelle angeben | [Von ReadMe migrieren](/guides/migrate-from-readme) |
 | `docsify` | `docsify-cli` oder `docsify` in `package.json`; bei einer Seite ohne `package.json` musst du die Quelle angeben | [Von Docsify migrieren](/guides/migrate-from-docsify) |
+| `jekyll` | `_config.yml` im Stammverzeichnis oder in `docs/`; wird erst nach allen anderen Quellen geprüft, die Blume erkennt | [Von Just the Docs migrieren](/guides/migrate-from-jekyll) |
+| `github-wiki` | Wird nie erkannt: Ein Wiki hat keine Konfigurationsdatei, deshalb musst du die Quelle angeben | [Von einem GitHub-Wiki migrieren](/guides/migrate-from-github-wiki) |
 
 Die Erkennung prüft den Ordner, in dem du den Befehl ausführst. Für jede Quelle gibt es im Playbook eine eigene Mapping-Referenz. Für mehrere Quellen gibt es außerdem einen Codemod, den der Agent zuerst für die mechanischen Umschreibungen ausführt. So kann er sich selbst auf die Ermessensentscheidungen konzentrieren. Auch eine Seite, die mit einem anderen Framework gebaut wurde, lässt sich migrieren. Führ den Befehl einfach ohne Quelle aus. Der Agent sieht sich dann zuerst an, was im Repo liegt, und arbeitet anschließend nach den allgemeinen Regeln des Playbooks.
 
@@ -48,7 +52,7 @@ Der Agent folgt dem Workflow des Playbooks, von der Konfiguration der Quelle bis
 1. Er schreibt `blume.config.ts` und überträgt dabei nur, was deine Quelle deklariert. Den Rest decken Blumes Standardwerte ab.
 2. Er baut die Inhalte in eine [Dateisystem-Navigation](/docs/content/navigation) um und wandelt die Sortierdateien der einzelnen Ordner (Fumadocs `meta.json`, Nextra `_meta`) in `meta.ts` um.
 3. Er schreibt die Seiten um: Frontmatter auf Blumes Schema, Callout-Komponenten zu [Direktiven](/docs/content/syntax), Icons zu Lucide. Snippets fügt er direkt in die Seiten ein.
-4. Er legt für jede URL, die sich ändert, eine [Weiterleitung](/docs/deployment#redirects) an, damit kein Link kaputtgeht. Die `#/`-URLs von Docsify erreichen nie den Server. Für diese fügt er deshalb ein kleines Skript hinzu, das jede davon auf ihre neue Seite weiterleitet.
+4. Er legt für jede URL, die sich ändert, eine [Weiterleitung](/docs/deployment#redirects) an, damit kein Link kaputtgeht. Die `#/`-URLs von Docsify erreichen nie den Server. Für diese fügt er deshalb ein kleines Skript hinzu, das jede davon auf ihre neue Seite weiterleitet. Die URLs eines GitHub-Wikis bleiben auf github.com, und dort sind keine Weiterleitungen möglich. Deshalb ordnet der Agent jede Seite ihrer neuen Route zu und bereitet Link-Stubs vor, die du ins alte Wiki pushen kannst.
 5. Er stellt die Skripte in deiner `package.json` auf `blume dev` und `blume build` um und ersetzt die Abhängigkeiten des alten Frameworks durch `blume`.
 6. Er führt `blume build` und `blume validate` so lange aus, bis beide ohne Fehler durchlaufen.
 

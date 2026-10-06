@@ -32,12 +32,16 @@ npx blume migrate fumadocs --codex
 | `nextra` | `package.json` में `nextra` | [Nextra से माइग्रेट करें](/guides/migrate-from-nextra) |
 | `vitepress` | रूट में या `docs/` में `.vitepress/config.ts` (या `.mts`, `.js`, `.mjs`), या `package.json` में `vitepress` | [VitePress से माइग्रेट करें](/guides/migrate-from-vitepress) |
 | `vuepress` | रूट में या `docs/` में `.vuepress/config.ts` (या `.js`, `.mjs`, `.yml`, `.toml`), `vuepress.config.*`, या `package.json` में `vuepress` (या `vuepress-vite`, `vuepress-webpack`) | [VuePress से माइग्रेट करें](/guides/migrate-from-vuepress) |
+| `docus` | `package.json` में `docus` (Docus 3 और उसके बाद के संस्करण) या `@nuxt-themes/docus` (Docus 1); वर्कस्पेस में कमांड को डॉक्स पैकेज से चलाएँ | [Docus से माइग्रेट करें](/guides/migrate-from-docus) |
 | `mkdocs` | `mkdocs.yml`, `mkdocs.yaml`, `zensical.toml`, `properdocs.yml` या `properdocs.yaml` | [MkDocs Material से माइग्रेट करें](/guides/migrate-from-mkdocs-material) |
+| `mdbook` | रूट में या `docs/` या `book/` में `book.toml` | [mdBook से माइग्रेट करें](/guides/migrate-from-mdbook) |
 | `fern` | `fern/docs.yml` | [Fern से माइग्रेट करें](/guides/migrate-from-fern) |
 | `gitbook` | `.gitbook.yaml`, `.gitbook.yml` या `gitbook-docs.yaml`, या `package.json` में `honkit` या `gitbook-cli`; केवल `SUMMARY.md` से कभी नहीं | [GitBook से माइग्रेट करें](/guides/migrate-from-gitbook) |
 | `redocly` | `sidebars.yaml`, या `package.json` में `@redocly/realm` या Realm परिवार का कोई अन्य पैकेज; केवल `redocly.yaml` से कभी नहीं | [Redocly से माइग्रेट करें](/guides/migrate-from-redocly) |
 | `readme` | `docs/`, `reference/`, `recipes/` या `custom_pages/` में `_order.yaml`; `rdme` से अपलोड करने वाली रिपॉज़िटरी के लिए स्रोत का नाम देना ज़रूरी है | [ReadMe से माइग्रेट करें](/guides/migrate-from-readme) |
 | `docsify` | `package.json` में `docsify-cli` या `docsify`; बिना `package.json` वाली साइट के लिए स्रोत का नाम देना ज़रूरी है | [Docsify से माइग्रेट करें](/guides/migrate-from-docsify) |
+| `jekyll` | रूट में या `docs/` में `_config.yml`; इसकी जाँच Blume द्वारा पहचाने जाने वाले बाकी सभी स्रोतों के बाद की जाती है | [Just the Docs से माइग्रेट करें](/guides/migrate-from-jekyll) |
+| `github-wiki` | कभी पहचाना नहीं जाता: विकी में कोई कॉन्फ़िग फ़ाइल नहीं होती, इसलिए स्रोत का नाम दें | [GitHub विकी से माइग्रेट करें](/guides/migrate-from-github-wiki) |
 
 पहचान उसी फ़ोल्डर में की जाती है जिसमें आप कमांड चलाते हैं। प्लेबुक में हर स्रोत के लिए अलग मैपिंग संदर्भ है। कई स्रोतों के लिए एक codemod भी है, जिसे एजेंट यांत्रिक बदलावों के लिए सबसे पहले चलाता है, ताकि वह अपना पूरा ध्यान निर्णय वाले मामलों पर लगा सके। किसी दूसरे टूल से बनी साइट भी माइग्रेट हो सकती है। इसके लिए कमांड को बिना स्रोत के चलाएँ। एजेंट पहले रिपॉज़िटरी की सूची तैयार करेगा, फिर प्लेबुक के सामान्य नियमों के आधार पर काम करेगा।
 
@@ -48,7 +52,7 @@ npx blume migrate fumadocs --codex
 1. `blume.config.ts` लिखता है। इसमें केवल वही मैप होता है जो आपका स्रोत घोषित करता है, और बाकी सब Blume के डिफ़ॉल्ट पर छोड़ दिया जाता है।
 2. कंटेंट को [फ़ाइलसिस्टम नेविगेशन](/docs/content/navigation) के अनुसार फिर से व्यवस्थित करता है। हर फ़ोल्डर की क्रम तय करने वाली फ़ाइलों (Fumadocs `meta.json`, Nextra `_meta`) को `meta.ts` में बदलता है।
 3. पेजों को फिर से लिखता है: फ़्रंटमैटर को Blume के स्कीमा में, callout कंपोनेंट को [directives](/docs/content/syntax) में और आइकन को Lucide में बदलता है। snippets को सीधे पेज में शामिल करता है।
-4. हर बदले हुए URL के लिए एक [रीडायरेक्ट](/docs/deployment#redirects) जोड़ता है, ताकि कोई लिंक न टूटे। Docsify के `#/` URL कभी सर्वर तक नहीं पहुँचते, इसलिए उनके लिए एजेंट एक छोटी स्क्रिप्ट जोड़ता है जो हर URL को उसके नए पेज पर भेज देती है।
+4. हर बदले हुए URL के लिए एक [रीडायरेक्ट](/docs/deployment#redirects) जोड़ता है, ताकि कोई लिंक न टूटे। Docsify के `#/` URL कभी सर्वर तक नहीं पहुँचते, इसलिए उनके लिए एजेंट एक छोटी स्क्रिप्ट जोड़ता है जो हर URL को उसके नए पेज पर भेज देती है। GitHub विकी के URL github.com पर ही रहते हैं, जो रीडायरेक्ट नहीं कर सकता। इसलिए एजेंट हर पेज को उसके नए रूट से मैप करता है और ऐसे लिंक स्टब तैयार करता है जिन्हें आप पुरानी विकी पर पुश कर सकते हैं।
 5. आपकी `package.json` स्क्रिप्ट्स को `blume dev` और `blume build` पर सेट करता है। पुराने फ़्रेमवर्क की डिपेंडेंसियों की जगह `blume` जोड़ता है।
 6. `blume build` और `blume validate` को तब तक चलाता है जब तक दोनों सफल न हो जाएँ।
 

@@ -47,7 +47,13 @@ export default defineMeta({
 
 Veja [Meta de pasta](/docs/content/meta) para todos os campos e para computar meta no momento da varredura.
 
-O `meta.title` de uma pasta e o `title` do frontmatter da sua própria página `index` são resolvidos de forma independente — traduzir um sob i18n e esquecer o outro renderiza uma barra lateral correta, mas com um `<title>`/título desatualizado na própria página de destino. O Blume emite um aviso `BLUME_NAV_INDEX_TITLE_MISMATCH` quando eles divergem em uma página de índice que oculta a própria linha na barra lateral (`sidebar.hidden: true`), caso em que o título da pasta é o único rótulo que a página tem na barra lateral. Quando a linha do índice está visível, a barra lateral já mostra os dois títulos, então combinar um título de pasta com um título de página diferente ("CLI" acima de "Overview") não tem problema. Páginas não traduzidas preenchidas a partir do idioma de fallback são isentas — o título delas pertence ao idioma de fallback, e a correção é traduzir a página, não editar o frontmatter dela.
+O `meta.title` de uma pasta e o `title` do frontmatter da sua própria página `index` são resolvidos de forma independente — traduzir um sob i18n e esquecer o outro renderiza uma barra lateral correta, mas com um título desatualizado na própria página de destino. O Blume emite um aviso `BLUME_NAV_INDEX_TITLE_MISMATCH` quando eles divergem em uma página de índice que oculta a própria linha na barra lateral (`sidebar.hidden: true`), caso em que o título da pasta é o único rótulo que a página tem na barra lateral. A verificação lê o `title`, que é o que o título da página exibe; o `seo.title` substitui apenas o `<title>`, então não conta. Páginas não traduzidas preenchidas a partir do idioma de fallback são isentas — o título delas pertence ao idioma de fallback, e a correção é traduzir a página, não editar o frontmatter dela.
+
+Como todo aviso, ele faz o [`blume validate --strict`](/docs/cli/validate) falhar. Qualquer uma destas opções o resolve:
+
+- Altere o `title` da página ou o `meta.title` da pasta para que os dois coincidam.
+- Mantenha o título da página de propósito definindo o `sidebar.label` dela como o título da pasta, do mesmo jeito que qualquer página define um rótulo na barra lateral diferente do seu título.
+- Mostre a linha do índice de novo. A barra lateral passa a mostrar os dois títulos, então combinar um título de pasta com um título de página diferente ("CLI" acima de "Overview") não tem problema.
 
 Para agrupar páginas _sem_ adicionar um segmento de URL, use um nome de pasta entre parênteses — veja [Páginas](/docs/content#group-folders).
 
@@ -154,7 +160,9 @@ sidebar:
   hidden: true
 ```
 
-A página `index` de uma pasta aparece tanto como o link da linha do grupo quanto como a primeira linha dentro do grupo. Oculte a página de índice para manter apenas o cabeçalho com link: a linha do grupo continua abrindo a página de destino, e os links de anterior/próximo continuam passando por ela.
+Uma página oculta também fica de fora do sitemap e do `llms.txt`, e também da busca do site, a menos que [`search.indexing.includeHiddenPages`](/docs/configuration/search#excluding-pages) esteja ativado.
+
+A página `index` de uma pasta aparece tanto como o link da linha do grupo quanto como a primeira linha dentro do grupo. Oculte a página de índice para manter apenas o cabeçalho com link: a linha do grupo continua abrindo a página de destino, e os links de anterior/próximo continuam passando por ela. Como a navegação continua apontando para a página, ela não é tratada como oculta em nenhum outro lugar: continua no sitemap, na busca do site e no `llms.txt`.
 
 ## Abas [#tabs]
 
