@@ -1,7 +1,7 @@
 ---
 title: Blume पर माइग्रेट करें
 description: >-
-  किसी Mintlify, Fumadocs, Docusaurus, Starlight या Nextra साइट को एक ही कमांड से Blume पर ले जाएँ। यह कमांड माइग्रेशन का काम Codex या Claude Code को सौंप देती है।
+  किसी Mintlify, Docusaurus, GitBook, MkDocs, ReadMe या किसी अन्य डॉक्स साइट को एक ही कमांड से Blume पर ले जाएँ। यह कमांड माइग्रेशन का काम Codex या Claude Code को सौंप देती है।
 sidebar:
   label: Blume पर माइग्रेट करें
   order: 2.4
@@ -30,8 +30,16 @@ npx blume migrate fumadocs --codex
 | `docusaurus` | `docusaurus.config.*` | [Docusaurus से माइग्रेट करें](/guides/migrate-from-docusaurus) |
 | `starlight` | `package.json` में `@astrojs/starlight` | [Starlight से माइग्रेट करें](/guides/migrate-from-starlight) |
 | `nextra` | `package.json` में `nextra` | [Nextra से माइग्रेट करें](/guides/migrate-from-nextra) |
+| `vitepress` | रूट में या `docs/` में `.vitepress/config.ts` (या `.mts`, `.js`, `.mjs`), या `package.json` में `vitepress` | [VitePress से माइग्रेट करें](/guides/migrate-from-vitepress) |
+| `vuepress` | रूट में या `docs/` में `.vuepress/config.ts` (या `.js`, `.mjs`, `.yml`, `.toml`), `vuepress.config.*`, या `package.json` में `vuepress` (या `vuepress-vite`, `vuepress-webpack`) | [VuePress से माइग्रेट करें](/guides/migrate-from-vuepress) |
+| `mkdocs` | `mkdocs.yml`, `mkdocs.yaml`, `zensical.toml`, `properdocs.yml` या `properdocs.yaml` | [MkDocs Material से माइग्रेट करें](/guides/migrate-from-mkdocs-material) |
+| `fern` | `fern/docs.yml` | [Fern से माइग्रेट करें](/guides/migrate-from-fern) |
+| `gitbook` | `.gitbook.yaml`, `.gitbook.yml` या `gitbook-docs.yaml`, या `package.json` में `honkit` या `gitbook-cli`; केवल `SUMMARY.md` से कभी नहीं | [GitBook से माइग्रेट करें](/guides/migrate-from-gitbook) |
+| `redocly` | `sidebars.yaml`, या `package.json` में `@redocly/realm` या Realm परिवार का कोई अन्य पैकेज; केवल `redocly.yaml` से कभी नहीं | [Redocly से माइग्रेट करें](/guides/migrate-from-redocly) |
+| `readme` | `docs/`, `reference/`, `recipes/` या `custom_pages/` में `_order.yaml`; `rdme` से अपलोड करने वाली रिपॉज़िटरी के लिए स्रोत का नाम देना ज़रूरी है | [ReadMe से माइग्रेट करें](/guides/migrate-from-readme) |
+| `docsify` | `package.json` में `docsify-cli` या `docsify`; बिना `package.json` वाली साइट के लिए स्रोत का नाम देना ज़रूरी है | [Docsify से माइग्रेट करें](/guides/migrate-from-docsify) |
 
-प्लेबुक में हर स्रोत के लिए अलग मैपिंग संदर्भ है। किसी दूसरे टूल से बनी साइट भी माइग्रेट हो सकती है। इसके लिए कमांड को बिना स्रोत के चलाएँ। एजेंट पहले रिपॉज़िटरी की सूची तैयार करेगा, फिर प्लेबुक के सामान्य नियमों के आधार पर काम करेगा। [MkDocs Material गाइड](/guides/migrate-from-mkdocs-material) में इसी तरीके से किए गए माइग्रेशन को चरण-दर-चरण समझाया गया है।
+पहचान उसी फ़ोल्डर में की जाती है जिसमें आप कमांड चलाते हैं। प्लेबुक में हर स्रोत के लिए अलग मैपिंग संदर्भ है। कई स्रोतों के लिए एक codemod भी है, जिसे एजेंट यांत्रिक बदलावों के लिए सबसे पहले चलाता है, ताकि वह अपना पूरा ध्यान निर्णय वाले मामलों पर लगा सके। किसी दूसरे टूल से बनी साइट भी माइग्रेट हो सकती है। इसके लिए कमांड को बिना स्रोत के चलाएँ। एजेंट पहले रिपॉज़िटरी की सूची तैयार करेगा, फिर प्लेबुक के सामान्य नियमों के आधार पर काम करेगा।
 
 ## एजेंट क्या करता है [#what-the-agent-does]
 
@@ -40,7 +48,7 @@ npx blume migrate fumadocs --codex
 1. `blume.config.ts` लिखता है। इसमें केवल वही मैप होता है जो आपका स्रोत घोषित करता है, और बाकी सब Blume के डिफ़ॉल्ट पर छोड़ दिया जाता है।
 2. कंटेंट को [फ़ाइलसिस्टम नेविगेशन](/docs/content/navigation) के अनुसार फिर से व्यवस्थित करता है। हर फ़ोल्डर की क्रम तय करने वाली फ़ाइलों (Fumadocs `meta.json`, Nextra `_meta`) को `meta.ts` में बदलता है।
 3. पेजों को फिर से लिखता है: फ़्रंटमैटर को Blume के स्कीमा में, callout कंपोनेंट को [directives](/docs/content/syntax) में और आइकन को Lucide में बदलता है। snippets को सीधे पेज में शामिल करता है।
-4. हर बदले हुए URL के लिए एक [रीडायरेक्ट](/docs/deployment#redirects) जोड़ता है, ताकि कोई लिंक न टूटे।
+4. हर बदले हुए URL के लिए एक [रीडायरेक्ट](/docs/deployment#redirects) जोड़ता है, ताकि कोई लिंक न टूटे। Docsify के `#/` URL कभी सर्वर तक नहीं पहुँचते, इसलिए उनके लिए एजेंट एक छोटी स्क्रिप्ट जोड़ता है जो हर URL को उसके नए पेज पर भेज देती है।
 5. आपकी `package.json` स्क्रिप्ट्स को `blume dev` और `blume build` पर सेट करता है। पुराने फ़्रेमवर्क की डिपेंडेंसियों की जगह `blume` जोड़ता है।
 6. `blume build` और `blume validate` को तब तक चलाता है जब तक दोनों सफल न हो जाएँ।
 

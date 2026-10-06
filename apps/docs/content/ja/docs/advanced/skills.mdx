@@ -16,7 +16,7 @@ npx skills add haydenbleasel/blume
 
 ## 移行 [#migration]
 
-`blume-migrate` は、既存のドキュメントサイトを Blume に移行します。対象は Mintlify、Fumadocs、Docusaurus、Starlight、Nextra、その他あらゆるフレームワークです。1 行ずつの移植ではなく Blume らしい構成を目指しており、上記の各フレームワーク向けのマッピングリファレンスを備え、移動するすべての URL にリダイレクトを設定し、移行しなかった内容をすべてレポートします。最も手軽な実行方法は [`blume migrate`](/docs/migrating) です。フレームワークを検出し、パッケージにバンドルされたスキルを使って Codex または Claude Code を起動します。他のエージェントから使うには、インストールしてください。
+`blume-migrate` は、既存のドキュメントサイトを Blume に移行します。対象は Mintlify、Docusaurus、GitBook、MkDocs、ReadMe、[その他の対応ソース](/docs/migrating#sources)、その他あらゆるフレームワークです。1 行ずつの移植ではなく Blume らしい構成を目指しており、対応する各フレームワーク向けのマッピングリファレンスを備え、移動するすべての URL にリダイレクトを設定し、移行しなかった内容をすべてレポートします。最も手軽な実行方法は [`blume migrate`](/docs/migrating) です。フレームワークを検出し、パッケージにバンドルされたスキルを使って Codex または Claude Code を起動します。他のエージェントから使うには、インストールしてください。
 
 ```bash
 npx skills add haydenbleasel/blume --skill blume-migrate

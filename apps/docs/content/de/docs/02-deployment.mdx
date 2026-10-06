@@ -193,7 +193,7 @@ redirects: [{ from: "/old", to: "/new", status: 301 }],
 
 `status` akzeptiert `301`, `302`, `307` oder `308` (Standard `301`). Server-Builds beantworten Weiterleitungen zur Anfragezeit mit dem konfigurierten Status, ebenso `blume dev`. Statische Builds erzeugen Weiterleitungsseiten **und** die Plattformdateien, die dein Host liest, damit er eine echte HTTP-Weiterleitung ausgibt: `_redirects` für `netlify()` und `cloudflare()`, `vercel.json` für `vercel()` und — wenn kein Host angegeben ist — beide sowie `blume-redirects.json`, ein strukturiertes Manifest für alles Übrige (nginx-/Apache-Regeln, ein Edge Worker). Eine `_redirects` oder `vercel.json`, die du in `public/` mitlieferst, bleibt unangetastet.
 
-Eine Weiterleitung, die eine Seite auf eine andere verschiebt, nimmt das [Roh-Markdown](/docs/discoverability/markdown#raw-markdown) der Seite mit: `/old.md` und `/old.mdx` leiten mit demselben Status auf `/new.md` und `/new.mdx` weiter, in `blume dev` und in jedem Build.
+Eine Weiterleitung, die eine Seite auf eine andere verschiebt, nimmt das [Roh-Markdown](/docs/discoverability/markdown#raw-markdown) der Seite mit: `/old.md` und `/old.mdx` leiten mit demselben Status auf `/new.md` und `/new.mdx` weiter, in `blume dev` und in jedem Build. Eine Weiterleitung von einer `.html`-URL, etwa `/old.html` von einer Site, die du migriert hast, tut das nicht, da diese URL nie eine Markdown-Kopie hatte.
 
 Zwei Hosts benötigen mehr als die Datei:
 
