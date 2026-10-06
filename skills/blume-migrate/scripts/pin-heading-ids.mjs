@@ -269,6 +269,10 @@ const normalize = (text) =>
 
 // --- Routes and source files --------------------------------------------------
 
+/** A path as reports show it: relative to `from`, with `/` on every platform. */
+const shown = (from, file) =>
+  path.relative(from, file).split(path.sep).join("/");
+
 /** A path with symlinks resolved (macOS's /var is /private/var), so reports stay relative. */
 const real = (file) => {
   try {
@@ -603,7 +607,7 @@ const sourceHeadings = (file, context, seen = new Set()) => {
         out.push(...sourceHeadings(resolved, context, nextSeen));
       } else {
         context.notes.push(
-          `${path.relative(context.cwd, file)}: include not found: ${target}`
+          `${shown(context.cwd, file)}: include not found: ${target}`
         );
       }
     } else if (heading.test(line)) {
@@ -783,7 +787,7 @@ const pinHeading = (result, page, heading, oldId, entry) => {
   const claimed = claims.get(claim);
   if (claimed && claimed !== oldId) {
     notes.push(
-      `${path.relative(cwd, entry.file)}:${entry.index + 1}: renders with two old ids (#${claimed}, #${oldId}), and a line pins one; kept #${claimed}`
+      `${shown(cwd, entry.file)}:${entry.index + 1}: renders with two old ids (#${claimed}, #${oldId}), and a line pins one; kept #${claimed}`
     );
     return;
   }
@@ -795,7 +799,7 @@ const pinHeading = (result, page, heading, oldId, entry) => {
     fileEdits.set(entry.index, markerFor(entry, oldId));
     edits.set(entry.file, fileEdits);
     pins.push({
-      file: path.relative(cwd, entry.file),
+      file: shown(cwd, entry.file),
       from: heading.id,
       line: entry.index + 1,
       replaces: entry.pinned,
@@ -980,7 +984,7 @@ const noPairsWarning = (result) => {
   if (result.paired > 0 || (result.compared > 0 && result.oldSections === 0)) {
     return;
   }
-  const built = path.relative(result.cwd, result.dist) || ".";
+  const built = shown(result.cwd, result.dist) || ".";
   const where = `the build in ${built} and the old site at ${result.options.old}`;
   const what =
     result.compared === 0
