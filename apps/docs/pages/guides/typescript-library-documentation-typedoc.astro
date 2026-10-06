@@ -1,0 +1,750 @@
+---
+// Publish TypeScript API reference with TypeDoc: checked against the pages
+// (.md vs .mdx, index files), navigation (tabs, display modes), folder meta,
+// frontmatter (seo.description vs description), syntax (relative .md links,
+// callouts), validate, CLI, and deployment docs, and on main against
+// core/sources/normalize.ts (deriveTitle, extractComponentTags), core/links.ts
+// (toRoute), core/navigation.ts (index display, folder meta order),
+// core/manifest.ts (hidden pages in search), astro/generate.ts (editUrlFor),
+// astro/templates.ts (trailingSlash), and audit/checks/content.ts; TypeDoc's
+// and typedoc-plugin-markdown's option declarations and router selection
+// (renderer/render.js) and typedoc-plugin-frontmatter's source. Library: True
+// Myth (MIT) at 62633ffadb9617381e3418af223ba3039c3fac2d, with TypeDoc
+// 0.28.20, typedoc-plugin-markdown 4.13.1, typedoc-plugin-frontmatter 1.3.2,
+// TypeScript 6.0.3, Node 24.14.1, and blume 2.1.3 (main, linked into
+// node_modules from the repo instead of installed from npm). Ran, on a fresh
+// clone: `pnpm install` for the library, `blume init docs-site --template
+// docs --yes --no-install`, `npm install -D` of the three TypeDoc packages,
+// the files and scripts on this page, `npm run validate` (seven
+// BLUME_BROKEN_ANCHOR warnings for #map), the comment fixes below, then `npm
+// run validate` and `npm run build` clean, `blume doctor`, and `blume
+// preview` with a crawl of every page (no 404s, no missing anchors). Also
+// ran: .mdx output (True Myth builds, with a false BLUME_UNKNOWN_COMPONENT
+// warning; a probe comment with `{` and `<` fails `blume build` while
+// validate, check, and doctor pass), sanitizeComments, the module router,
+// the barrel index's BLUME_DUPLICATE_ROUTE, TypeDoc without the library's
+// dependencies, `typedoc --watch` beside `blume dev`, `.md` and
+// trailing-slash links in preview and dev, a `github` config's edit links,
+// `blume audit`, and the packages strategy on TanStack Store at
+// c1a40d47e2c5e8a1ca30225771870bad8aacc0c2 (store and react-store). Not run:
+// the GitHub Actions workflow on GitHub (its commands ran locally, with pnpm
+// for the library's install), `npm ci` against a lockfile that includes
+// blume, and any deploy. Reviewed against core/links.ts (toRoute,
+// resolveRelativeHref, BLUME_BROKEN_LINK), core/navigation.ts (humanize),
+// audit/checks/duplicates.ts and social.ts, ai/llms.ts, core/package-json.ts,
+// cli/init/scaffold.ts, and cli/commands/build.ts (no link check), and
+// TypeDoc's peer ranges on npm. Re-ran on a copy of the clean project:
+// `npm run validate` on the original comments (the seven warnings shown
+// below, exit 1 under --strict), `npm run build`, and `blume preview` (the
+// trailing-slash 404, the `.md` href, and its text/markdown response); the
+// module router (maybe.md at 6,909 lines); and the `.md` and `.mdx` hazard
+// comment
+// (`<string>` read as a tag; `blume build` fails while validate, check, and
+// doctor exit 0).
+import Callout from "blume/components/content/Callout.astro";
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const typedocJson = `{
+  "$schema": "https://typedoc-plugin-markdown.org/schema.json",
+  "entryPoints": [
+    "../src/maybe.ts",
+    "../src/result.ts",
+    "../src/task.ts",
+    "../src/task/delay.ts",
+    "../src/toolbelt.ts",
+    "../src/unit.ts",
+    "../src/standard-schema.ts",
+    "../src/test-support.ts"
+  ],
+  "tsconfig": "../tsconfig.json",
+  "plugin": [
+    "typedoc-plugin-markdown",
+    "./typedoc-blume.mjs",
+    "typedoc-plugin-frontmatter"
+  ],
+  "out": "docs/reference",
+  "readme": "none",
+  "entryFileName": "index",
+  "hidePageHeader": true,
+  "hideBreadcrumbs": true,
+  "hidePageTitle": true,
+  "useCodeBlocks": true,
+  "parametersFormat": "table"
+}`;
+
+const pluginCode = `import { copyFileSync } from "node:fs";
+import { join } from "node:path";
+import { ReflectionKind, RendererEvent } from "typedoc";
+import { MarkdownPageEvent } from "typedoc-plugin-markdown";
+
+// The first paragraph of a doc comment, as one line of plain text.
+const summary = (comment) =>
+  (comment?.summary ?? [])
+    .map((part) => part.text)
+    .join("")
+    .split(/\\n\\s*\\n/u)[0]
+    .replaceAll(/\\[([^\\]]*)\\]\\([^)]*\\)/gu, "$1")
+    .replaceAll(/\\*{1,2}([^*]+)\\*{1,2}/gu, "$1")
+    .replaceAll("\`", "")
+    .replaceAll(/\\s+/gu, " ")
+    .trim();
+
+const ALERT = /^(\\s*>\\s*)\\[!(NOTE|TIP|IMPORTANT|WARNING|CAUTION)\\]/gimu;
+
+/** @param {import("typedoc-plugin-markdown").MarkdownApplication} app */
+export function load(app) {
+  app.renderer.on(MarkdownPageEvent.BEGIN, (page) => {
+    const model = page.model;
+    const isRoot = model.isProject();
+    const isModule = model.kindOf(ReflectionKind.SomeModule);
+    const description = summary(model.comment ?? model.signatures?.[0]?.comment);
+    page.frontmatter = {
+      title: isRoot ? "API reference" : model.name,
+      ...(description && { seo: { description } }),
+      ...(isModule && { sidebar: { display: "page" } }),
+      ...page.frontmatter,
+    };
+  });
+
+  // Blume has no \`> [!NOTE]\` alerts in .md pages: keep the quote, label it.
+  app.renderer.on(MarkdownPageEvent.END, (page) => {
+    page.contents = page.contents?.replaceAll(
+      ALERT,
+      (_, quote, kind) => \`\${quote}**\${kind[0]}\${kind.slice(1).toLowerCase()}:**\`
+    );
+  });
+
+  // TypeDoc empties its output folder on every run, so copy the folder meta in.
+  app.renderer.on(RendererEvent.END, (event) => {
+    const meta = new URL("reference.meta.ts", import.meta.url);
+    copyFileSync(meta, join(event.outputDirectory, "meta.ts"));
+  });
+}
+`;
+
+const generatedPage = `---
+title: map
+seo:
+  description: "Map over a Maybe instance: apply the function to the wrapped value if the instance is Just, and return Nothing if the instance is Nothing."
+---
+
+## Call Signature
+
+\`\`\`ts
+function map<T, U>(mapFn): (maybe) => Maybe<U>;
+\`\`\``;
+
+const gettingStarted = `---
+title: Getting started
+description: Install True Myth, import each type from its own module, and replace a null check with a Maybe.
+---
+
+## Install
+
+\`\`\`bash
+npm add true-myth
+\`\`\`
+
+## Replace a null check
+
+\`maybe.of\` wraps a value that might be \`null\` or \`undefined\`. Transform it with [\`map\`](/reference/maybe/functions/map), and get a plain value back with [\`unwrapOr\`](./reference/maybe/functions/unwrapOr.md):
+
+\`\`\`ts
+import * as maybe from "true-myth/maybe";
+
+const length = (s: string) => s.length;
+
+const name = maybe.of(document.querySelector("input")?.value);
+const nameLength = maybe.unwrapOr(0, maybe.map(length, name));
+\`\`\`
+
+The same operations are methods on the [\`Maybe\` class](/reference/maybe/classes/Maybe#map), so \`name.map(length).unwrapOr(0)\` works too. For the ideas behind the type, read [Understanding Maybe](/guide/understanding/maybe).`;
+
+const commentLinks = `-For a deep dive on the type, see [the guide](/guide/understanding/maybe.md).
++For a deep dive on the type, see [the guide](/guide/understanding/maybe).`;
+
+const validateOutput = `BLUME_BROKEN_ANCHOR No anchor target on /reference/maybe/functions/and matches #map.
+  at docs/reference/maybe/functions/and.md:23:32
+  docs: https://useblume.dev/docs/cli/validate
+…
+BLUME_BROKEN_ANCHOR No anchor target on /reference/result/functions/mapOr matches #map.
+  at docs/reference/result/functions/mapOr.md:110:68
+  docs: https://useblume.dev/docs/cli/validate
+
+7 warning(s)`;
+
+const anchorFix = `-  Notice that, unlike in [\`map\`](#map) or its variants, the original \`maybe\` is
++  Notice that, unlike in {@linkcode map} or its variants, the original \`maybe\` is
+   not involved in constructing the new \`Maybe\`.`;
+---
+
+<GuidePage guide={guideById("typescript-library-documentation-typedoc")}>
+  <p>
+    To publish a TypeScript library's API reference beside hand-written
+    tutorials, have TypeDoc write your doc comments out as Markdown with
+    typedoc-plugin-markdown, into a folder of a Blume site, and give that
+    folder its own tab. Every export gets a page, and the reference shares the
+    site's navigation, search index, and link check with your tutorials, so a
+    broken link from a guide to a function, or from a comment to a guide,
+    fails the check.
+  </p>
+  <p>
+    The walkthrough uses{" "}
+    <a href="https://github.com/true-myth/true-myth">True Myth</a>, an
+    MIT-licensed library with an entry point per type:{" "}
+    <code>true-myth/maybe</code>, <code>true-myth/result</code>,{" "}
+    <code>true-myth/task</code>, and a few more. By the end, its repository
+    has a <code>docs-site</code> folder with tutorials in a Guides tab, a page
+    per export in a Reference tab, scripts that regenerate the reference
+    before every build, and a CI job that fails on a broken link. Swap in your
+    own entry points as you go.
+  </p>
+
+  <h2>Lay out the repository</h2>
+  <p>Keep the docs site in its own folder, beside the library's source:</p>
+  <CodeBlock
+    code={`true-myth/
+├─ src/                  the library
+├─ package.json
+├─ tsconfig.json
+└─ docs-site/
+   ├─ package.json       blume, typedoc, and the plugins
+   ├─ blume.config.ts
+   ├─ typedoc.json
+   ├─ typedoc-blume.mjs
+   ├─ reference.meta.ts
+   └─ docs/
+      ├─ index.mdx
+      ├─ getting-started.mdx
+      ├─ guide/          hand-written tutorials
+      └─ reference/      generated by TypeDoc, not committed`}
+    lang="txt"
+  />
+  <p>
+    Blume writes its build to <code>dist/</code> and its runtime to{" "}
+    <code>.blume/</code> in the folder that holds <code>blume.config.ts</code>,
+    and most libraries already build to <code>dist/</code>. A folder of its
+    own keeps the two apart, and keeps the docs' dependencies out of the
+    package you publish.
+  </p>
+
+  <h2>Create the docs site</h2>
+  <p>
+    From the repository root, scaffold the site, then add TypeDoc, its
+    Markdown plugin, and the frontmatter plugin:
+  </p>
+  <CodeBlock
+    code={`npx blume init docs-site --template docs --yes
+cd docs-site
+npm install -D typedoc typedoc-plugin-markdown typedoc-plugin-frontmatter`}
+    lang="bash"
+  />
+  <p>
+    npm also installs TypeScript, which TypeDoc takes as a peer dependency.
+    TypeDoc supports TypeScript 5.0 through 6.0 from version 0.28.18. The
+    commands here use npm; any package manager works.
+  </p>
+  <p>
+    TypeDoc type-checks your library with its own <code>tsconfig.json</code>{" "}
+    before it writes anything, so the library's dependencies have to be
+    installed at the repository root too. Without them, TypeDoc stops on
+    errors like <code>Cannot find type definition file for 'node'</code>.
+  </p>
+
+  <h2>Configure TypeDoc</h2>
+  <p>
+    Add a <code>typedoc.json</code> beside <code>blume.config.ts</code>. Its
+    paths are relative to the file:
+  </p>
+  <CodeBlock code={typedocJson} lang="json" title="docs-site/typedoc.json" />
+  <p>Most of these options fit the output to Blume:</p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Option</th>
+        <th scope="col">Why</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>entryPoints</code></td>
+        <td>
+          One file per public entry point, matching the package's{" "}
+          <code>exports</code>. TypeDoc names each module after its path, like{" "}
+          <code>maybe</code> or <code>task/delay</code>.
+        </td>
+      </tr>
+      <tr>
+        <td><code>tsconfig</code></td>
+        <td>
+          The library's own config, so TypeDoc resolves imports and types the
+          way your build does.
+        </td>
+      </tr>
+      <tr>
+        <td><code>out</code></td>
+        <td>
+          A folder inside Blume's content root. TypeDoc empties it on every
+          run, so keep nothing else in it.
+        </td>
+      </tr>
+      <tr>
+        <td><code>readme: "none"</code></td>
+        <td>Without it, your README becomes the reference's first page.</td>
+      </tr>
+      <tr>
+        <td><code>entryFileName: "index"</code></td>
+        <td>
+          typedoc-plugin-markdown names a folder's page{" "}
+          <code>README.md</code> by default.
+          Blume makes <code>index.md</code> a folder's own page, and treats a{" "}
+          <code>README.md</code> as one more page.
+        </td>
+      </tr>
+      <tr>
+        <td><code>hidePageHeader</code>, <code>hideBreadcrumbs</code></td>
+        <td>Blume's header, sidebar, and breadcrumbs already show where a page sits.</td>
+      </tr>
+      <tr>
+        <td><code>hidePageTitle</code></td>
+        <td>
+          Blume renders the frontmatter <code>title</code> as the page's h1, so
+          TypeDoc's own <code># Function: map()</code> would be a second one.
+        </td>
+      </tr>
+      <tr>
+        <td><code>useCodeBlocks</code></td>
+        <td>Signatures render as highlighted TypeScript instead of escaped Markdown.</td>
+      </tr>
+      <tr>
+        <td><code>parametersFormat: "table"</code></td>
+        <td>
+          A table per signature instead of a heading per parameter. A cell
+          holds one line, so a parameter comment with a list, a code block, or
+          a quote runs together. Leave the option out to keep those.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <h3>Leave out a barrel file</h3>
+  <p>
+    True Myth's <code>src/index.ts</code> only re-exports the other modules,
+    so it isn't listed. Listed with them, TypeDoc names it <code>index</code>,
+    and its page, <code>index/index.md</code>, lands on the same route as the
+    reference's own <code>index.md</code>, which Blume reports as{" "}
+    <code>BLUME_DUPLICATE_ROUTE</code>. A library with a single entry point
+    doesn't have this problem: list that one file, and its exports go straight
+    under <code>reference/</code>.
+  </p>
+
+  <h3>Keep .md, not .mdx</h3>
+  <p>
+    typedoc-plugin-markdown writes <code>.md</code> files unless you set{" "}
+    <code>fileExtension</code>. Keep it that way. MDX reads <code>{"{"}</code>{" "}
+    and <code>&lt;</code> in prose as code. The plugin escapes them in
+    signatures, but copies comment text as written, so a comment that mentions{" "}
+    <code>{"{ strict: true }"}</code> or <code>a &lt; b</code> stops{" "}
+    <code>blume build</code> with an MDX error, while{" "}
+    <code>blume validate</code>, <code>blume check</code>, and{" "}
+    <code>blume doctor</code> all pass it. The plugin's{" "}
+    <code>sanitizeComments</code> option escapes comment text too, but then
+    HTML you meant, like <code>&lt;br&gt;</code>, shows up as text. In{" "}
+    <code>.md</code>, HTML in a comment renders as HTML, and generated pages
+    have no use for MDX components.
+  </p>
+
+  <h3>One page per export</h3>
+  <p>
+    The plugin's default router, <code>member</code>, gives every function,
+    class, interface, type alias, enum, and variable a page of its own, in a
+    folder per module and a subfolder per kind:{" "}
+    <code>/reference/maybe/functions/map</code>. Each one gets its own URL,
+    search result, and Markdown copy. <code>"router": "module"</code> puts a
+    whole module on one page instead, which suits a small library: True
+    Myth's <code>maybe</code> module comes out at nearly 7,000 lines that way.
+    Older setups choose between the two with <code>outputFileStrategy</code>,
+    which the plugin has deprecated in favor of <code>router</code>.
+  </p>
+
+  <h2>Give the pages Blume's frontmatter</h2>
+  <p>
+    typedoc-plugin-frontmatter writes a page's frontmatter object out as
+    YAML, and a small local plugin fills that object in. Save it beside{" "}
+    <code>typedoc.json</code>, which loads it as{" "}
+    <code>./typedoc-blume.mjs</code>:
+  </p>
+  <CodeBlock code={pluginCode} lang="js" title="docs-site/typedoc-blume.mjs" />
+  <p>It does five things:</p>
+  <ul>
+    <li>
+      <strong>A title.</strong> The symbol's name, like <code>map</code>, or{" "}
+      <code>API reference</code> for the reference's own page. Blume uses it
+      for the h1, the sidebar label, and the browser tab. Without one, Blume
+      titles the page after its first heading, which with{" "}
+      <code>hidePageTitle</code> is a section heading like{" "}
+      <code>Call Signature</code>.
+    </li>
+    <li>
+      <strong>A meta description.</strong> The first paragraph of the
+      symbol's comment, as <code>seo.description</code>. A top-level{" "}
+      <code>description</code> would work too, but Blume shows it under the
+      title, where it repeats the paragraph that opens the page.
+    </li>
+    <li>
+      <strong>A sidebar panel per module.</strong>{" "}
+      <code>sidebar.display: page</code> on a module's page turns its folder
+      into one sidebar row that opens a panel of its exports, instead of one
+      sidebar listing every export of every module.
+    </li>
+    <li>
+      <strong>Readable alerts.</strong> TypeDoc's HTML theme renders GitHub
+      alerts like <code>&gt; [!NOTE]</code>, so comments written for it use
+      them, as True Myth's do. Blume doesn't, so the marker would show as
+      text. The plugin turns it into a bold label.
+    </li>
+    <li>
+      <strong>Folder meta.</strong> A <code>meta.ts</code> written into{" "}
+      <code>docs/reference</code> would be deleted by the next run, so the
+      plugin copies <code>reference.meta.ts</code> in after each one.
+    </li>
+  </ul>
+  <p>A generated page then starts like this:</p>
+  <CodeBlock
+    code={generatedPage}
+    lang="md"
+    title="docs-site/docs/reference/maybe/functions/map.md"
+  />
+  <p>
+    The folder meta sets the order of the modules, by folder name. Without
+    it, they sort alphabetically:
+  </p>
+  <CodeBlock
+    code={`import { defineMeta } from "blume";
+
+export default defineMeta({
+  pages: [
+    "maybe",
+    "result",
+    "task",
+    "toolbelt",
+    "unit",
+    "standard-schema",
+    "test-support",
+  ],
+});`}
+    lang="ts"
+    title="docs-site/reference.meta.ts"
+  />
+
+  <h2>Add the Reference tab</h2>
+  <p>Point a tab at the folder TypeDoc writes to:</p>
+  <CodeBlock
+    code={`import { defineConfig } from "blume";
+
+export default defineConfig({
+  title: "True Myth",
+  description: "Safe, idiomatic null, error, and async code handling in TypeScript.",
+  navigation: {
+    tabs: [
+      { label: "Guides", path: "/" },
+      { label: "Reference", path: "/reference" },
+    ],
+  },
+});`}
+    lang="ts"
+    title="docs-site/blume.config.ts"
+  />
+  <p>
+    Under <code>/reference</code>, the sidebar shows only the reference: its
+    own page first, then a row per module in the folder meta's order, labeled
+    from the folder name (<code>standard-schema</code> reads Standard Schema).
+    Every other page stays in the Guides tab.
+  </p>
+
+  <h2>Link tutorials and reference</h2>
+  <p>
+    Tutorials are ordinary pages in <code>docs/</code>. Link to a reference
+    page by its route, or by a relative path to its <code>.md</code> file,
+    which Blume rewrites to the route. Methods on a class page are headings,
+    so each has an anchor:
+  </p>
+  <CodeBlock
+    code={gettingStarted}
+    lang="mdx"
+    title="docs-site/docs/getting-started.mdx"
+  />
+  <p>
+    Reference URLs keep the symbol's case, as in{" "}
+    <code>/reference/maybe/classes/Maybe</code> and{" "}
+    <code>/reference/maybe/functions/unwrapOr</code>.
+  </p>
+  <p>
+    Links run the other way too. True Myth's comments link to guide pages on
+    its own site, and TypeDoc copies those links into the reference as
+    written, so they resolve against your Blume site. Give the tutorials those
+    routes, here <code>/guide/understanding/maybe</code> and its siblings, and
+    write the links in your comments as routes:
+  </p>
+  <CodeBlock code={commentLinks} lang="diff" title="src/maybe.ts" />
+  <ul>
+    <li>
+      <strong>No <code>.md</code>.</strong> Blume rewrites a relative{" "}
+      <code>.md</code> link to the page, but leaves a root-relative one as
+      written, so <code>/guide/understanding/maybe.md</code> opens the page's
+      raw Markdown copy.
+    </li>
+    <li>
+      <strong>No trailing slash.</strong> <code>blume dev</code> and{" "}
+      <code>blume preview</code> answer{" "}
+      <code>/guide/understanding/task/</code> with a 404.
+    </li>
+    <li>
+      <strong>Symbols by name.</strong> Link to another export with{" "}
+      <code>{"{@link map}"}</code> rather than a Markdown link, and TypeDoc
+      writes the URL of wherever its page ends up.
+    </li>
+  </ul>
+  <p>
+    <code>blume validate</code> doesn't flag the first two: it reads both
+    forms as the page.
+  </p>
+
+  <h2>Build and check</h2>
+  <p>
+    TypeDoc has to run before every Blume command that reads the content.
+    Replace the scripts <code>blume init</code> wrote:
+  </p>
+  <CodeBlock
+    code={`"scripts": {
+  "reference": "typedoc",
+  "dev": "typedoc && blume dev",
+  "build": "typedoc && blume build",
+  "validate": "typedoc && blume validate --strict",
+  "doctor": "blume doctor"
+}`}
+    lang="json"
+    title="docs-site/package.json"
+  />
+  <p>
+    Keep the generated pages out of git by adding their folder to the{" "}
+    <code>.gitignore</code> that <code>blume init</code> wrote. They're
+    rebuilt from the source on every run, and committed copies would drift
+    from it:
+  </p>
+  <CodeBlock code="docs/reference/" lang="txt" title="docs-site/.gitignore" />
+  <p>Then check the links, build, and serve the result:</p>
+  <CodeBlock
+    code={`npm run validate
+npm run build
+npx blume preview`}
+    lang="bash"
+  />
+  <p>
+    On a first run, <code>npm run validate</code> may stop on links in your
+    doc comments, as it does on True Myth's.{" "}
+    <a href="#fix-what-validate-finds">Fix what validate finds</a> covers
+    those, and the build and preview still run. Open the URL{" "}
+    <code>blume preview</code> prints and check three things:
+  </p>
+  <ul>
+    <li>
+      <strong>The Reference tab.</strong> It lists the modules in your order,
+      and each opens a panel of its exports.
+    </li>
+    <li>
+      <strong>Search.</strong> Searching for an export, like{" "}
+      <code>withRetries</code>, finds its page, with Reference, Task, and
+      Functions in the result's breadcrumb. Reference and tutorials share one
+      index.
+    </li>
+    <li>
+      <strong>The Markdown copy.</strong>{" "}
+      <code>/reference/maybe/functions/map.md</code> returns the page as
+      Markdown, with its links rewritten to routes, for agents to read.
+    </li>
+  </ul>
+
+  <h2>Fix what validate finds</h2>
+  <p>
+    <code>blume validate</code> checks every link in the generated pages, so
+    it finds problems in your comments. On True Myth, the first run reports
+    seven anchor warnings, and <code>--strict</code> fails on them:
+  </p>
+  <CodeBlock code={validateOutput} lang="txt" />
+  <p>
+    The comments link to <code>#map</code>, an anchor that exists when a whole
+    module shares one page. With a page per export, <code>map</code> has a
+    page of its own. Link to the symbol, and TypeDoc writes the right URL:
+  </p>
+  <CodeBlock code={anchorFix} lang="diff" title="src/maybe.ts" />
+  <p>
+    Fix these in the library's source, since that's what TypeDoc reads. An
+    edit in <code>docs/reference</code> is gone after the next run.
+  </p>
+  <p>
+    TypeDoc prints warnings of its own: <code>@param</code> names that don't
+    match a parameter, links it couldn't resolve, and types the reference
+    refers to but doesn't include. They don't stop a run. Once you've fixed
+    them, set <code>"treatWarningsAsErrors": true</code> in{" "}
+    <code>typedoc.json</code> so new ones do.
+  </p>
+
+  <h2>Preview while you edit comments</h2>
+  <p>
+    <code>npm run dev</code> generates the reference once, then starts Blume's
+    dev server. To see comment edits as you make them, run TypeDoc in watch
+    mode in a second terminal:
+  </p>
+  <CodeBlock code="npx typedoc --watch" lang="bash" />
+  <p>
+    Each change to the library regenerates the reference, and the dev server
+    reloads the pages.
+  </p>
+
+  <h2>Check it in CI</h2>
+  <p>
+    Run the same checks on every pull request, so a renamed export or a
+    rewritten comment can't leave a broken link behind:
+  </p>
+  <CodeBlock
+    code={`name: Docs
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm ci
+        working-directory: docs-site
+      - run: npm run reference
+        working-directory: docs-site
+      - run: npx blume validate --strict
+        working-directory: docs-site
+      - run: npx blume build
+        working-directory: docs-site`}
+    lang="yaml"
+    title=".github/workflows/docs.yml"
+  />
+  <p>
+    The first <code>npm ci</code> installs the library's own dependencies,
+    which TypeDoc needs to type-check it. If the library uses another package
+    manager, as True Myth does with pnpm, set that one up and use its frozen
+    install there instead, like <code>pnpm install --frozen-lockfile</code>.
+    The job fails on a broken link or anchor, and on a page that doesn't
+    build.
+  </p>
+
+  <h2>Deploy</h2>
+  <p>
+    <code>npm run build</code> leaves a static site in{" "}
+    <code>docs-site/dist</code>, so any static host works, and{" "}
+    <a href="/guides/markdown-docs-github-pages">Deploy Markdown docs to GitHub Pages</a>{" "}
+    has a workflow that publishes it. If your host runs the build itself, it
+    needs more than the <code>docs-site</code> folder: TypeDoc reads{" "}
+    <code>../src</code> and <code>../tsconfig.json</code>, and the library's
+    dependencies have to be installed. On Vercel, with <code>docs-site</code>{" "}
+    as the Root Directory, keep{" "}
+    <strong>Include source files outside of the Root Directory in the Build Step</strong>{" "}
+    on, which is the default, and make the install command cover the
+    library's dependencies as well.
+  </p>
+
+  <h2>Document a monorepo</h2>
+  <p>
+    For a workspace of packages, point TypeDoc at the package folders instead
+    of files. Here are the keys that change, for two of TanStack Store's
+    packages. Drop <code>tsconfig</code> too: TypeDoc reads each package's
+    own.
+  </p>
+  <CodeBlock
+    code={`{
+  "entryPointStrategy": "packages",
+  "entryPoints": ["../packages/store", "../packages/react-store"],
+  "packageOptions": { "entryPoints": ["src/index.ts"] },
+  "excludeScopesInPaths": true
+}`}
+    lang="json"
+    title="docs-site/typedoc.json"
+  />
+  <ul>
+    <li>
+      <strong><code>entryPointStrategy: "packages"</code></strong> converts
+      each package as a project of its own and merges them into one
+      reference, with a folder per package.
+    </li>
+    <li>
+      <strong><code>packageOptions</code></strong> applies options to every
+      package, here the entry point inside each one.
+    </li>
+    <li>
+      <strong><code>excludeScopesInPaths</code></strong> drops the scope from
+      the folders. Without it, <code>@tanstack/store</code> lands in{" "}
+      <code>reference/@tanstack/store</code>, under a sidebar group named
+      @tanstack.
+    </li>
+  </ul>
+  <p>
+    <code>reference.meta.ts</code> then lists package folders, like{" "}
+    <code>pages: ["store", "react-store"]</code>. Install the workspace's
+    dependencies first: TypeDoc type-checks every package.
+  </p>
+
+  <h2>Limitations</h2>
+  <ul>
+    <li>
+      <strong>Comments are Markdown, not MDX.</strong> Blume's callouts and
+      components need <code>.mdx</code>, which generated pages can't use
+      safely. A generic in comment prose outside backticks, like{" "}
+      <code>Array&lt;string&gt;</code>, is read as HTML, so{" "}
+      <code>&lt;string&gt;</code> drops out of the text.
+    </li>
+    <li>
+      <strong>Shared names share a title.</strong> <code>map</code> exists in{" "}
+      <code>maybe</code>, <code>result</code>, and <code>task</code>, and all
+      three pages are titled <code>map</code>. Their URLs and search results
+      tell them apart, but <code>blume audit</code> reports duplicate titles.
+    </li>
+    <li>
+      <strong>No llms.txt descriptions.</strong> Reference pages set{" "}
+      <code>seo.description</code>, not <code>description</code>, so their{" "}
+      <code>llms.txt</code> entries are bare links.
+    </li>
+    <li>
+      <strong>Edit links point at generated files.</strong> With{" "}
+      <code>github</code> set, every reference page gets an Edit on GitHub
+      link to its file in <code>docs/reference</code>, which isn't in the
+      repository. Blume has no per-page switch for it. The Defined in link on
+      each page points at the declaration in your source, where its comment
+      lives.
+    </li>
+    <li>
+      <strong>URLs follow your symbols.</strong> They keep the symbol's case,
+      which <code>blume audit</code> notes, and renaming or moving an export
+      moves its page. Add a{" "}
+      <a href="/docs/deployment#redirects">redirect</a> when you rename a
+      public export.
+    </li>
+    <li>
+      <strong>Every run rewrites every page.</strong> In watch mode, one
+      comment edit reloads the whole reference in the dev server.
+    </li>
+  </ul>
+
+  <Callout type="tip">
+    If your library ships UI components, show them running beside their
+    reference:{" "}
+    <a href="/guides/react-examples-mdx-documentation">Add live React component demos to your MDX docs</a>.
+  </Callout>
+</GuidePage>

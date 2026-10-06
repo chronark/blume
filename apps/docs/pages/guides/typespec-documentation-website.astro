@@ -1,0 +1,1194 @@
+---
+// Publish API documentation from a TypeSpec definition: checked against the
+// OpenAPI, navigation, folder meta, versioning, validate, audit, and
+// deployment docs, and on main against the OpenAPI loader and its
+// diagnostics (openapi/source.ts, including the dev-only warning for an
+// unloadable spec), routes and tag order (openapi/model.ts operationKey,
+// operationCollector, extractOperations), the title and sidebar label
+// fallbacks (openapi/render-mdx.ts), example resolution
+// (components/openapi/helpers.ts, operation-model.ts, playground-schema.ts),
+// the agent Markdown serializers (ai/openapi-components.ts), `blume init`
+// (cli/commands/init.ts, cli/init/scaffold.ts), and the source-vs-user folder
+// meta merge (core/project-graph.ts). TypeSpec side: the @typespec/openapi3
+// 1.16.0 README (emitter options), the compiler, http, openapi, and
+// versioning decorator declarations in node_modules, the packages' engines
+// and peer dependencies, and the `rest` template in microsoft/typespec at
+// 86a4ad18744c2e5d1eb54fd09ac56e2be7e84a9d
+// (packages/compiler/templates/rest/main.tsp), byte-identical to what
+// `tsp init --template rest` wrote from @typespec/compiler 1.16.0.
+//
+// Ran end to end on 2026-10-05, Node 24.14.1 and npm 11.11.0, in a fresh
+// folder outside the repo: every command and file on this page, in order,
+// extracted from this page and compared byte for byte with what was built.
+// TypeSpec 1.16.0 (@typespec/compiler, http, openapi, openapi3) and
+// @typespec/versioning 0.86.0 from npm; Blume 2.1.3 symlinked from main into
+// node_modules and run by path in place of `npx blume` and
+// `npm install blume`. Results: the template spec as is (the widgets-list
+// URLs and GET /widgets titles in the table, BLUME_NAV_DUPLICATE_LABEL,
+// validate --strict exit 1); the final definition (the jq output shown,
+// `npm run build`, validate --strict exit 0, audit 0 errors and 0 warnings,
+// `blume preview` with curl: 200 on every route in the table, 404 on the old
+// widgets-list URL, page text checked for titles, auth, samples, and
+// examples); `tsp compile . --watch` beside `blume dev` updating a page
+// without a restart; the workflow's steps run locally after a git commit
+// (two compiles wrote identical bytes; the freshness check passed, failed
+// with the diff shown after a `label` property was added, and passed again);
+// and the versioned project (two files, the old openapi.json left behind,
+// validate listing the three stale links, audit at 35 warnings without
+// `noindex` and 0 with `noindex` alone, the glob freshness check). Also
+// probed: inline @tagMetadata reversing the tag order; a model-level @example
+// putting the read-only id in Create a widget's request sample;
+// @opExample rejecting a Widget body without id and a missing update body;
+// no request example on a merge-patch body (and one on a Create<W> body);
+// parameter examples only with experimental-parameter-examples, and none
+// from @example on a path parameter; operations outside an interface getting
+// bare operation IDs; @doc and doc comments both writing `description`;
+// @versioned overriding @info's version; 3.0.0 and 3.2.0 output building the
+// same pages; several openapi-versions writing per-version folders; the tag
+// meta.ts with and without title and order; validate failing with
+// BLUME_BROKEN_LINK after an @operationId was removed; and
+// BLUME_OPENAPI_UNAVAILABLE without openapi.json. Not run: `npm ci` (Blume
+// was linked, not installed), the workflow on GitHub Actions, and a deploy.
+//
+// Independent review, same versions, in copies of that project: recompiled
+// (byte-identical openapi.json), build, validate --strict exit 0, audit 0
+// warnings, and the page text of Get, Create, and Update a widget and the
+// overview; the template spec again (the table's URLs, titles, and labels,
+// BLUME_NAV_DUPLICATE_LABEL, validate --strict exit 1); one summary renamed,
+// which showed the sidebar sorts a tag's operations by label
+// (core/navigation.ts sortNodes), not by URL, so both places that said URL
+// were fixed; the versioned audit (35 warnings without the three options:
+// duplicate titles and meta descriptions, identical pages without a
+// canonical, and an orphan /api/v1; 0 with noindex alone); `blume build`
+// exiting 1 on BLUME_OPENAPI_UNAVAILABLE; both @opExample missing-property
+// errors and Create<Widget>; inline @tagMetadata reversing the tags; and an
+// @example on a path parameter not being emitted. tspconfig.yaml now keeps
+// the template's `kind: project` line, which the e2e run didn't have; a
+// compile with it wrote byte-identical output.
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const mainTsp = `import "@typespec/http";
+import "@typespec/openapi";
+
+using Http;
+using OpenAPI;
+
+/**
+ * Create, update, and analyze the widgets in your Acme account.
+ * Every request needs an API key, sent as a bearer token.
+ */
+@service(#{ title: "Widget Service" })
+@info(#{ version: "1.0.0" })
+@server("https://api.widgets.example", "Production")
+@useAuth(BearerAuth)
+@tagMetadata(#[
+  #{
+    name: "Widgets",
+    description: "Create, read, update, and delete widgets.",
+  },
+  #{
+    name: "Analysis",
+    description: "Run checks on a widget you already created.",
+  }
+])
+namespace WidgetService;
+
+/** A widget in your account. */
+model Widget {
+  /** The widget's ID, set by the API when you create it. */
+  @visibility(Lifecycle.Read)
+  @example("wdg_8f2k")
+  id: string;
+
+  /** The widget's weight, in grams. */
+  @minValue(1)
+  @example(120)
+  weight: int32;
+
+  /** The widget's color. */
+  @example("red")
+  color: "red" | "blue";
+}
+
+/** A page of widgets. */
+model WidgetList {
+  /** The widgets on this page. */
+  items: Widget[];
+}
+
+/** The error every operation returns when a request fails. */
+@error
+model Error {
+  /** A numeric code for the error. */
+  @example(404)
+  code: int32;
+
+  /** What went wrong, in a sentence. */
+  @example("No widget has that ID.")
+  message: string;
+}
+
+/** The result of analyzing a widget. */
+model AnalyzeResult {
+  /** The ID of the widget that was analyzed. */
+  id: string;
+
+  /** What the analysis found. */
+  analysis: string;
+}
+
+@route("/widgets")
+@tag("Widgets")
+interface Widgets {
+  /** Returns every widget in your account, newest first. */
+  @summary("List widgets")
+  @operationId("listWidgets")
+  @get
+  list(): WidgetList | Error;
+
+  /**
+   * Returns one widget by its ID, with its current weight and color.
+   * @param id The widget's ID, from the response to Create a widget.
+   */
+  @summary("Get a widget")
+  @operationId("getWidget")
+  @returnsDoc("The widget.")
+  @opExample(#{
+    parameters: #{ id: "wdg_8f2k" },
+    returnType: #{ id: "wdg_8f2k", weight: 120, color: "red" },
+  })
+  @get
+  read(@path id: string): Widget | Error;
+
+  /** Creates a widget and returns it with the ID the API assigned. */
+  @summary("Create a widget")
+  @operationId("createWidget")
+  @post
+  create(@body body: Widget): Widget | Error;
+
+  /**
+   * Changes the fields you send and leaves the rest as they are.
+   * @param id The ID of the widget to update.
+   */
+  @summary("Update a widget")
+  @operationId("updateWidget")
+  @opExample(#{ parameters: #{ id: "wdg_8f2k", body: #{ weight: 150 } } })
+  @patch
+  update(@path id: string, @body body: MergePatchUpdate<Widget>):
+    | Widget
+    | Error;
+
+  /**
+   * Deletes a widget. This can't be undone.
+   * @param id The ID of the widget to delete.
+   */
+  @summary("Delete a widget")
+  @operationId("deleteWidget")
+  @returnsDoc("The widget is deleted.")
+  @opExample(#{ parameters: #{ id: "wdg_8f2k" } })
+  @delete
+  delete(@path id: string): void | Error;
+}
+
+@route("/widgets/{id}/analyze")
+@tag("Analysis")
+interface Analysis {
+  /**
+   * Checks a widget's weight and color against your account's rules.
+   * @param id The ID of the widget to analyze.
+   */
+  @summary("Analyze a widget")
+  @operationId("analyzeWidget")
+  @opExample(#{
+    parameters: #{ id: "wdg_8f2k" },
+    returnType: #{
+      id: "wdg_8f2k",
+      analysis: "Within your account's weight limit.",
+    },
+  })
+  @post
+  analyze(@path id: string): AnalyzeResult | Error;
+}`;
+
+const indexMdx = `---
+title: Introduction
+description: Store widgets, update them, and run analysis on them with the Widget Service API, using an API key and any HTTP client.
+---
+
+The Widget Service API stores the widgets in your Acme account and checks them
+against your account's rules.
+
+- [Quickstart](/quickstart) takes you from an API key to your first analyzed widget.
+- The [API reference](/api) lists every operation, generated from the API's TypeSpec definition.`;
+
+const quickstartMdx = `---
+title: Quickstart
+description: Authenticate with an API key, create your first widget with the Widget Service API, and run an analysis on it.
+---
+
+Every request needs an API key, sent in the \`Authorization\` header as a bearer
+token. Set it in your shell first:
+
+\`\`\`bash
+export WIDGETS_API_KEY="your-api-key"
+\`\`\`
+
+## Create a widget
+
+Send its weight and color to [Create a widget](/api/widgets/create-widget):
+
+\`\`\`bash
+curl https://api.widgets.example/widgets \\
+  -H "Authorization: Bearer $WIDGETS_API_KEY" \\
+  -H "Content-Type: application/json" \\
+  -d '{"weight":120,"color":"red"}'
+\`\`\`
+
+The response is the widget, with the ID the API assigned:
+
+\`\`\`json
+{ "id": "wdg_8f2k", "weight": 120, "color": "red" }
+\`\`\`
+
+## Analyze it
+
+Pass the ID to [Analyze a widget](/api/analysis/analyze-widget):
+
+\`\`\`bash
+curl -X POST https://api.widgets.example/widgets/wdg_8f2k/analyze \\
+  -H "Authorization: Bearer $WIDGETS_API_KEY"
+\`\`\`
+
+## Handle errors
+
+A failed request returns an error object with a numeric \`code\` and a
+\`message\`. Every operation's page lists it under its responses.`;
+
+const versionedDiff = ` import "@typespec/http";
+ import "@typespec/openapi";
++import "@typespec/versioning";
+
+ using Http;
+ using OpenAPI;
++using Versioning;
+
+ /**
+  * Create, update, and analyze the widgets in your Acme account.
+  * Every request needs an API key, sent as a bearer token.
+  */
+ @service(#{ title: "Widget Service" })
+-@info(#{ version: "1.0.0" })
++@versioned(Versions)
+ @server("https://api.widgets.example", "Production")
+ ...
+ namespace WidgetService;
+
++/** The versions of the Widget Service API. */
++enum Versions {
++  v1: "1.0",
++  v2: "2.0",
++}
++
+ ...
+ @route("/widgets/{id}/analyze")
+ @tag("Analysis")
++@added(Versions.v2)
+ interface Analysis {`;
+---
+
+<GuidePage guide={guideById("typespec-documentation-website")}>
+  <p>
+    To publish documentation from a TypeSpec API definition, compile it to
+    OpenAPI with the <code>@typespec/openapi3</code> emitter, write the file
+    beside your Blume config, and mount it with <code>openapi()</code>.
+    TypeSpec and Blume both run on Node.js, so they can share one{" "}
+    <code>package.json</code>, and one <code>npm run build</code> compiles the
+    definition and builds the site from it.
+  </p>
+  <p>
+    By the end of this guide, you have a TypeSpec definition whose doc
+    comments, summaries, and examples fill the reference, a page per operation
+    grouped by tag, a quickstart written beside it, and a CI check that fails
+    when the committed spec no longer matches the definition. The example
+    starts from TypeSpec's own REST template, the Widget Service, and was
+    tested with TypeSpec 1.16.0.
+  </p>
+  <p>
+    Blume never reads your <code>.tsp</code> files. Every page comes from the
+    OpenAPI document the emitter writes, so the decorators you add in TypeSpec
+    are where the docs get better. If you already have an OpenAPI file and no
+    TypeSpec, start with{" "}
+    <a href="/guides/openapi-documentation-website">Generate API docs from an OpenAPI spec</a>{" "}
+    instead.
+  </p>
+
+  <h2>How the pieces fit</h2>
+  <p>
+    The API definition and the docs live in one folder, as one Node.js
+    project:
+  </p>
+  <CodeBlock
+    code={`acme-widgets/
+├── main.tsp          the API definition
+├── tspconfig.yaml    where the OpenAPI emitter writes
+├── openapi.json      written by tsp compile, read by Blume
+├── blume.config.ts
+├── docs/
+│   ├── index.mdx
+│   └── quickstart.mdx
+└── package.json      TypeSpec and Blume, side by side`}
+    lang="txt"
+  />
+  <p>
+    <code>tsp compile .</code> turns <code>main.tsp</code> into{" "}
+    <code>openapi.json</code>. Blume reads that file at build time and renders
+    a page for each operation under <code>/api</code>, next to the Markdown
+    pages in <code>docs/</code>. Blume's content lives in <code>docs/</code>,
+    so the TypeSpec files at the root never become pages.
+  </p>
+
+  <h2>Start the project</h2>
+  <p>
+    If you already have a TypeSpec project, run the last three commands from
+    its root and skip the first two. Otherwise, create one from TypeSpec's
+    REST template and add Blume to it:
+  </p>
+  <CodeBlock
+    code={`mkdir acme-widgets && cd acme-widgets
+npx --package=@typespec/compiler@1.16.0 tsp init --template rest --no-prompt
+npm uninstall @typespec/rest
+npm install --save-exact @typespec/compiler@1.16.0 @typespec/http@1.16.0 @typespec/openapi@1.16.0 @typespec/openapi3@1.16.0
+npx blume init . --template docs --yes
+npm install blume`}
+    lang="bash"
+  />
+  <ul>
+    <li>
+      <code>tsp init</code> writes <code>main.tsp</code> (the Widget Service),{" "}
+      <code>tspconfig.yaml</code>, <code>package.json</code>, and a{" "}
+      <code>.gitignore</code>, then installs the TypeSpec packages.{" "}
+      <code>npx --package</code> runs it without a global install of the
+      compiler.
+    </li>
+    <li>
+      The template lists <code>@typespec/rest</code>, which this API never
+      imports, so the next line removes it.
+    </li>
+    <li>
+      The install pins the compiler and emitters to exact versions. The CI
+      check later in this guide compares the spec byte for byte, and another
+      emitter release can word or order its output differently. Commit{" "}
+      <code>package-lock.json</code> too.
+    </li>
+    <li>
+      <code>blume init .</code> writes <code>blume.config.ts</code> and{" "}
+      <code>docs/index.mdx</code>, and adds <code>.blume/</code> and{" "}
+      <code>.env.local</code> to the <code>.gitignore</code>, which already
+      ignores <code>dist/</code> and <code>node_modules/</code>. It leaves the
+      existing <code>package.json</code> alone and doesn't install anything,
+      which is why <code>npm install blume</code> follows.
+    </li>
+  </ul>
+
+  <h2>Emit OpenAPI where Blume reads it</h2>
+  <p>
+    The template's <code>tspconfig.yaml</code> writes the spec to{" "}
+    <code>tsp-output/schema/openapi.yaml</code>, a folder its{" "}
+    <code>.gitignore</code> ignores. Replace it so the spec lands beside{" "}
+    <code>blume.config.ts</code>. In a TypeSpec project of your own, keep its
+    other emitters and change only the <code>@typespec/openapi3</code>{" "}
+    options:
+  </p>
+  <CodeBlock
+    code={`kind: project
+emit:
+  - "@typespec/openapi3"
+options:
+  "@typespec/openapi3":
+    emitter-output-dir: "{project-root}"
+    output-file: "openapi.json"
+    openapi-versions:
+      - 3.1.0
+    experimental-parameter-examples: data`}
+    lang="yaml"
+    title="tspconfig.yaml"
+  />
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Option</th>
+        <th scope="col">What it does here</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>emitter-output-dir</code></td>
+        <td>
+          Writes into the project root. The emitter's own default is{" "}
+          <code>tsp-output/@typespec/openapi3/</code>.
+        </td>
+      </tr>
+      <tr>
+        <td><code>output-file</code></td>
+        <td>
+          Names the file <code>openapi.json</code>; the extension makes it JSON.
+          Blume reads YAML just as well.
+        </td>
+      </tr>
+      <tr>
+        <td><code>openapi-versions</code></td>
+        <td>
+          Writes OpenAPI 3.1. Without this option, the emitter writes 3.0.
+        </td>
+      </tr>
+      <tr>
+        <td><code>experimental-parameter-examples</code></td>
+        <td>
+          Writes the parameter values from <code>@opExample</code> into the
+          spec. Without it they're dropped, and the code samples call{" "}
+          <code>/widgets/string</code>.
+        </td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    3.0, 3.1, and 3.2 all work. Blume upgrades a 3.0 spec to 3.1 as it reads
+    it and reads 3.1 and 3.2 as written, and this guide's definition built the
+    same pages from each. Choose one, though: with more than one in{" "}
+    <code>openapi-versions</code>, the emitter writes each into a folder named
+    after it, like <code>3.1.0/openapi.json</code>, and the path Blume reads
+    moves. TypeSpec marks <code>experimental-parameter-examples</code> as
+    experimental, so check its entry in the emitter's README when you upgrade.
+  </p>
+  <p>Compile the template once to see what it gives you:</p>
+  <CodeBlock code="npx tsp compile ." lang="bash" />
+
+  <h2>Write the definition for readers</h2>
+  <p>
+    The template compiles, but it makes a poor reference. Its operations have
+    doc comments and nothing else, and once you mount the reference in{" "}
+    <a href="#mount-the-reference">the next section</a>, Blume builds these
+    pages from its spec:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Operation</th>
+        <th scope="col">Page</th>
+        <th scope="col">Title</th>
+        <th scope="col">Sidebar label</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>Widgets.list</code></td>
+        <td><code>/api/widgets/widgets-list</code></td>
+        <td>GET /widgets</td>
+        <td>/widgets</td>
+      </tr>
+      <tr>
+        <td><code>Widgets.create</code></td>
+        <td><code>/api/widgets/widgets-create</code></td>
+        <td>POST /widgets</td>
+        <td>/widgets</td>
+      </tr>
+      <tr>
+        <td><code>Widgets.read</code></td>
+        <td><code>/api/widgets/widgets-read</code></td>
+        <td>GET /widgets/&#123;id&#125;</td>
+        <td>/widgets/&#123;id&#125;</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Three things cause that, and each has a fix in TypeSpec:</p>
+  <ul>
+    <li>
+      <strong>No summaries.</strong> TypeSpec writes a doc comment to the
+      operation's <code>description</code>, never its <code>summary</code>.
+      Blume titles a page with the summary and falls back to the method and
+      path, and its sidebar label falls back to the path alone. Operations that
+      share a path then share a label, which Blume reports as{" "}
+      <code>BLUME_NAV_DUPLICATE_LABEL</code>, so{" "}
+      <code>blume validate --strict</code> fails. Add <code>@summary</code> to
+      every operation.
+    </li>
+    <li>
+      <strong>Generated operation IDs.</strong> By default the emitter names an
+      operation after its interface and itself, like{" "}
+      <code>Widgets_list</code>. Blume builds the page URL from the tag and the
+      operation ID, so the tag appears twice. Set the ID with{" "}
+      <code>@operationId</code> from <code>@typespec/openapi</code>. If an SDK
+      generator reads the same spec, the ID is its method name too, so change
+      it on purpose. Operations declared directly in the service namespace,
+      outside an interface, get their bare name.
+    </li>
+    <li>
+      <strong>No examples.</strong> Without them, the code samples and the Try
+      it panel fill in placeholder values like <code>"string"</code> and{" "}
+      <code>0</code>.
+    </li>
+  </ul>
+  <p>Here's the whole definition with those fixed:</p>
+  <CodeBlock code={mainTsp} lang="typespec" title="main.tsp" />
+
+  <h3>Where each decorator shows up</h3>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In TypeSpec</th>
+        <th scope="col">In the spec</th>
+        <th scope="col">On the docs site</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>@service(#&#123; title &#125;)</code></td>
+        <td><code>info.title</code></td>
+        <td>The overview page's title</td>
+      </tr>
+      <tr>
+        <td>Doc comment on the namespace</td>
+        <td><code>info.description</code></td>
+        <td>The overview page's introduction</td>
+      </tr>
+      <tr>
+        <td><code>@info(#&#123; version &#125;)</code></td>
+        <td><code>info.version</code></td>
+        <td>"Version 1.0.0" on the overview page</td>
+      </tr>
+      <tr>
+        <td><code>@server</code></td>
+        <td><code>servers</code></td>
+        <td>The base URL, where Try it sends requests, and the code samples' host</td>
+      </tr>
+      <tr>
+        <td><code>@useAuth(BearerAuth)</code></td>
+        <td>
+          <code>components.securitySchemes</code> and the root{" "}
+          <code>security</code>
+        </td>
+        <td>
+          An Authorization section on every operation, and{" "}
+          <code>Authorization: Bearer YOUR_TOKEN</code> in its samples
+        </td>
+      </tr>
+      <tr>
+        <td><code>@tag</code></td>
+        <td>The operation's <code>tags</code></td>
+        <td>Its sidebar group, and the URL segment <code>/api/widgets/</code></td>
+      </tr>
+      <tr>
+        <td><code>@tagMetadata</code></td>
+        <td>The top-level <code>tags</code> list</td>
+        <td>The groups' order, and each overview section's description</td>
+      </tr>
+      <tr>
+        <td><code>@operationId</code></td>
+        <td><code>operationId</code></td>
+        <td>The page URL: <code>getWidget</code> becomes <code>get-widget</code></td>
+      </tr>
+      <tr>
+        <td><code>@summary</code></td>
+        <td><code>summary</code></td>
+        <td>The page title and sidebar label</td>
+      </tr>
+      <tr>
+        <td>Doc comment on the operation, or <code>@doc</code></td>
+        <td><code>description</code></td>
+        <td>The paragraph under the title, and the start of the page's meta description</td>
+      </tr>
+      <tr>
+        <td><code>@param</code> in that doc comment</td>
+        <td>The parameter's <code>description</code></td>
+        <td>The parameter's row</td>
+      </tr>
+      <tr>
+        <td><code>@returnsDoc</code></td>
+        <td>The success response's <code>description</code></td>
+        <td>The text beside the response's status code</td>
+      </tr>
+      <tr>
+        <td>Doc comments on model properties</td>
+        <td>Property <code>description</code>s</td>
+        <td>The schema tables</td>
+      </tr>
+      <tr>
+        <td><code>@example</code> on a property</td>
+        <td>The property's <code>examples</code></td>
+        <td>Request samples, Try it's starting values, and response examples</td>
+      </tr>
+      <tr>
+        <td><code>@opExample</code></td>
+        <td>
+          An <code>example</code> on each parameter and on the response body
+        </td>
+        <td>The path in the code samples, and the Response panel</td>
+      </tr>
+      <tr>
+        <td><code>@visibility(Lifecycle.Read)</code></td>
+        <td><code>readOnly: true</code></td>
+        <td>Left out of the request body table and the request sample</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Compile again and look at one operation. Everything the Get a widget page
+    shows is in it:
+  </p>
+  <CodeBlock
+    code={`npx tsp compile .
+jq '.paths["/widgets/{id}"].get' openapi.json`}
+    lang="bash"
+  />
+  <CodeBlock
+    code={`{
+  "operationId": "getWidget",
+  "summary": "Get a widget",
+  "description": "Returns one widget by its ID, with its current weight and color.",
+  "parameters": [
+    {
+      "name": "id",
+      "in": "path",
+      "required": true,
+      "description": "The widget's ID, from the response to Create a widget.",
+      "schema": {
+        "type": "string"
+      },
+      "example": "wdg_8f2k"
+    }
+  ],
+  "responses": {
+    "200": {
+      "description": "The widget.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/Widget"
+          },
+          "example": {
+            "id": "wdg_8f2k",
+            "weight": 120,
+            "color": "red"
+          }
+        }
+      }
+    },
+    "default": {
+      "description": "An unexpected error response.",
+      "content": {
+        "application/json": {
+          "schema": {
+            "$ref": "#/components/schemas/Error"
+          }
+        }
+      }
+    }
+  },
+  "tags": [
+    "Widgets"
+  ]
+}`}
+    lang="json"
+  />
+
+  <h3>Examples</h3>
+  <p>
+    Put <code>@example</code> on each property rather than on the whole
+    model. A model-level example becomes one example object for the schema,
+    read-only <code>id</code> included, and Blume uses it as written, so the
+    Create a widget sample sends an <code>id</code> the server sets. With
+    examples on the properties, Blume builds the request from them and leaves{" "}
+    <code>id</code> out, while response examples keep it.
+  </p>
+  <p>
+    <code>@opExample</code> is type-checked against the whole operation. That's
+    why Create a widget has none: its body is a <code>Widget</code>, so the
+    example would need an <code>id</code> too, and the request sample would
+    send it. Update a widget's example needs a <code>body</code> beside the{" "}
+    <code>id</code> for the same reason, but the emitter writes no request
+    example for a merge-patch body, so that page builds its body sample from
+    the property examples. The <code>id</code> is what matters there: with it,
+    the samples call <code>/widgets/wdg_8f2k</code>.
+  </p>
+
+  <h3>Tag order</h3>
+  <p>
+    Blume orders the sidebar groups and the overview's sections by the spec's
+    top-level <code>tags</code> list, then any tag it doesn't declare. Use the
+    array form of <code>@tagMetadata</code>, which keeps the order you write.
+    One <code>@tagMetadata("Widgets", …)</code> per tag also works, but the
+    spec then lists the tags in the reverse order of the decorators, and
+    Analysis comes before Widgets.
+  </p>
+
+  <h2>Mount the reference</h2>
+  <p>Replace the config that <code>blume init</code> wrote:</p>
+  <CodeBlock
+    code={`import { defineConfig } from "blume";
+import { openapi } from "blume/reference";
+
+export default defineConfig({
+  title: "Widget Docs",
+  description: "Guides and API reference for the Widget Service.",
+  deployment: { site: "https://docs.widgets.example" },
+  navigation: {
+    tabs: [
+      { label: "Guides", path: "/" },
+      { label: "API reference", path: "/api" },
+    ],
+  },
+  reference: [openapi({ route: "/api", spec: "./openapi.json" })],
+});`}
+    lang="ts"
+    title="blume.config.ts"
+  />
+  <p>
+    The reference doesn't add a header tab on its own, so the tab at{" "}
+    <code>/api</code> makes it reachable and scopes its sidebar.{" "}
+    <code>deployment.site</code> gives the sitemap and canonical links their
+    origin on hosts that don't tell the build its URL, like GitHub Pages.
+  </p>
+
+  <h2>Write guides beside the reference</h2>
+  <p>
+    The reference says what each operation takes and returns. A reader also
+    needs to know how to authenticate and which call comes first. Replace{" "}
+    <code>docs/index.mdx</code> and add a quickstart:
+  </p>
+  <CodeBlock code={indexMdx} lang="mdx" title="docs/index.mdx" />
+  <CodeBlock code={quickstartMdx} lang="mdx" title="docs/quickstart.mdx" />
+  <p>
+    Link to operation pages by their URL, which comes from the tag and the
+    operation ID. Those links are how a definition change that moves a page
+    gets caught: <code>blume validate</code> checks every one of them against
+    the reference.
+  </p>
+  <p>
+    Inside a tag's group, the sidebar sorts operations alphabetically by their
+    summaries, so Create a widget comes first, and the overview page lists
+    them path by path. Neither follows the order of your interface. To set the sidebar
+    order yourself, add a <code>meta.ts</code> in the folder that matches the
+    tag's route:
+  </p>
+  <CodeBlock
+    code={`import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Widgets",
+  order: 0,
+  pages: [
+    "list-widgets",
+    "get-widget",
+    "create-widget",
+    "update-widget",
+    "delete-widget",
+  ],
+});`}
+    lang="ts"
+    title="docs/api/widgets/meta.ts"
+  />
+  <p>
+    A <code>meta.ts</code> you write replaces the one Blume derives from the
+    spec, so it repeats the tag's <code>title</code> and its position in the
+    tag list. Without <code>order: 0</code>, the Widgets group moves below
+    Analysis.
+  </p>
+
+  <h2>Build and preview</h2>
+  <p>
+    <code>tsp init</code> wrote a <code>package.json</code> with no scripts.
+    Add scripts that compile the definition before every build:
+  </p>
+  <CodeBlock
+    code={`"scripts": {
+  "spec": "tsp compile .",
+  "dev": "blume dev",
+  "build": "tsp compile . && blume build"
+},`}
+    lang="json"
+    title="package.json"
+  />
+  <p>
+    A TypeSpec error stops <code>npm run build</code> before Blume runs, so a
+    definition that doesn't compile never publishes. Build, check the links,
+    and preview the result:
+  </p>
+  <CodeBlock
+    code={`npm run build
+npx blume validate --strict
+npx blume preview`}
+    lang="bash"
+  />
+  <p>
+    <code>--strict</code> fails on warnings as well as broken links, which
+    includes the duplicate sidebar labels a missing <code>@summary</code>{" "}
+    causes. Open <code>http://localhost:4321/api</code>. The overview lists
+    both tags with their descriptions, and each operation has its own page:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Operation</th>
+        <th scope="col">Page</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>GET /widgets</code></td>
+        <td><code>/api/widgets/list-widgets</code></td>
+      </tr>
+      <tr>
+        <td><code>GET /widgets/&#123;id&#125;</code></td>
+        <td><code>/api/widgets/get-widget</code></td>
+      </tr>
+      <tr>
+        <td><code>POST /widgets</code></td>
+        <td><code>/api/widgets/create-widget</code></td>
+      </tr>
+      <tr>
+        <td><code>PATCH /widgets/&#123;id&#125;</code></td>
+        <td><code>/api/widgets/update-widget</code></td>
+      </tr>
+      <tr>
+        <td><code>DELETE /widgets/&#123;id&#125;</code></td>
+        <td><code>/api/widgets/delete-widget</code></td>
+      </tr>
+      <tr>
+        <td><code>POST /widgets/&#123;id&#125;/analyze</code></td>
+        <td><code>/api/analysis/analyze-widget</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Each page has its summary as the title, the doc comment under it, an
+    Authorization section for the bearer token, schema tables with the
+    property descriptions, and code samples built from the examples, such as{" "}
+    <code>curl -X GET 'https://api.widgets.example/widgets/wdg_8f2k'</code>{" "}
+    on Get a widget. That host doesn't exist, so Send in Try it can't succeed
+    here. With your own API, the panel calls the server in{" "}
+    <code>@server</code>, and your API has to allow the docs origin; see{" "}
+    <a href="/guides/api-documentation-cors-errors">Fix CORS errors in an API documentation playground</a>.
+  </p>
+  <p>
+    While you write, run the compiler in watch mode in one terminal and Blume
+    in another. <code>blume dev</code> watches <code>openapi.json</code>, so
+    each save in <code>main.tsp</code> updates the open page without a
+    restart:
+  </p>
+  <CodeBlock
+    code={`npx tsp compile . --watch
+npm run dev`}
+    lang="bash"
+  />
+
+  <h2>Commit the spec and check it in CI</h2>
+  <p>
+    Commit <code>openapi.json</code> even though it's generated. A change to
+    one decorator can change dozens of lines of spec, and the pull request
+    shows the API change the way clients will see it. Other tools, like an SDK
+    generator or a breaking-change check, can read the file straight from Git.
+    And because <code>npm run build</code> compiles first, the docs host
+    rebuilds the spec from <code>main.tsp</code> anyway, so a stale commit
+    never reaches the site.
+  </p>
+  <p>
+    What can go stale is the committed copy. Add a workflow that compiles the
+    definition and fails when that changes the file:
+  </p>
+  <CodeBlock
+    code={`name: Docs
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Check the committed spec is up to date
+        run: |
+          npx tsp compile .
+          git diff --exit-code -- openapi.json
+      - run: npx blume validate --strict
+      - run: npm run build`}
+    lang="yaml"
+    title=".github/workflows/docs.yml"
+  />
+  <p>
+    The compiler writes the same bytes for the same definition, and the pinned
+    versions keep CI on the compiler you ran locally. Say a pull request adds
+    a <code>label</code> property to <code>Widget</code> but nobody compiled.
+    The check fails and prints what the commit is missing:
+  </p>
+  <CodeBlock
+    code={`             "examples": [
+               "red"
+             ]
++          },
++          "label": {
++            "type": "string",
++            "description": "A name for the widget, shown in your dashboard.",
++            "examples": [
++              "Front door sensor"
++            ]
+           }
+         },
+         "description": "A widget in your account."`}
+    lang="diff"
+    title="openapi.json"
+  />
+  <p>
+    A second hunk adds the same property, nullable, to the merge-patch schema
+    TypeSpec derives for Update a widget. Run <code>npm run spec</code> and
+    commit the result. <code>git diff</code>{" "}
+    only compares files Git tracks, so commit <code>openapi.json</code> before
+    you add the check. If nothing but the docs reads the spec, you can skip
+    all this: add <code>openapi.json</code> to <code>.gitignore</code>, let
+    the build script write it, and run <code>npm run spec</code> before{" "}
+    <code>npm run dev</code> in a fresh clone. You lose the reviewable diff. To
+    also fail a pull request that breaks existing clients, add oasdiff as
+    shown in{" "}
+    <a href="/guides/openapi-documentation-ci">Keep API documentation in sync with backend changes in CI</a>.
+  </p>
+
+  <h2>Document every version of a versioned API</h2>
+  <p>
+    With <code>@typespec/versioning</code>, one definition describes several
+    API versions, and the emitter writes one spec per version. Add the
+    package, then mark the namespace as versioned and say when things were
+    added:
+  </p>
+  <CodeBlock
+    code="npm install --save-exact @typespec/versioning@0.86.0"
+    lang="bash"
+  />
+  <CodeBlock code={versionedDiff} lang="diff" title="main.tsp" />
+  <p>
+    <code>@versioned</code> sets each file's <code>info.version</code> to that
+    version's value and overrides <code>@info</code>'s, so drop{" "}
+    <code>@info</code>. Then put <code>&#123;version&#125;</code> in the file
+    name, where the emitter fills in the same value:
+  </p>
+  <CodeBlock
+    code={`    output-file: "openapi.{version}.json"`}
+    lang="yaml"
+    title="tspconfig.yaml"
+  />
+  <p>
+    That writes <code>openapi.1.0.json</code> and{" "}
+    <code>openapi.2.0.json</code>, and only the 2.0 file has the Analysis
+    operation. The old <code>openapi.json</code> stays behind, so delete it
+    with <code>git rm openapi.json</code>, and point the CI check at the new
+    files with <code>git diff --exit-code -- 'openapi.*.json'</code>. Then
+    give each file its own source and route, and put both under a dropdown
+    tab:
+  </p>
+  <CodeBlock
+    code={`export default defineConfig({
+  // ...title, description, and deployment as before
+  navigation: {
+    tabs: [
+      { label: "Guides", path: "/" },
+      {
+        label: "API reference",
+        path: "/api",
+        items: [
+          { label: "Version 2.0", path: "/api/v2" },
+          { label: "Version 1.0", path: "/api/v1" },
+        ],
+      },
+    ],
+  },
+  reference: [
+    openapi({
+      sources: [
+        { label: "Version 2.0", route: "/api/v2", spec: "./openapi.2.0.json" },
+        {
+          label: "Version 1.0",
+          route: "/api/v1",
+          spec: "./openapi.1.0.json",
+          noindex: true,
+          includeInSearch: false,
+          includeInLlms: false,
+        },
+      ],
+    }),
+  ],
+});`}
+    lang="ts"
+    title="blume.config.ts"
+  />
+  <p>
+    The two versions share most of their operations, so without the last
+    three options <code>blume audit</code> warns about a dozen pages with
+    duplicate titles and descriptions, and about operation pages that are
+    identical in both versions with no canonical. <code>noindex</code> keeps
+    the 1.0 pages out of search engines and the sitemap, which clears those
+    warnings.
+    The other two keep them out of site search and <code>llms.txt</code>, so
+    readers and agents land on the current version; leave them out if 1.0
+    readers should still search their own pages.
+  </p>
+  <p>
+    Every operation now lives under its version's route, like{" "}
+    <code>/api/v2/widgets/get-widget</code>. Update the links in{" "}
+    <code>docs/</code> (<code>blume validate</code> lists each one you miss,
+    including the old <code>/api</code>, which no longer has a page), and move{" "}
+    <code>docs/api/widgets/meta.ts</code> to <code>docs/api/v2/widgets/</code>,
+    with a copy in <code>docs/api/v1/widgets/</code>. The tab's sidebar holds
+    both versions, sorted by name, which puts 1.0 first. A{" "}
+    <code>meta.ts</code> in each version's folder sets the order and shows one
+    version at a time:
+  </p>
+  <CodeBlock
+    code={`import { defineMeta } from "blume";
+
+export default defineMeta({
+  title: "Version 2.0",
+  display: "page",
+  order: 1,
+});`}
+    lang="ts"
+    title="docs/api/v2/meta.ts"
+  />
+  <p>
+    Add the same file in <code>docs/api/v1/</code> with its own title and{" "}
+    <code>order: 2</code>.{" "}
+    <a href="/guides/multiple-openapi-specs-documentation">Combine multiple OpenAPI specifications in one docs site</a>{" "}
+    covers routes, search, and overlapping names when several specs share a
+    site. Blume's own <a href="/docs/content/versioning">versioning</a>{" "}
+    doesn't apply here: it snapshots the pages in <code>docs/</code>, and
+    generated references always stay current.
+  </p>
+
+  <h2>Deploy</h2>
+  <p>
+    The site builds to static files in <code>dist/</code>. On your host, use
+    the build script rather than <code>blume build</code>, so every deploy
+    compiles the definition first:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Setting</th>
+        <th scope="col">Value</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Build command</td>
+        <td><code>npm run build</code></td>
+      </tr>
+      <tr>
+        <td>Output directory</td>
+        <td><code>dist</code></td>
+      </tr>
+      <tr>
+        <td>Node.js version</td>
+        <td>22.12 or later</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    TypeSpec 1.16 needs Node.js 22 and Blume needs 22.12, so the second is the
+    floor. The <a href="/docs/deployment">deployment docs</a> cover each host,
+    and{" "}
+    <a href="/guides/markdown-docs-github-pages">Deploy Markdown docs to GitHub Pages</a>{" "}
+    adds a deploy job to a workflow like the one above.
+  </p>
+
+  <h2>Limitations</h2>
+  <ul>
+    <li>
+      <strong>Only what the emitter writes reaches the docs.</strong> Blume
+      reads the OpenAPI file, not TypeSpec, so a decorator the openapi3
+      emitter doesn't translate, like an <code>@example</code> on a path
+      parameter, changes nothing on the site.
+    </li>
+    <li>
+      <strong>Parameter examples are experimental.</strong> They need{" "}
+      <code>experimental-parameter-examples</code>, which TypeSpec may change.
+      Without it, path values in the samples fall back to placeholders.
+    </li>
+    <li>
+      <strong>Merge-patch bodies get no request example.</strong> The emitter
+      drops the <code>body</code> of an <code>@opExample</code> on a{" "}
+      <code>MergePatchUpdate</code> operation, so property examples are the
+      only way to shape that sample.
+    </li>
+    <li>
+      <strong>Try it still lists read-only fields.</strong> The request body
+      table and the request sample leave <code>id</code> out, but the Try it
+      form shows it as an optional, empty field.
+    </li>
+    <li>
+      <strong>Operation order doesn't follow the interface.</strong> The
+      sidebar sorts a tag's operations alphabetically by summary and the
+      overview lists them by path, whatever order the interface declares them
+      in. A <code>meta.ts</code> that lists the pages sets the sidebar order,
+      but not the overview's.
+    </li>
+    <li>
+      <strong>Agents get the prose, not the tables.</strong> The Markdown copy
+      of each operation page, which <code>llms-full.txt</code> and the{" "}
+      <code>.md</code> URLs serve, carries its summary, doc comment, and
+      endpoint, without parameters, schemas, or responses. Write the doc
+      comments so they stand on their own.
+    </li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <h3>URLs read widgets-list instead of list-widgets</h3>
+  <p>
+    The operation has no <code>@operationId</code>, so the emitter named it{" "}
+    <code>Widgets_list</code>. Add one, and if the old URLs are already
+    public, add a redirect for each in <code>blume.config.ts</code>.
+  </p>
+  <h3>validate --strict fails with BLUME_NAV_DUPLICATE_LABEL</h3>
+  <p>
+    Two operations on the same path have no <code>@summary</code>, so both
+    sidebar entries are labeled with the path. Add a summary to each.
+  </p>
+  <h3>The code samples call /widgets/string</h3>
+  <p>
+    The path parameter has no example. Add an <code>@opExample</code> with the
+    parameter's value, and check that <code>tspconfig.yaml</code> sets{" "}
+    <code>experimental-parameter-examples: data</code>. An{" "}
+    <code>@example</code> on the parameter itself isn't written to the spec.
+  </p>
+  <h3>tsp compile fails with "Property 'id' is missing"</h3>
+  <p>
+    An <code>@opExample</code> body has to be a complete instance of the
+    body's type, read-only properties included. Drop the{" "}
+    <code>@opExample</code> from that operation and rely on property
+    examples, as Create a widget does, or give the operation a body type
+    without the property, like <code>Create&lt;Widget&gt;</code>.
+  </p>
+  <h3>The Analysis group comes before Widgets</h3>
+  <p>
+    The tags are declared with one <code>@tagMetadata</code> each, which
+    writes them in reverse. Use the array form. If a <code>meta.ts</code>{" "}
+    sits in the tag's folder, give it the tag's <code>order</code> as well.
+  </p>
+  <h3>The build fails with BLUME_OPENAPI_UNAVAILABLE</h3>
+  <p>
+    Blume couldn't find <code>openapi.json</code>. <code>blume build</code> on
+    its own doesn't compile TypeSpec, so run <code>npm run build</code>, or{" "}
+    <code>npm run spec</code> first. In <code>blume dev</code> a missing spec
+    is only a warning and the reference is skipped, so a working dev server
+    can hide it.
+  </p>
+</GuidePage>

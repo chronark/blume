@@ -103,9 +103,10 @@ export interface Guide {
   updated?: string;
 }
 
-// Written 2026-09-27 against main ahead of the 2.1 release, from the plan in
-// "Search-focused tutorials for Blume". None has been run end to end on a
-// clean project yet, so none sets `tested`, and none has its example project.
+// The first batch was written 2026-09-27 against main ahead of the 2.1
+// release, from the plan in "Search-focused tutorials for Blume". None of
+// those has been run end to end on a clean project yet, so none sets `tested`.
+// Guides added since set `tested` only when their walkthrough really ran.
 export const guides: Guide[] = [
   {
     author: "hayden",
@@ -718,6 +719,81 @@ export const guides: Guide[] = [
     summary:
       "A DRF API whose drf-spectacular schema generates without warnings, published as an API reference with a first-request tutorial beside it and rebuilt from code in CI.",
     title: "Build Django REST Framework docs with drf-spectacular",
+    topic: "reference",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/references/openapi", label: "OpenAPI reference" },
+      {
+        href: "/docs/references/openapi#multiple-specs",
+        label: "Multiple specs",
+      },
+      { href: "/docs/content/meta", label: "Folder meta" },
+      { href: "/docs/cli/validate", label: "Validate" },
+    ],
+    id: "typespec-documentation-website",
+    image: { src: "/guides/typespec-documentation-website.webp" },
+    meta: {
+      description:
+        "Compile a TypeSpec API definition to OpenAPI and publish it with Blume: doc comments, summaries, and examples become a page per operation, beside your guides.",
+      title: "How to publish API documentation from a TypeSpec definition",
+    },
+    nextStep: {
+      body: "Run it at the root of your TypeSpec project, point openapi() at the file tsp compile writes, and give every operation a @summary.",
+      command: "npx blume init . --template docs --yes",
+      link: {
+        href: "/guides/openapi-documentation-ci",
+        label: "Add breaking-change checks in CI",
+      },
+      title: "Add docs to your TypeSpec project",
+    },
+    prerequisites: [
+      "A TypeSpec project, or the REST template created in the guide",
+      "Node.js 22.12 or later",
+      "Some familiarity with TypeSpec decorators",
+    ],
+    published: "2026-10-05",
+    summary:
+      "Compile TypeSpec to OpenAPI in the same project as your docs, turn doc comments, summaries, and examples into a page per operation, and fail CI when the committed spec goes stale.",
+    tested: { date: "2026-10-05", version: "2.1.3" },
+    title: "Publish API documentation from a TypeSpec definition",
+    topic: "reference",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/content/navigation#tabs", label: "Navigation tabs" },
+      { href: "/docs/content/meta", label: "Folder meta" },
+      { href: "/docs/content/frontmatter", label: "Frontmatter" },
+      { href: "/docs/cli/validate", label: "blume validate" },
+    ],
+    id: "typescript-library-documentation-typedoc",
+    image: { src: "/guides/typescript-library-documentation-typedoc.webp" },
+    meta: {
+      description:
+        "Generate TypeScript API reference from TSDoc comments with TypeDoc and typedoc-plugin-markdown, and publish it in a Reference tab beside your tutorials.",
+      title: "How to build a TypeScript library docs site with TypeDoc",
+    },
+    nextStep: {
+      body: "Run it at the root of your library's repository, then add TypeDoc, the two plugins, and the config from this guide.",
+      command: "npx blume init docs-site --template docs --yes",
+      link: {
+        href: "/docs/content/navigation#tabs",
+        label: "Read the navigation docs",
+      },
+      title: "Add a docs site to your library",
+    },
+    prerequisites: [
+      "A TypeScript library with TSDoc comments",
+      "The library's dependencies installed, since TypeDoc type-checks it",
+      "Node.js 22.12 or later",
+    ],
+    published: "2026-10-05",
+    summary:
+      "Turn your TSDoc comments into a page per export with TypeDoc, and publish them in a Reference tab beside hand-written tutorials, with links between the two checked on every pull request.",
+    tested: { date: "2026-10-05", version: "2.1.3" },
+    title: "Publish TypeScript API reference beside your tutorials",
     topic: "reference",
   },
   {
