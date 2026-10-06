@@ -510,6 +510,18 @@ describe("the generated Astro config", () => {
       '"redirects":[["^/docs/old/?$","/base/docs/new",307],["^/docs/old\\\\.md/?$","/base/docs/new.md",307],["^/docs/old\\\\.mdx/?$","/base/docs/new.mdx",307]]'
     );
   });
+
+  it("leaves the home page's Markdown copies to their endpoint", () => {
+    // `/index.md` is the home page's copy: a redirect there would replace it
+    // with a redirect page pointing at itself.
+    const generated = configFor({ redirects: [{ from: "/index", to: "/" }] }, [
+      "/",
+    ]);
+    expect(generated).toContain(
+      'redirects: {"/index":{"destination":"/","status":301}},'
+    );
+    expect(generated).toContain('"redirects":[["^/index/?$","/",301]]');
+  });
 });
 
 describe("the scan", () => {
@@ -570,5 +582,40 @@ describe("the scan", () => {
       redirects: scanned.config.redirects,
     });
     expect(links).toEqual([]);
+  });
+
+  it("warns on an exact redirect from a page's Markdown copy", async () => {
+    const scanned = await scanProject(
+      await scratch({
+        "blume.config.ts": `export default ${JSON.stringify({
+          redirects: [
+            { from: "/intro.md", to: "/intro" },
+            { from: "/index.mdx", to: "/llms.txt" },
+            // No page has these copies, and `/index` is no copy at all.
+            { from: "/gone.md", to: "/" },
+            { from: "/index", to: "/" },
+          ],
+        })};\n`,
+        "docs/index.md": "---\ntitle: Home\n---\n\nHome.\n",
+        "docs/intro.md": "---\ntitle: Intro\n---\n\nIntro.\n",
+      }),
+      { mode: "build" }
+    );
+    expect(
+      scanned.diagnostics
+        .filter(
+          (diagnostic) => diagnostic.code === "BLUME_REDIRECT_MATCHES_PAGE"
+        )
+        .map((diagnostic) => [diagnostic.severity, diagnostic.message])
+    ).toEqual([
+      [
+        "warning",
+        "The redirect from /intro.md is also the Markdown copy of the page /intro, so that copy never publishes: its URL redirects to /intro instead.",
+      ],
+      [
+        "warning",
+        "The redirect from /index.mdx is also the Markdown copy of the page /, so that copy never publishes: its URL redirects to /llms.txt instead.",
+      ],
+    ]);
   });
 });

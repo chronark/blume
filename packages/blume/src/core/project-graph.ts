@@ -15,7 +15,10 @@ import {
   realPath,
   resolveLastModifiedConfig,
 } from "./last-modified.ts";
+import { routeSetFor } from "./locale-links.ts";
+import type { RouteSet } from "./locale-links.ts";
 import { buildManifest } from "./manifest.ts";
+import { mirroredPage } from "./markdown-mirrors.ts";
 import { discoverFolderMeta } from "./meta.ts";
 import type { FolderMetaSource } from "./meta.ts";
 import { resolveProjectContext } from "./project.ts";
@@ -315,29 +318,45 @@ const substituteLoadedVariables = (
  * Astro ranks its route above the page's catch-all, in dev and build alike,
  * and writes the redirect page where the page would go, so the page never
  * publishes. That's a warning rather than an error, since the outcome doesn't
- * depend on the host.
+ * depend on the host. So is one from a page's Markdown copy (`/guide.md`, or
+ * the root's `/index.md`), which it takes over the same way. `mirrored` are
+ * the routes served with copies: the content pages.
  */
 const redirectPageDiagnostics = (
   config: ResolvedConfig,
   pages: readonly string[],
+  mirrored: RouteSet,
   configFile: string | null
 ): Diagnostic[] =>
   config.redirects.flatMap((redirect): Diagnostic[] => {
     const from = withBasePath(config.basePath, redirect.from);
     if (!isPatternPath(redirect.from)) {
       const page = normalizePath(from);
-      return pages.includes(page)
-        ? [
+      if (pages.includes(page)) {
+        return [
+          {
+            code: "BLUME_REDIRECT_MATCHES_PAGE",
+            file: configFile ?? undefined,
+            message: `The redirect from ${redirect.from} is also the page ${page}, which never publishes: its URL redirects to ${redirect.to} instead.`,
+            severity: "warning",
+            suggestion:
+              "If the page moved, delete it or give it a new slug; otherwise remove the redirect.",
+          } satisfies Diagnostic,
+        ];
+      }
+      const owner = mirroredPage(mirrored, page);
+      return owner === undefined
+        ? []
+        : [
             {
               code: "BLUME_REDIRECT_MATCHES_PAGE",
               file: configFile ?? undefined,
-              message: `The redirect from ${redirect.from} is also the page ${page}, which never publishes: its URL redirects to ${redirect.to} instead.`,
+              message: `The redirect from ${redirect.from} is also the Markdown copy of the page ${owner}, so that copy never publishes: its URL redirects to ${redirect.to} instead.`,
               severity: "warning",
               suggestion:
-                "If the page moved, delete it or give it a new slug; otherwise remove the redirect.",
+                "Remove the redirect: that URL serves the page's Markdown to agents.",
             } satisfies Diagnostic,
-          ]
-        : [];
+          ];
     }
     const matched = pathsUnderPattern(from, pages);
     const [first] = matched;
@@ -607,6 +626,7 @@ export const scanProject = async (
       ...redirectPageDiagnostics(
         config,
         [...manifest.routes.map((route) => route.path), ...extraRoutes],
+        routeSetFor(manifest.routes),
         context.configFile
       ),
     ],

@@ -8,6 +8,11 @@ import {
 } from "../core/base-path.ts";
 import { routeSetFor, servesRoute } from "../core/locale-links.ts";
 import type { RouteSet } from "../core/locale-links.ts";
+import {
+  MIRROR_EXTENSIONS,
+  mirrorName,
+  mirrorOwner,
+} from "../core/markdown-mirrors.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import {
   compileRedirects,
@@ -113,12 +118,6 @@ export const applyBaseToPlatformRedirects = (
 };
 
 /**
- * The raw-Markdown copies Blume serves beside every page (`/guide.md`,
- * `/guide.mdx`; see `rawMarkdownEndpointTemplate`).
- */
-const MIRROR_EXTENSIONS = [".md", ".mdx"] as const;
-
-/**
  * A path naming an `.html` file (`/guide.html`), the URL another generator
  * served a page at. No Blume page was ever served there, so it had no
  * Markdown copy (`/guide.html.md`) for a redirect to move.
@@ -127,24 +126,25 @@ const HTML_FILE_PATH = /\.html$/u;
 
 /**
  * Where a page's Markdown copy is served, from the page's served path and the
- * deployment base that path carries: the endpoints name the root `index`.
+ * deployment base that path carries.
  */
-const mirrorPath = (path: string, base: string, extension: string): string => {
-  const route = stripBasePath(base, path);
-  return `${base}${route === "/" ? "/index" : route}${extension}`;
-};
+const mirrorPath = (path: string, base: string, extension: string): string =>
+  `${base}${mirrorName(stripBasePath(base, path))}${extension}`;
 
 /**
  * Based `redirects`, each exact one that moves a page followed by the same
- * redirect for the page's Markdown copies: from a path no page is served at
- * to one a page is, `/old.md` goes to `/new.md` (and `.mdx` alike), where it
- * would otherwise 404 for an agent still reading the old URL. A pattern gets
- * none; one that carries its capture over (`/beta/:slug*` → `/v2/:slug*`)
- * already moves `/beta/guide.md` along. Nor does a redirect from an `.html`
- * file (`/guide.html`, from a migrated site), which had no copy to move.
- * `pages` are the served page routes (carrying `basePath`, not
- * `deployment.base`), and `bases` the deployment base each end carries:
- * Astro's config leaves it off `from` (see {@link applyBaseToAstroRedirects}).
+ * redirect for the page's Markdown copies: from a path whose copies no page
+ * serves to one a page is served at, `/old.md` goes to `/new.md` (and `.mdx`
+ * alike), where it would otherwise 404 for an agent still reading the old
+ * URL. A served copy never gives way: `/index` names the root's copies, so
+ * `/index` → `/` moving them would turn the home page's `/index.md` into a
+ * redirect to itself. A pattern gets none; one that carries its capture over
+ * (`/beta/:slug*` → `/v2/:slug*`) already moves `/beta/guide.md` along. Nor
+ * does a redirect from an `.html` file (`/guide.html`, from a migrated site),
+ * which had no copy to move. `pages` are the served page routes (carrying
+ * `basePath`, not `deployment.base`), and `bases` the deployment base each
+ * end carries: Astro's config leaves it off `from` (see
+ * {@link applyBaseToAstroRedirects}).
  */
 export const withMirrorRedirects = (
   redirects: Redirect[],
@@ -158,7 +158,8 @@ export const withMirrorRedirects = (
       !isPatternPath(redirect.from) &&
       !HTML_FILE_PATH.test(from) &&
       servesRoute(pages, stripBasePath(bases.to, to)) &&
-      !servesRoute(pages, stripBasePath(bases.from, from));
+      mirrorOwner(pages, mirrorName(stripBasePath(bases.from, from))) ===
+        undefined;
     return movesPage
       ? [
           redirect,

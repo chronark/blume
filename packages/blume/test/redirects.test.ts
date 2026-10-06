@@ -247,6 +247,69 @@ describe("a moved page's Markdown copies", () => {
     expect(withMirrorRedirects(kept, pages, unbased)).toStrictEqual(kept);
   });
 
+  it("never take over a copy that's already served", () => {
+    // `/index` names the root's copies: moving them would turn the home
+    // page's `/index.md` into a redirect to itself.
+    const home = [{ from: "/index", status: 301 as const, to: "/" }];
+    expect(withMirrorRedirects(home, pages, unbased)).toStrictEqual(home);
+    // So under a deployment base, on either side of Astro's asymmetry.
+    const based = [{ from: "/base/index", status: 301 as const, to: "/base" }];
+    expect(
+      withMirrorRedirects(based, pages, { from: "/base", to: "/base" })
+    ).toStrictEqual(based);
+    const astro = [{ from: "/index/", status: 308 as const, to: "/base/" }];
+    expect(
+      withMirrorRedirects(astro, pages, { from: "", to: "/base" })
+    ).toStrictEqual(astro);
+    // The root's copies are served with no page at `/` too (a landing page
+    // gets the llms.txt index), so neither `/index` nor `/` moves them.
+    const landing = new Set(["/new"]);
+    const fromRoot = [
+      { from: "/index", status: 301 as const, to: "/new" },
+      { from: "/", status: 301 as const, to: "/new" },
+    ];
+    expect(withMirrorRedirects(fromRoot, landing, unbased)).toStrictEqual(
+      fromRoot
+    );
+    // Under `basePath`, the root page's copies are `/docs.md`, so nothing is
+    // served at `/docs/index.md` and its copies move as any others do.
+    expect(
+      withMirrorRedirects(
+        [{ from: "/docs/index", status: 301, to: "/docs" }],
+        pages,
+        unbased
+      ).slice(1)
+    ).toStrictEqual([
+      { from: "/docs/index.md", status: 301, to: "/docs.md" },
+      { from: "/docs/index.mdx", status: 301, to: "/docs.mdx" },
+    ]);
+  });
+
+  it("keep the home page's copies out of every host file", () => {
+    // SAFETY: platformRedirects reads only basePath, deployment.base, and
+    // redirects; the rest of ResolvedConfig is irrelevant to this test.
+    const config = {
+      basePath: "",
+      deployment: { options: {} },
+      redirects: [
+        { from: "/index", status: 301, to: "/" },
+        { from: "/old", status: 301, to: "/new" },
+      ],
+    } as ResolvedConfig;
+    // SAFETY: platformRedirects reads only each route's path.
+    const routes = [{ path: "/" }, { path: "/new" }] as RouteManifestEntry[];
+    const platform = platformRedirects({ config, manifest: { routes } });
+    expect(buildNetlifyRedirects(platform)).toBe(
+      "/index / 301\n/old /new 301\n/old.md /new.md 301\n/old.mdx /new.mdx 301\n"
+    );
+    expect(
+      JSON.parse(buildVercelConfig(platform)).redirects.map(
+        (redirect: { source: string }) => redirect.source
+      )
+    ).toStrictEqual(["/index", "/old", "/old.md", "/old.mdx"]);
+    expect(JSON.parse(buildRedirectManifest(platform))).toStrictEqual(platform);
+  });
+
   it("reach the platform redirects, exact paths still first", () => {
     // SAFETY: platformRedirects reads only basePath, deployment.base, and
     // redirects; the rest of ResolvedConfig is irrelevant to this test.
