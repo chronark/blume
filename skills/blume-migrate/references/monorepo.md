@@ -46,7 +46,7 @@ Report to the user: the detected content root, the folders you scoped `include` 
 
 ---
 
-## 2. pnpm `minimumReleaseAge` blocks installing fresh Blume
+## 2. Release-age guards (pnpm `minimumReleaseAge`, Yarn `npmMinimalAgeGate`) block installing fresh Blume
 
 pnpm's supply-chain guard (`minimumReleaseAge`, often set to `1440` = 24h) refuses to install any package version published more recently than the window. Right after Blume publishes, that's **every** Blume release — so `pnpm add blume` / the workspace install fails or silently pins an older version.
 
@@ -75,13 +75,15 @@ minimum-release-age-exclude[]=blume
 
 Report: "Added `blume` to `minimumReleaseAgeExclude` so the just-published version installs; the release-age guard still applies to everything else."
 
+**Yarn ≥4.10** has the same guard: `npmMinimalAgeGate` in `.yarnrc.yml` (e.g. `2w`). Its per-package exemption is `npmPreapprovedPackages`. Yarn reads rc files from parent directories, so a nested `docs/` package inherits the root's gate. Detect with `grep -rn "npmMinimalAgeGate" .yarnrc.yml docs/.yarnrc.yml 2>/dev/null`, then add `npmPreapprovedPackages: ["blume"]` (or append `blume` to the existing list) in the file that sets the gate. Don't remove the gate.
+
 ---
 
-## 3. Frozen lockfile — regenerate and commit `pnpm-lock.yaml` in the same change
+## 3. Frozen lockfile — regenerate and commit the lockfile in the same change
 
 CI and Vercel install with `--frozen-lockfile` (pnpm's default in CI): if `package.json` and `pnpm-lock.yaml` disagree by even one dependency, the install **fails immediately** — before any build step runs. A migration always edits dependencies (add `blume`, drop the old framework), so the lockfile is guaranteed stale.
 
-**After every dependency edit, regenerate the lockfile and stage it with the manifest:**
+**After every dependency edit, regenerate the lockfile with the repo's package manager (`pnpm install` from the workspace root, `yarn install`, `npm install`, `bun install`) and stage it with the manifest.** The pnpm case:
 
 ```bash
 pnpm install            # NOT --frozen-lockfile — this rewrites pnpm-lock.yaml
@@ -210,6 +212,7 @@ patchedDependencies:
 Commit **both** the patch file and the `patchedDependencies` entry, then re-run `pnpm install`.
 
 - **The patch is pinned to `oxfmt@0.71.0`** (the version Blume's own repo pins). pnpm requires an exact version match, and the diff targets a file whose name is hashed per oxfmt release (`dist/markdown-*.js`), so it won't apply to any other version. If `pnpm why oxfmt` reports a different one, pin `oxfmt` to `0.71.0` as a direct dev dependency (Ultracite accepts any `oxfmt` ≥ 0.59 as a peer). If the repo can't take that pin, tell the user and fall back to keeping directive-heavy files out of the formatter's globs.
+- **The risk isn't Ultracite-only.** Any plain `oxfmt` run over Markdown (a lint-staged `oxfmt` on `**/*.md`, say) treats `:::` the same way. Check `lint-staged`/pre-commit config for globs that reach the migrated pages; `.mdx` files outside an `*.md` glob are safe.
 - **Not on pnpm?** The patch mechanism is pnpm-specific. For npm/yarn, either pin oxfmt and apply the diff with `patch-package`, or exclude `.md`/`.mdx` from Ultracite formatting so it never touches the directives — report whichever you chose.
 
 ---
@@ -218,6 +221,7 @@ Commit **both** the patch file and the `patchedDependencies` entry, then re-run 
 
 - [ ] Located real content folders (not assumed `docs/`); set `content.root` + scoped `content.include`.
 - [ ] `minimumReleaseAge` present? Added `blume` to `minimumReleaseAgeExclude` only.
+- [ ] `npmMinimalAgeGate` present? Added `blume` to `npmPreapprovedPackages` only.
 - [ ] Ran plain `pnpm install`; committed `pnpm-lock.yaml` with the `package.json` change; verified `pnpm install --frozen-lockfile` is clean.
 - [ ] Wrote `apps/docs/vercel.json` + package scripts; told the user to set Root Directory + Node 22 in the Vercel project.
 - [ ] Checked for a workspace Vite override; if the build crashes inside Astro/Vite, gave the pnpm-patch recipe.

@@ -19,17 +19,33 @@ export const MIGRATE_SOURCES = [
   "docusaurus",
   "starlight",
   "nextra",
+  "vitepress",
+  "vuepress",
+  "mkdocs",
+  "fern",
+  "gitbook",
+  "redocly",
+  "readme",
+  "docsify",
 ] as const;
 
 export type MigrateSourceId = (typeof MIGRATE_SOURCES)[number];
 
 /** Display names, for messages and the prompt. */
 export const MIGRATE_SOURCE_NAMES: Record<MigrateSourceId, string> = {
+  docsify: "Docsify",
   docusaurus: "Docusaurus",
+  fern: "Fern",
   fumadocs: "Fumadocs",
+  gitbook: "GitBook",
   mintlify: "Mintlify",
+  mkdocs: "MkDocs",
   nextra: "Nextra",
+  readme: "ReadMe",
+  redocly: "Redocly",
   starlight: "Starlight",
+  vitepress: "VitePress",
+  vuepress: "VuePress",
 };
 
 /** The skill's directory inside the published package. */
@@ -96,6 +112,82 @@ const SIGNALS: {
   },
   { deps: ["nextra"], source: "nextra" },
   { deps: ["@astrojs/starlight"], source: "starlight" },
+  // The config usually sits in docs/.vitepress, often with the dependency in
+  // docs/package.json rather than the root one.
+  {
+    deps: ["vitepress"],
+    files: [".vitepress", "docs/.vitepress"].flatMap((dir) =>
+      ["ts", "mts", "js", "mjs"].map((ext) => `${dir}/config.${ext}`)
+    ),
+    source: "vitepress",
+  },
+  // v1 also reads YAML and TOML configs; v2 also reads vuepress.config.* from
+  // the directory it runs in. vuepress-vite and vuepress-webpack were the v2
+  // beta wrappers.
+  {
+    deps: ["vuepress", "vuepress-vite", "vuepress-webpack"],
+    files: [
+      ...[".vuepress", "docs/.vuepress"].flatMap((dir) =>
+        ["ts", "js", "mjs", "yml", "toml"].map((ext) => `${dir}/config.${ext}`)
+      ),
+      "vuepress.config.ts",
+      "vuepress.config.js",
+      "vuepress.config.mjs",
+    ],
+    source: "vuepress",
+  },
+  // MkDocs and the tools that build its projects (Zensical, ProperDocs). They
+  // come after the JavaScript frameworks, so a stale mkdocs.yml doesn't win.
+  {
+    files: [
+      "mkdocs.yml",
+      "mkdocs.yaml",
+      "zensical.toml",
+      "properdocs.yml",
+      "properdocs.yaml",
+    ],
+    source: "mkdocs",
+  },
+  // Not fern.config.json alone: plenty of repos run Fern only to generate SDKs.
+  { files: ["fern/docs.yml"], source: "fern" },
+  // Not SUMMARY.md (mdBook and HonKit books have one too) or book.json (too
+  // generic a name).
+  {
+    deps: ["honkit", "gitbook-cli"],
+    files: ["gitbook-docs.yaml", ".gitbook.yaml", ".gitbook.yml"],
+    source: "gitbook",
+  },
+  // After the config-file sources, and never on redocly.yaml alone: that file
+  // is just as often Redocly CLI lint config in a repo built with another
+  // framework.
+  {
+    deps: [
+      "@redocly/realm",
+      "@redocly/redoc",
+      "@redocly/revel",
+      "@redocly/reef",
+      "@redocly/redoc-revel",
+      "@redocly/redoc-reef",
+      "@redocly/revel-reef",
+    ],
+    files: ["sidebars.yaml"],
+    source: "redocly",
+  },
+  // ReadMe's bi-directional Git sync; repos that only push with the rdme CLI
+  // leave no tell, so those are named-only.
+  {
+    files: [
+      "docs/_order.yaml",
+      "reference/_order.yaml",
+      "recipes/_order.yaml",
+      "custom_pages/_order.yaml",
+    ],
+    source: "readme",
+  },
+  // A Docsify site is an index.html that loads the library from a CDN, so only
+  // the ones with a manifest give themselves away. Not _sidebar.md: on a
+  // case-insensitive filesystem it also matches a GitHub wiki's _Sidebar.md.
+  { deps: ["docsify-cli", "docsify"], source: "docsify" },
 ];
 
 /**

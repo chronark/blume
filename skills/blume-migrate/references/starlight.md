@@ -12,7 +12,7 @@ Keep content where it is — set `content.root: "src/content/docs"`.
 
 ## Config: `starlight({…})` → `blume.config.ts`
 
-**Harvest the surrounding `astro.config.*` too, not just the `starlight()` call:** top-level Astro `redirects` → Blume `redirects`; `site` → `deployment.site`, unless the target host is Vercel, Netlify, or Cloudflare Pages, which Blume auto-detects (see SKILL.md); other integrations → report.
+**Harvest the surrounding `astro.config.*` too, not just the `starlight()` call:** top-level Astro `redirects` → Blume `redirects`; `site` → `deployment.site`, unless the target host is Vercel or Netlify, which Blume auto-detects (see SKILL.md); other integrations → report.
 
 | Starlight option | Blume |
 | --- | --- |

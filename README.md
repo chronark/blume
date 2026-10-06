@@ -30,7 +30,7 @@ npm run build
 
 In a project that already has a `package.json`, `blume init` leaves it alone: add `"dev": "blume dev"` and `"build": "blume build"` to its scripts, or run `npx blume dev`. Blume works with any package manager and never requires you to set up Astro or Tailwind yourself.
 
-Moving from another docs framework? `npx blume migrate` hands a Mintlify, Fumadocs, Docusaurus, Starlight, or Nextra site to Claude Code or Codex — see [Migrate to Blume](https://useblume.dev/docs/migrating). On Blume 1, run `npx blume@latest upgrade` — see [Upgrade to Blume 2](https://useblume.dev/docs/upgrading).
+Moving from another docs framework? `npx blume migrate` hands a Mintlify, Docusaurus, GitBook, MkDocs, ReadMe, or other docs site to Claude Code or Codex — see [Migrate to Blume](https://useblume.dev/docs/migrating). On Blume 1, run `npx blume@latest upgrade` — see [Upgrade to Blume 2](https://useblume.dev/docs/upgrading).
 
 ## Features
 
@@ -67,7 +67,7 @@ Moving from another docs framework? `npx blume migrate` hands a Mintlify, Fumado
 | `blume eval` | Test the docs: an agent answers your questions using only the documentation. |
 | `blume translate` | Translate docs into the configured locales with a local agent CLI. |
 | `blume version [id]` | Freeze the current docs as an archived version (no id lists configured versions). |
-| `blume migrate [source]` | Move a Mintlify, Fumadocs, Docusaurus, Starlight, or Nextra site to Blume with Claude Code or Codex. |
+| `blume migrate [source]` | Move a Mintlify, Docusaurus, GitBook, MkDocs, ReadMe, or other docs site to Blume with Claude Code or Codex. |
 | `blume upgrade` | Move to a new major: bump `blume`, then list the config changes left or hand them to Claude Code or Codex. |
 
 Run them through your package manager (`npx blume <command>`) or a `package.json` script. See the [CLI reference](https://useblume.dev/docs/cli) for every flag.

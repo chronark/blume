@@ -55,7 +55,7 @@ export const commandMeta = {
   },
   migrate: {
     description:
-      "Migrate a docs site from Mintlify, Fumadocs, Docusaurus, Starlight, or Nextra with a coding agent.",
+      "Migrate a docs site from Mintlify, Docusaurus, GitBook, MkDocs, ReadMe, or another framework with a coding agent.",
     name: "migrate",
   },
   preview: {

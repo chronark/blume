@@ -3,7 +3,7 @@
 This package ships agent skills for working with Blume documentation projects. Before modifying a Blume project, read the relevant skill. Each skill's canonical instructions live in its `SKILL.md`:
 
 - `./skills/blume/SKILL.md` — build and maintain a Blume site: scaffolding, writing Markdown/MDX, `blume.config.ts`, navigation, search, theming, SEO, and the `blume` CLI.
-- `./skills/blume-migrate/SKILL.md` — migrate an existing docs site (Mintlify, Fumadocs, Docusaurus, Starlight, Nextra, or another framework) to Blume. `blume migrate [source] --codex` (or `--claude`) opens an agent on it.
+- `./skills/blume-migrate/SKILL.md` — migrate an existing docs site (Mintlify, Docusaurus, GitBook, MkDocs, ReadMe, and the other frameworks its `references/` cover, or any other) to Blume. `blume migrate [source] --codex` (or `--claude`) opens an agent on it.
 - `./skills/blume-update-docs/SKILL.md` — audit a Blume docs site against the product it documents, fix stale pages, and open a maintenance pull request.
 - `./skills/blume-write-skill/SKILL.md` — write the docs site's own agent skill from its docs, in place of the page map Blume generates at `/skill.md`. `blume skill --codex` (or `--claude`) opens an agent on it.
 
