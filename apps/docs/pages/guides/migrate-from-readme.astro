@@ -1,0 +1,534 @@
+---
+// Migrate from ReadMe: written from an end-to-end run of the blume-migrate
+// skill (SKILL.md and references/readme.md) on a real ReadMe hub in
+// bi-directional Git sync: github.com/basiqio-oss/Basiq-docs, its default
+// version's branch v3.0 at 09b542aa4f15bf4e4330837a0f26f936ad1b86c6 plus
+// changelogs/ from main at df271b8e8991a7263bbbba057d3b47aecae35e1e
+// (published at api.basiq.io: 75 guides, 10 OpenAPI files with 73 endpoint
+// pages and 21 tag pages, 61 changelog entries), with Blume 2.1.3 (main, the
+// CLI run by path). The agent read only the skill and the Blume docs it points
+// to, and wrote its own converters. Outcome: `blume build` passed (227 pages,
+// 0 warnings; 107 redirects), `blume validate --strict` and `blume audit
+// --only redirects` passed, and all 247 old URLs (the repo's files plus the
+// sitemap) resolved against dist/: 149 as pages, 98 by redirect to a page.
+// Also checked with curl: the hub's settings JSON, and that ReadMe answers an
+// empty parent and a tag page with a 302 to the first child. The hub started
+// answering 429 after 8 requests in a few minutes.
+// After the run, scripts/readme-codemod.mjs was written from the run's
+// converters and friction, the reference was rewritten around it, and
+// scripts/operation-routes.mjs replaced the run's route matching. The codemod
+// was checked on a fresh copy of the same two commits: both passes, each
+// idempotent; then the run's hand work (its pages and islands for the 11
+// files the codemod reports as needing a person, its config, and its
+// dead-link fixes); then build, validate --strict, and audit passed, and 247
+// of 247 old URLs resolved (149 pages, 98 redirects). The URL check below was
+// run against `blume dev` on a probe with an exact and a pattern redirect.
+// In review: the codemod's test and that fresh-copy check were rerun after
+// fixes to the codemod (same result; its Basiq output changed only in two
+// lone accordions that now keep their icons); the Acme before/after below is
+// the codemod's real output; `blume migrate` with no agent flag, run by path
+// from the working tree's CLI in the Basiq checkout, detected ReadMe from
+// docs/_order.yaml; the URL check was rerun in zsh; a probe build showed that
+// Tailwind classes in MDX and islands compile; curl showed ReadMe answers
+// /docs and /reference with a 301 and / with a 302; heading ids on two saved
+// hub pages matched Blume's (github-slugger on both), callout titles aside.
+// Blume claims were checked in packages/blume/src and apps/docs/content/docs,
+// ReadMe claims in ReadMe's docs and the readmeio/markdown and rdme sources.
+// Not run: `npx blume migrate readme --claude` itself (the readme source
+// isn't in 2.1.3, so the entry sets no `tested`), an agent following the
+// revised reference end to end, a deploy, or the lockfile regeneration.
+// The example project and snippets below are invented (Acme).
+import Callout from "blume/components/content/Callout.astro";
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const readmePage = [
+  "---",
+  "title: Create an order",
+  "excerpt: Place your first order with the Orders API.",
+  "metadata:",
+  "  title: Create an order | Acme",
+  "icon: fa-cart-shopping",
+  "---",
+  "# Create an order",
+  "",
+  "> 📘 Sandbox keys",
+  ">",
+  "> Test keys never charge a card. See [API keys](doc:api-keys).",
+  "",
+  '<Image align="center" src="https://files.readme.io/1a2b3c4-order-flow.png" />',
+  "",
+  "```curl",
+  "curl https://api.acme.example/v1/orders",
+  "```",
+  "```javascript Node SDK",
+  'await acme.orders.create({ sku: "tee" });',
+  "```",
+].join("\n");
+
+const blumePage = [
+  "---",
+  "title: Create an order",
+  "description: Place your first order with the Orders API.",
+  "icon: shopping-cart",
+  "seo:",
+  "  title: Create an order | Acme",
+  "---",
+  "",
+  ":::info[Sandbox keys]",
+  "Test keys never charge a card. See [API keys](/docs/api-keys).",
+  ":::",
+  "",
+  "![order flow](https://files.readme.io/1a2b3c4-order-flow.png)",
+  "",
+  "<CodeGroup>",
+  "",
+  "```bash cURL",
+  "curl https://api.acme.example/v1/orders",
+  "```",
+  "",
+  '```javascript title="Node SDK"',
+  'await acme.orders.create({ sku: "tee" });',
+  "```",
+  "",
+  "</CodeGroup>",
+].join("\n");
+
+const changelogCommand = "git archive origin/main changelogs | tar -x";
+
+const sitemapCommand = [
+  "curl -s https://docs.acme.example/sitemap.xml \\",
+  "  | grep -o '<loc>[^<]*' \\",
+  "  | sed -e 's#<loc>https://docs.acme.example##' \\",
+  "  > ../old-urls.txt",
+].join("\n");
+
+const hubPageCommand =
+  "curl -s https://docs.acme.example/docs/getting-started -o hub.html";
+
+const hiddenUrlsCommand = [
+  "node -p \"require('./readme-migration.json').urls.map((u) => u.url).join('\\n')\" \\",
+  "  >> ../old-urls.txt",
+  "sort -u -o ../old-urls.txt ../old-urls.txt",
+].join("\n");
+
+const urlCheck = [
+  "while read -r route; do",
+  '  code=$(curl -sL -o /dev/null -w "%{http_code}" "http://localhost:4321$route")',
+  '  [ "$code" = "200" ] || echo "$code $route"',
+  "done < ../old-urls.txt",
+].join("\n");
+
+const handlerGrep = [
+  "grep -rnE 'on[A-Z][a-zA-Z]*=|<style|className=\"fa' \\",
+  "  docs reference recipes page changelog --include='*.mdx'",
+].join("\n");
+
+const variableSyntax = "{{name}}";
+
+const corsProbe = [
+  "curl -si -X OPTIONS https://api.acme.example/v1/orders \\",
+  "  -H 'Origin: https://docs.acme.example' \\",
+  "  -H 'Access-Control-Request-Method: GET' \\",
+  "  | grep -i '^access-control-allow-origin'",
+].join("\n");
+---
+
+<GuidePage guide={guideById("migrate-from-readme")}>
+  <p>
+    By the end of this guide, your ReadMe developer hub is a Blume project in
+    the same repository: your guides and changelog converted from ReadMe's
+    Markdown to Blume's, your categories rebuilt as folders, your API reference
+    generated from the OpenAPI files you already sync, and every old URL either
+    still serving its page or redirecting to it. A coding agent does the
+    conversion with a codemod that ships with Blume, and you review it.
+  </p>
+
+  <h2>Which repository you have</h2>
+  <p>
+    ReadMe is hosted, so what's in Git depends on how your project talks to it:
+  </p>
+  <ul>
+    <li>
+      <strong>Bi-directional Git sync.</strong> ReadMe commits every page to
+      your repository: folders per category, <code>_order.yaml</code> files for
+      the sidebar order, your OpenAPI files in <code>reference/</code>, and one
+      branch per version. This is the shape the codemod reads, and the one this
+      guide follows.
+    </li>
+    <li>
+      <strong>Uploads with <code>rdme</code>.</strong> A CI step pushes Markdown
+      files to ReadMe, and each file's frontmatter places it in the sidebar.
+      The repository holds only what CI uploads, so edits made in ReadMe's
+      editor are missing. The agent rebuilds the folders from frontmatter
+      first, then converts the pages.
+    </li>
+    <li>
+      <strong>No Git at all.</strong> Export first. On a current project,
+      connect bi-directional sync to a new, empty repository (Settings → Git
+      Connection): ReadMe writes the whole hub there, every version as a
+      branch, and you're in the first case.
+    </li>
+  </ul>
+
+  <h2>What carries over</h2>
+  <p>
+    Your pages are MDX already, so most of the work is ReadMe's own syntax and
+    keeping its flat URLs. On one real hub with 75 guides and 10 API
+    definitions, the build passed and all 247 old URLs either served a page or
+    redirected to one.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In ReadMe</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td>Dashboard settings: logo, colors, fonts, navigation names</td>
+        <td><code>blume.config.ts</code>, read from the settings your hub publishes</td>
+      </tr>
+      <tr>
+        <td>Categories and <code>_order.yaml</code></td>
+        <td>Group folders, which add nothing to the URL, with a <code>meta.ts</code> for order</td>
+      </tr>
+      <tr>
+        <td>Pages nested under a parent page</td>
+        <td>Folders, with each page's flat URL pinned in its frontmatter</td>
+      </tr>
+      <tr>
+        <td>Emoji blockquotes and <code>&lt;Callout&gt;</code></td>
+        <td><code>:::info</code>, <code>:::warning</code>, and the other callouts</td>
+      </tr>
+      <tr>
+        <td>Code blocks written back to back</td>
+        <td><code>&lt;CodeGroup&gt;</code> tabs</td>
+      </tr>
+      <tr>
+        <td><code>&lt;Image&gt;</code>, <code>&lt;Embed&gt;</code>, <code>&lt;Table&gt;</code>, <code>&lt;Cards&gt;</code>, <code>&lt;Accordion&gt;</code></td>
+        <td>Markdown images, <code>&lt;YouTube&gt;</code>, Markdown tables, <code>&lt;CardGroup&gt;</code>, <code>&lt;Accordion&gt;</code> and <code>&lt;Expandable&gt;</code></td>
+      </tr>
+      <tr>
+        <td>Glossary terms</td>
+        <td><code>&lt;Tooltip&gt;</code>, with each definition from your hub</td>
+      </tr>
+      <tr>
+        <td>Reusable content blocks</td>
+        <td>Partials in <code>_snippets/</code>, pulled in with <code>&lt;include&gt;</code></td>
+      </tr>
+      <tr>
+        <td>Custom components</td>
+        <td>Blume components, or React islands when they're interactive</td>
+      </tr>
+      <tr>
+        <td>Endpoint pages, one per operation</td>
+        <td>
+          Pages generated from your OpenAPI files, in ReadMe's order, with any
+          prose you wrote on them
+        </td>
+      </tr>
+      <tr>
+        <td>The changelog, from your <code>main</code> branch</td>
+        <td>Changelog pages with the same URLs, an index, and an RSS feed</td>
+      </tr>
+      <tr>
+        <td>Font Awesome icons</td>
+        <td>Lucide icons</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Here's one page before and after the conversion:</p>
+  <CodeBlock code={readmePage} lang="md" title="docs/Orders/create-an-order.md (ReadMe)" />
+  <CodeBlock code={blumePage} lang="mdx" title="docs/(Orders)/create-an-order.mdx (Blume)" />
+  <p>
+    The page still serves <code>/docs/create-an-order</code>. Every page
+    becomes <code>.mdx</code>, since ReadMe's <code>.md</code> files are MDX.
+  </p>
+
+  <h2>Before you start</h2>
+  <p>
+    Check out the branch named after your hub's default version (not{" "}
+    <code>main</code>, which holds the changelog) and branch from it.{" "}
+    <strong>Use a name that matches none of your ReadMe versions:</strong> with
+    sync on, ReadMe reads and writes every branch named after a version, so
+    restructuring one changes your live hub.
+  </p>
+  <CodeBlock code="git switch -c migrate-to-blume" lang="bash" />
+  <p>
+    ReadMe keeps the changelog only on <code>main</code>. Bring it into your
+    working tree:
+  </p>
+  <CodeBlock code={changelogCommand} lang="bash" />
+  <p>
+    Then save every URL your hub serves today, outside the repository:
+  </p>
+  <CodeBlock code={sitemapCommand} lang="bash" />
+  <p>
+    And save one page of the hub as <code>hub.html</code> at the root of the
+    repository. Every page embeds your project's settings (logo, colors, fonts,
+    navigation names, glossary, and ReadMe's own redirects), so the agent reads
+    them from that file instead of asking you, and deletes it when it's done:
+  </p>
+  <CodeBlock code={hubPageCommand} lang="bash" />
+  <p>
+    Replace <code>docs.acme.example</code> with your hub's domain. ReadMe can
+    start refusing requests (<code>429</code>) after as few as eight in a few
+    minutes, so save these files rather than fetching pages one by one. Check
+    that you have Node.js 22.12 or later, and that Claude Code or Codex is
+    installed and signed in.
+  </p>
+
+  <h2>Run the migration</h2>
+  <p>From the root of your repository, run:</p>
+  <CodeBlock code="npx blume migrate readme --claude" lang="bash" />
+  <p>
+    To use Codex, swap <code>--claude</code> for <code>--codex</code>. Leave out{" "}
+    <code>readme</code> and Blume detects a synced repository from its{" "}
+    <code>_order.yaml</code> files. An <code>rdme</code> upload repository
+    leaves no such sign, so name the source there.
+  </p>
+  <p>
+    <code>blume migrate</code> converts nothing itself. It opens the agent on the{" "}
+    <code>blume-migrate</code> skill inside the package, pointed at its ReadMe
+    reference. Following it, the agent:
+  </p>
+  <ol>
+    <li>
+      Runs the ReadMe codemod, which moves every page into place, converts
+      ReadMe's syntax and frontmatter, turns <code>_order.yaml</code> into{" "}
+      <code>meta.ts</code>, and writes the redirects it can already compute. It
+      lists everything that needs a person.
+    </li>
+    <li>
+      Writes <code>blume.config.ts</code> from your hub's settings, with each
+      OpenAPI file as a source of the <code>openapi()</code> reference.
+    </li>
+    <li>
+      Works through the codemod's list: custom components, interactive
+      widgets, page styles, links that were already broken, and images.
+    </li>
+    <li>
+      Builds once, reads the new operation routes from the build, and runs the
+      codemod's second pass, which redirects every old endpoint URL and puts
+      each tag's endpoints back in ReadMe's order.
+    </li>
+    <li>
+      Adds a <code>package.json</code>, removes any <code>rdme</code> upload
+      steps from CI, and runs <code>blume build</code>,{" "}
+      <code>blume validate --strict</code>, and{" "}
+      <code>blume audit --only redirects</code> until they pass.
+    </li>
+  </ol>
+  <p>
+    It ends with a summary of what it migrated, dropped, and approximated. Keep
+    it for the review.
+  </p>
+  <Callout type="info">
+    The codemod gives the same output every time; the agent's work around it
+    is judgment, so two runs can differ. Read the diff rather than trusting it.
+  </Callout>
+
+  <h2>Review the changes</h2>
+  <p>
+    Start with <code>git diff --stat</code>, run <code>npx blume dev</code>, and
+    check these, which are where a ReadMe migration most often needs a second
+    look.
+  </p>
+  <ul>
+    <li>
+      <strong>Interactive widgets.</strong> A button with an{" "}
+      <code>onClick</code> pasted into a page builds fine in Blume and does
+      nothing. Hubs often paste the same one, such as a "contact support" box,
+      into many pages. Each should now be one React island. The search below
+      should print nothing outside code samples.
+    </li>
+    <li>
+      <strong>Page styles.</strong> Rules in a page's{" "}
+      <code>&lt;style&gt;</code> block, like <code>ul {"{ … }"}</code>, restyle
+      the whole site, sidebar included, once they move to{" "}
+      <code>theme.css</code>. Pages that leaned on them should be rebuilt with
+      components instead.
+    </li>
+    <li>
+      <strong>Custom components.</strong> Blume compiles Tailwind classes, but
+      ReadMe's own CSS variables don't exist here, so check each block the
+      agent ported or replaced, in light and dark mode.
+    </li>
+    <li>
+      <strong>Callouts and code tabs.</strong> A blockquote that starts with an
+      emoji was a callout on ReadMe; one the conversion missed shows as a plain
+      quote. Fenced blocks written back to back were tabs; check the tab
+      labels.
+    </li>
+    <li>
+      <strong>Headings.</strong> Where a page used <code>#</code> headings for
+      its sections, every heading moved down one level, since Blume renders the
+      title as the page's only H1. Anchors keep their ids.
+    </li>
+    <li>
+      <strong>Images.</strong> Images move off ReadMe's CDN into{" "}
+      <code>public/</code>. Where an image had no usable alt text, the agent
+      derived one from the file name; read those.
+    </li>
+    <li>
+      <strong>Variables.</strong> Each <code>{variableSyntax}</code> needs a
+      default in <code>variables</code>. ReadMe filled them per reader; Blume
+      shows the default to everyone, so make sure no default is a real key.
+    </li>
+    <li>
+      <strong>Links that were already broken.</strong> Hubs collect links to
+      pages from older versions, which 404 on ReadMe too. The agent points each
+      at the closest page or unlinks it, and lists them.
+    </li>
+    <li>
+      <strong>The API reference.</strong> Each OpenAPI file is its own
+      group in the API tab, in ReadMe's category order, with endpoints in
+      ReadMe's order inside each tag. Prose you wrote on an endpoint page, and
+      callouts inside your spec's descriptions, now show on the operation page.
+      A ReadMe category that held several files is split into one group per
+      file, each with its own label.
+    </li>
+    <li>
+      <strong>Hidden and custom pages.</strong> Pages hidden on ReadMe stay
+      reachable by URL and out of the sidebar and search. Custom pages have no
+      sidebar, as before.
+    </li>
+  </ul>
+  <CodeBlock code={handlerGrep} lang="bash" />
+
+  <h2>Keep every old URL working</h2>
+  <p>
+    ReadMe serves every page at a flat URL however deeply it's nested, and
+    Blume keeps those. API reference URLs change, because Blume builds them
+    from your OpenAPI files:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Old ReadMe URL</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>/docs/create-an-order</code>, at any depth</td>
+        <td>The same page</td>
+      </tr>
+      <tr>
+        <td><code>/changelog/12-05-2022</code></td>
+        <td>The same entry; its URL is pinned so the date stays whole</td>
+      </tr>
+      <tr>
+        <td><code>/reference/getorder</code></td>
+        <td>
+          Its operation page, by redirect:{" "}
+          <code>/reference/orders-api/orders/get-order</code>, or{" "}
+          <code>/reference/orders/get-order</code> with a single API file
+        </td>
+      </tr>
+      <tr>
+        <td>A tag page, like <code>/reference/orders</code></td>
+        <td>A redirect to its first endpoint, as ReadMe did</td>
+      </tr>
+      <tr>
+        <td>A parent page with no content of its own, and <code>/docs</code></td>
+        <td>A redirect to the first page under it, as ReadMe did</td>
+      </tr>
+      <tr>
+        <td><code>/v3.0/docs/create-an-order</code></td>
+        <td>A redirect to <code>/docs/create-an-order</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    Your sitemap leaves out hidden pages. The codemod's{" "}
+    <code>readme-migration.json</code> lists every URL your repository served,
+    hidden ones included, so add them to your list while the file is there:
+  </p>
+  <CodeBlock code={hiddenUrlsCommand} lang="bash" />
+  <p>
+    Then, with <code>npx blume dev</code> running, check every URL and print
+    the ones that don't land on a page:
+  </p>
+  <CodeBlock code={urlCheck} lang="bash" />
+  <p>
+    Redirects count as passing, since <code>-L</code> follows them. Add a
+    redirect for each path it prints and run it again until it prints nothing.
+    Run it against <code>blume dev</code> rather than{" "}
+    <code>blume preview</code>, which skips pattern redirects like the version
+    prefixes. For status codes and how each host serves redirects, see{" "}
+    <a href="/guides/documentation-url-migration-redirects">Move documentation URLs while preserving old links</a>.
+  </p>
+
+  <h2>Deploy and switch over</h2>
+  <p>
+    Build and run the checks the agent ran, so you see them pass yourself:
+  </p>
+  <CodeBlock
+    code={`npx blume build
+npx blume validate --strict
+npx blume audit --only redirects`}
+    lang="bash"
+  />
+  <p>
+    Pick a host and follow <a href="/docs/deployment">Deployment</a>. ReadMe
+    sent Try it requests through its own proxy; Blume sends them from the
+    reader's browser, so your API has to allow your docs origin. Send a
+    preflight and look for an <code>access-control-allow-origin</code>{" "}
+    header:
+  </p>
+  <CodeBlock code={corsProbe} lang="bash" />
+  <p>
+    If it's missing, choose a host adapter with server output, such as{" "}
+    <code>vercel()</code>, and set <code>playground: {"{ proxy: true }"}</code>{" "}
+    in the <code>openapi()</code> entry.
+  </p>
+  <p>
+    <strong>Disconnect Git sync before you merge</strong> (Settings → Git
+    Connection), or ReadMe syncs the restructured branch into your live hub.
+    Then push the branch, check a preview deployment, and rerun the URL check
+    against it. Point your custom domain's DNS at the new host, and keep the
+    ReadMe project until production passes the URL check, so rolling back is a
+    DNS change. Submit the new <code>sitemap.xml</code> in Google Search
+    Console, since search engines recrawl moved URLs on their own schedule.
+  </p>
+
+  <h2>What doesn't carry over</h2>
+  <ul>
+    <li>
+      <strong>The hosted editor.</strong> ReadMe's editor, branches and
+      reviews, and suggested edits stay with ReadMe. In Blume, pages are files
+      reviewed in pull requests, and each page can link to its source on
+      GitHub.
+    </li>
+    <li>
+      <strong>API metrics and logs.</strong> My Requests, API Metrics, and the
+      developer dashboard read your API's traffic through ReadMe. Analytics in
+      Blume come from the adapter you choose and cover the docs, not the API.
+    </li>
+    <li>
+      <strong>Personalized docs.</strong> ReadMe filled in each reader's API
+      key and variables after they logged in. Blume shows every reader the
+      same page, and Try it takes the credentials they type.
+    </li>
+    <li>
+      <strong>Discussions.</strong> The community forum doesn't move; link to
+      wherever your community lives now from the header.
+    </li>
+    <li>
+      <strong>Logins.</strong> Blume has no reader accounts. Use your host's
+      protection, such as Vercel Deployment Protection or Cloudflare Access,
+      which covers the whole site; mixing public and private pages takes two
+      sites.
+    </li>
+    <li>
+      <strong>The landing page and recipe walkthroughs.</strong> ReadMe's
+      landing page builder doesn't sync to Git, so rebuild your home page as a
+      Blume page. Recipes become ordinary pages; their step-by-step code modal
+      doesn't carry over.
+    </li>
+  </ul>
+</GuidePage>

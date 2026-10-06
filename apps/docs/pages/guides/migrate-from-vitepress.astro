@@ -1,0 +1,630 @@
+---
+// Migrate from VitePress: written from an end-to-end run of the blume-migrate
+// skill (SKILL.md and references/vitepress.md) on a real VitePress site: the
+// Ts.ED docs, github.com/tsedio/tsed `docs/` at
+// 5bea7974cbf72795e48269ac8906d737858d4647 (VitePress 1.6.4 with the
+// @tsed/vitepress-theme 1.8.0 custom theme, published on GitHub Pages: 106
+// pages, 107 old URLs with `cleanUrls` off, 444 snippet imports, 209 code
+// groups, a sidebar per section), with Blume 2.1.3 (main). The agent read only
+// the skill and the Blume docs it points to, and wrote a one-off script for
+// the mechanical part. Outcome: `blume build` passed (105 content pages and
+// the 404; `docs/configuration.md` beside `docs/configuration/index.md` was
+// folded into it), `blume validate --strict` passed after the agent fixed 13
+// anchors, `blume audit --only redirects` passed, and all 107 old URLs were
+// covered: 5 as pages, 102 by `.html` redirects. 69 pages moved into
+// `(group)` folders with no URL change, and 37 anchors were pinned (35 of
+// them badge headings).
+// After the run: the bundled codemod (scripts/vitepress-codemod.mjs), written
+// from the run's script, was applied to a fresh copy of the same docs. It
+// converted 209 code groups, 248 callouts, 422 snippet imports (reporting the
+// 22 from outside the docs), 389 fence labels, 100 H1s, and 185 links, within
+// a few of the run's counts, and a second pass changed nothing. Its author's
+// build of that output with crude stand-ins for the hand work passed with 105
+// pages and the 404 (per the build log). Review then fixed edge cases Ts.ED
+// doesn't hit (containers left as written inside callouts, includes inside
+// fences, `:line-numbers` after a range, links in callout titles); its Ts.ED
+// counts didn't change. Its `--redirects` output matched the run's 102
+// redirects, and the URL check below passed on the run's build.
+// pin-heading-ids.mjs, dry-run on the run's build against the old one, paired
+// 1,017 headings and found 180 heading lines to pin. On a three-page
+// VitePress 1.6.4 site, the guide's commands ran in order: the old-site build
+// and URL list, the codemod and its `--redirects`, `blume build`, the anchor
+// script with --write (from the repo's skills/ folder; one pin, then 0), the
+// URL check, and `blume validate --strict`. The Netlify advice comes from
+// Blume's deployment docs and wasn't run. The Acme before/after sample is
+// the codemod's real output, built with Blume; `blume preview` with the
+// `.html` fix from e10a457f (after 2.1.3) served it at /guide/install and
+// the /guide/install.html redirect page (it still 404s /guide/ with a slash).
+// Not run: `npx blume migrate vitepress` itself (the agent was pointed at the
+// skill directly; detection landed after the run), a deploy, or the lockfile
+// regeneration. How GitHub Pages serves the `.html` redirect pages is
+// unverified. The reference was revised after the run (codemod, `(group)`
+// folders, anchor script); those revisions weren't rerun on Ts.ED end to end.
+// Examples are invented (Acme).
+import Callout from "blume/components/content/Callout.astro";
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const fence = "```";
+
+const saveUrls = [
+  "npx vitepress build docs --outDir ../old-site",
+  "find ../old-site -name '*.html' | sed 's#^\\.\\./old-site##' | sort > ../old-urls.txt",
+].join("\n");
+
+const saveCleanUrls = [
+  "find ../old-site -name '*.html' ! -name 404.html \\",
+  "  | sed -e 's#^\\.\\./old-site##' -e 's#index\\.html$##' -e 's#\\.html$##' \\",
+  "  | sort > ../old-urls.txt",
+].join("\n");
+
+const beforePage = [
+  "# Install",
+  "",
+  "::: tip Before you start",
+  "You need Node.js 22.",
+  ":::",
+  "",
+  "::: code-group",
+  `${fence}sh [npm]`,
+  "npm install @acme/sdk",
+  fence,
+  `${fence}sh [pnpm]`,
+  "pnpm add @acme/sdk",
+  fence,
+  ":::",
+  "",
+  "<<< @/snippets/client.ts{2} [client.ts]",
+  "",
+  "> [!WARNING]",
+  "> Keep your key out of the browser.",
+  "",
+  "Next, read the [configuration](./configuration.html) guide.",
+].join("\n");
+
+const afterPage = [
+  "---",
+  "title: Install",
+  "---",
+  "",
+  ":::tip[Before you start]",
+  "You need Node.js 22.",
+  ":::",
+  "",
+  "<CodeGroup>",
+  "",
+  `${fence}sh npm`,
+  "npm install @acme/sdk",
+  fence,
+  `${fence}sh pnpm`,
+  "pnpm add @acme/sdk",
+  fence,
+  "",
+  "</CodeGroup>",
+  "",
+  '<include meta="client.ts {2}">/snippets/client.ts</include>',
+  "",
+  ":::warning",
+  "Keep your key out of the browser.",
+  ":::",
+  "",
+  "Next, read the [configuration](/guide/configuration) guide.",
+].join("\n");
+
+const codemodReport = [
+  "guide/install.md → guide/install.mdx",
+  "  1 × ::: code-group → <CodeGroup>",
+  "  1 × ::: type Title → :::type[Title]",
+  "  1 × <<< import → <include>",
+  "  1 × GitHub alert → directive",
+  "  1 × body H1 → frontmatter title",
+  "  2 × fence [label] → title",
+  "  1 × link → route",
+  "",
+  "guide/advanced.md → guide/advanced.mdx",
+  "  1 × ::: code-group → <CodeGroup>",
+  "  1 × ::: type → :::type",
+  "  1 × duplicate body H1 removed",
+  "  2 × fence [label] → title",
+  "  1 × unclosed code group ended at its last code block",
+  "  REVIEW line 3: frontmatter `outline` isn't a Blume key (the schema is strict): …",
+  "  REVIEW line 18: code group has no closer before line 26; it now ends at its last code block …",
+  "  REVIEW line 39: component <Playground>: map it to a Blume component, an island, or Markdown",
+  "  REVIEW line 51: `<<<` region #setup: <include> has no region selection; …",
+].join("\n");
+
+const groupFolders = [
+  "docs/",
+  "  guide/",
+  "    meta.ts",
+  "    (basics)/",
+  "      meta.ts          title: Basics",
+  "      install.mdx      still /guide/install",
+  "      configuration.mdx",
+  "    (advanced)/",
+  "      meta.ts          title: Advanced",
+  "      plugins.mdx      still /guide/plugins",
+].join("\n");
+
+const leftovers = [
+  "grep -rn '^ *::: ' . --include='*.md' --include='*.mdx' \\",
+  "  --exclude-dir={node_modules,dist,public,.blume}",
+  "grep -rln '^:::' . --include='*.md' --exclude-dir={node_modules,dist,public,.blume}",
+  "grep -rnE '\\{\\{|<script|<ClientOnly| :[a-z-]+=\"' . --include='*.mdx' \\",
+  "  --exclude-dir={node_modules,dist,public,.blume}",
+  "grep -rn '\\.html' . --include='*.md' --include='*.mdx' \\",
+  "  --exclude-dir={node_modules,dist,public,.blume} | grep -v '://'",
+].join("\n");
+
+const pinAnchors = [
+  "npx blume build",
+  "node node_modules/blume/skills/blume-migrate/scripts/pin-heading-ids.mjs --old ../old-site",
+].join("\n");
+
+const vueIsland = [
+  "<script setup>",
+  'import { ref } from "vue";',
+  "const props = defineProps({ start: { type: Number, default: 0 } });",
+  "const count = ref(props.start);",
+  "</script>",
+  "",
+  "<template>",
+  '  <button @click="count++">Clicked {{ count }}</button>',
+  "</template>",
+].join("\n");
+
+const checkUrls = [
+  'import { existsSync, readFileSync, statSync } from "node:fs";',
+  "",
+  'const lines = (file) => readFileSync(file, "utf8").split("\\n").filter(Boolean);',
+  "const isFile = (path) => existsSync(path) && statSync(path).isFile();",
+  'const isPage = (route) => isFile(`dist${route === "/" ? "" : route}/index.html`);',
+  'const rules = existsSync("dist/_redirects") ? lines("dist/_redirects") : [];',
+  "const redirects = new Map(rules.map((line) => line.split(/\\s+/)));",
+  "",
+  "let missing = 0;",
+  "for (const url of lines(process.argv[2])) {",
+  "  // A file served as is: 404.html, index.html, anything from public/.",
+  "  if (isFile(`dist${url}`)) continue;",
+  "  // An old /x.html needs a redirect; /x/ and /x/index.html are the page itself.",
+  '  const route = url.replace(/(?:\\/index)?\\.html$|\\/$/, "") || "/";',
+  '  const pageUrl = !url.endsWith(".html") || url.endsWith("/index.html");',
+  "  const target = redirects.get(url) ?? (pageUrl ? route : undefined);",
+  "  if (!(target && isPage(target))) {",
+  '    console.log(`MISSING ${url}${target ? ` -> ${target}` : " (no redirect)"}`);',
+  "    missing += 1;",
+  "  }",
+  "}",
+  'console.log(missing === 0 ? "Every old URL reaches a page." : `${missing} old URL(s) don\'t.`);',
+].join("\n");
+---
+
+<GuidePage guide={guideById("migrate-from-vitepress")}>
+  <p>
+    By the end of this guide, your VitePress docs are a Blume project: your
+    containers and code groups converted, your snippet imports turned into
+    includes, your sidebars rebuilt as folders and tabs without moving a page,
+    and every old <code>.html</code> URL redirecting to its page. A coding
+    agent does the conversion, starting with a codemod for the mechanical part,
+    and you review it.
+  </p>
+  <p>
+    It's written for VitePress 1.x sites on the default theme or a theme that
+    extends it. The Markdown carries over; the Vue around it doesn't. Custom
+    theme components, data loaders, and dynamic routes are yours to rebuild or
+    drop, and the agent lists each one.
+  </p>
+
+  <h2>What carries over</h2>
+  <p>
+    The run behind this guide migrated a real VitePress site: 106 pages with a
+    custom theme, 444 snippet imports, and a sidebar per section. Every page
+    carried over, and all 107 old URLs reached a page. Here's how the pieces
+    map:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In VitePress</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>.vitepress/config.ts</code></td>
+        <td><code>blume.config.ts</code></td>
+      </tr>
+      <tr>
+        <td>A sidebar per section (<code>'/guide/': [...]</code>)</td>
+        <td>Header tabs, one folder each</td>
+      </tr>
+      <tr>
+        <td>Sidebar groups</td>
+        <td>
+          Folders with a <code>meta.ts</code>; <code>(group)</code> folders when
+          the pages share one folder, so URLs don't change
+        </td>
+      </tr>
+      <tr>
+        <td><code>::: tip</code>, <code>::: warning Title</code></td>
+        <td><code>:::tip</code>, <code>:::warning[Title]</code>, in <code>.mdx</code> pages</td>
+      </tr>
+      <tr>
+        <td><code>::: details</code></td>
+        <td><code>&lt;Expandable&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>::: code-group</code> and <code>[label]</code> fences</td>
+        <td><code>&lt;CodeGroup&gt;</code>, each block titled with its label</td>
+      </tr>
+      <tr>
+        <td><code>&gt; [!NOTE]</code> alerts</td>
+        <td><code>:::note</code> and the other callouts</td>
+      </tr>
+      <tr>
+        <td><code>&lt;&lt;&lt; @/snippets/x.ts</code> and <code>&lt;!--@include: --&gt;</code></td>
+        <td><code>&lt;include&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>```js{"{2}"}</code>, <code>:line-numbers</code>, <code>// [!code ++]</code></td>
+        <td><code>```js {"{2}"}</code>, <code>lineNumbers</code>, the same comment</td>
+      </tr>
+      <tr>
+        <td><code>&lt;Badge type="tip" text="v2" /&gt;</code></td>
+        <td><code>&lt;Badge variant="accent"&gt;v2&lt;/Badge&gt;</code></td>
+      </tr>
+      <tr>
+        <td>The page's <code># H1</code></td>
+        <td>Its frontmatter <code>title</code></td>
+      </tr>
+      <tr>
+        <td><code>/guide/setup.html</code></td>
+        <td><code>/guide/setup</code>, with a redirect from the old URL</td>
+      </tr>
+      <tr>
+        <td><code>public/</code> inside your source folder</td>
+        <td><code>public/</code> beside <code>blume.config.ts</code></td>
+      </tr>
+      <tr>
+        <td>Local search, or Algolia DocSearch</td>
+        <td>
+          Built-in search. The <code>algolia()</code> adapter needs a new index:
+          Blume replaces an index's contents when it syncs
+        </td>
+      </tr>
+      <tr>
+        <td>Vue components in pages</td>
+        <td>Blume components, Markdown, or Vue islands</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Here's one page before and after the codemod:</p>
+  <CodeBlock code={beforePage} lang="md" title="guide/install.md (VitePress)" />
+  <CodeBlock code={afterPage} lang="mdx" title="guide/install.mdx (Blume)" />
+
+  <h2>Before you start</h2>
+  <p>
+    The agent edits your repository in place, so start on a new branch with a
+    clean working tree:
+  </p>
+  <CodeBlock code="git switch -c migrate-to-blume" lang="bash" />
+  <p>
+    Then build your VitePress site once, outside the <code>.vitepress/</code>{" "}
+    folder the agent will delete. The build is your list of old URLs, the
+    record of what your live site rendered, and the source of its heading
+    anchors. From the folder whose <code>package.json</code> runs VitePress,
+    with its dependencies installed, run this, naming the folder your build
+    script passes to <code>vitepress build</code> (<code>docs</code>, or{" "}
+    <code>.</code> when the docs are their own package):
+  </p>
+  <CodeBlock code={saveUrls} lang="bash" />
+  <p>
+    If your site set <code>cleanUrls: true</code>, its URLs never ended in{" "}
+    <code>.html</code>, and they already match Blume's. Write the list without
+    it instead:
+  </p>
+  <CodeBlock code={saveCleanUrls} lang="bash" />
+  <p>
+    Keep <code>../old-site</code> until you're done. You also need Node.js
+    22.12 or later, and Claude Code or Codex installed and signed in.
+  </p>
+
+  <h2>Run the migration</h2>
+  <p>From the same folder, run:</p>
+  <CodeBlock code="npx blume migrate vitepress --claude" lang="bash" />
+  <p>
+    To use Codex, swap <code>--claude</code> for <code>--codex</code>. Leave out{" "}
+    <code>vitepress</code> and Blume detects the source from a{" "}
+    <code>.vitepress/config</code> file at the root or in <code>docs/</code>, or
+    a <code>vitepress</code> dependency.
+  </p>
+  <p>
+    <code>blume migrate</code> converts nothing itself. It opens the agent on the{" "}
+    <code>blume-migrate</code> skill inside the package, pointed at its
+    VitePress reference. Following it, the agent:
+  </p>
+  <ol>
+    <li>
+      Runs the bundled VitePress codemod over your pages. It converts
+      containers, code groups, alerts, fence labels, snippet imports, includes,
+      badges, <code>.html</code> links, and H1s, renames the pages that now need
+      MDX to <code>.mdx</code>, and reports everything it leaves.
+    </li>
+    <li>
+      Works through that report: frontmatter keys Blume rejects, Vue
+      components, snippets with regions or from outside the docs, and
+      containers whose structure it had to repair.
+    </li>
+    <li>
+      Writes <code>blume.config.ts</code> from <code>.vitepress/config</code>:
+      title, logo, edit links, social links, analytics, and a header tab for
+      each sidebar.
+    </li>
+    <li>
+      Rebuilds each sidebar as folders, <code>meta.ts</code> files, and{" "}
+      <code>sidebar</code> frontmatter, hiding the pages VitePress left out of
+      it.
+    </li>
+    <li>
+      Adds a redirect from every old <code>.html</code> URL and pins each
+      heading's old anchor, both generated from your VitePress build.
+    </li>
+    <li>
+      Swaps VitePress for Blume in <code>package.json</code>, deletes{" "}
+      <code>.vitepress/</code>, points your deploy at Blume's{" "}
+      <code>dist/</code>, and runs <code>blume build</code>,{" "}
+      <code>blume validate --strict</code>, and{" "}
+      <code>blume audit --only redirects</code> until they pass.
+    </li>
+  </ol>
+  <p>The codemod's report looks like this, one block per page:</p>
+  <CodeBlock code={codemodReport} lang="txt" />
+  <p>
+    The redirects and anchor pins come from your old build, so if the agent
+    asks for it or starts rebuilding VitePress, point it at{" "}
+    <code>../old-site</code>. It ends with a summary of what it migrated,
+    dropped, and approximated. Keep it for the review.
+  </p>
+  <Callout type="info">
+    The codemod is deterministic, but the rest of the agent's work is judgment,
+    so two runs on one repository can differ. Read the diff rather than
+    trusting it.
+  </Callout>
+
+  <h2>Review the changes</h2>
+  <p>
+    Start with <code>git diff --stat</code>, run <code>npx blume dev</code>, and
+    work through these, which are where a VitePress migration most often
+    needs a second look.
+  </p>
+  <ul>
+    <li>
+      <strong>Containers.</strong> VitePress writes <code>::: tip</code> with a
+      space, and Blume shows that as literal text without an error. Blume's
+      directives also work only in <code>.mdx</code> pages. The first two
+      searches below should print nothing.
+    </li>
+    <li>
+      <strong>Repaired structure.</strong> VitePress pairs a bare{" "}
+      <code>:::</code> with the outermost open container, so sites collect
+      unclosed code groups that swallow the next callout, and stray{" "}
+      <code>:::</code> lines that show as text. The codemod repairs each one,
+      ending a code group at its last code block and dropping a stray{" "}
+      <code>:::</code>, and reports it. Compare those pages with the old build
+      in <code>../old-site</code>; a missing opener, for one, needs you to put
+      the group back.
+    </li>
+    <li>
+      <strong>Vue components.</strong> Each component the theme registered
+      becomes a Blume component, plain Markdown, or an island, or it's dropped.
+      Check the old build first: a component the theme never registered
+      rendered nothing there, so converting it shows content readers never saw.
+      A component that read API data or contributor lists usually goes, so look
+      for sentences that now lead into nothing.
+    </li>
+    <li>
+      <strong>The theme.</strong> Layout slots, custom CSS, and theme-package
+      home sections don't carry over. Your brand color becomes{" "}
+      <code>theme.accent</code>, and CSS worth keeping moves to a{" "}
+      <code>theme.css</code> written against Blume's tokens.
+    </li>
+    <li>
+      <strong>Data loaders and dynamic routes.</strong> A{" "}
+      <code>.data.ts</code> loader becomes static content, a custom Astro page,
+      or a content source. A <code>[slug].md</code> page with a{" "}
+      <code>.paths.ts</code> file becomes one real page per path.
+    </li>
+    <li>
+      <strong>Navigation.</strong> Click through each tab. Groups that lived
+      only in your sidebar config are now <code>(group)</code> folders, which
+      add a sidebar group without adding a URL segment. Pages your sidebar
+      didn't list are hidden from Blume's sidebar but still built.
+    </li>
+    <li>
+      <strong>Titles.</strong> VitePress showed each page's H1, so the H1 is now
+      its frontmatter <code>title</code>. A title that had inline code or a
+      badge in it is left for you.
+    </li>
+    <li>
+      <strong>The repository.</strong> CI and publish scripts that pointed at{" "}
+      <code>.vitepress/dist</code> now publish <code>dist/</code>, and{" "}
+      <code>.gitignore</code> lists <code>.blume</code> and <code>dist</code>.
+      If the docs folder has a <code>tsconfig.json</code>, Blume's build reads
+      it, so its <code>extends</code> must resolve from there.
+    </li>
+  </ul>
+  <p>
+    Run from your content folder (Blume's <code>content.root</code>), these
+    print spaced containers, directives left in <code>.md</code> pages, Vue
+    syntax left in <code>.mdx</code> pages, and internal <code>.html</code>{" "}
+    links:
+  </p>
+  <CodeBlock code={leftovers} lang="bash" />
+  <p>
+    Sidebar groups that existed only in config end up as folders like these,
+    which leave every URL where it was:
+  </p>
+  <CodeBlock code={groupFolders} lang="txt" />
+  <p>
+    A page you move one folder deeper keeps its URL, but not its relative
+    links: a <code>./images/diagram.png</code> or <code>../setup.md</code> in it
+    now points one level off. <code>blume build</code> fails on a missing
+    image, and <code>blume validate --strict</code> reports the broken links.
+  </p>
+  <p>
+    An interactive Vue component can stay Vue. Drop it in an{" "}
+    <code>islands/</code> folder, install <code>@astrojs/vue</code> and{" "}
+    <code>vue</code>, and use it in any <code>.mdx</code> page with no import,
+    passing props in JSX form (<code>:start="3"</code> becomes{" "}
+    <code>start={"{3}"}</code>):
+  </p>
+  <CodeBlock code={vueIsland} lang="vue" title="islands/Counter.vue" />
+  <p>
+    A component that imports from <code>vitepress</code>, like{" "}
+    <code>useData()</code> or a theme part, doesn't run outside VitePress.
+    See <a href="/docs/content/islands">Islands</a> for hydration options.
+  </p>
+
+  <h2>Check every old URL</h2>
+  <p>
+    Build the site, then check that each URL in your saved list is either a
+    page Blume built or an old <code>.html</code> address with a redirect to
+    one. Save this in the folder you built VitePress from, which now holds{" "}
+    <code>blume.config.ts</code>:
+  </p>
+  <CodeBlock code={checkUrls} lang="js" title="check-urls.mjs" />
+  <p>Run it after a build:</p>
+  <CodeBlock
+    code={`npx blume build
+node check-urls.mjs ../old-urls.txt`}
+    lang="bash"
+  />
+  <p>
+    It reads <code>dist/_redirects</code>, which a static build writes for
+    Netlify, Cloudflare, or no named host. Add a redirect for each URL it
+    prints and run it again until it prints nothing. Index pages need no redirect:{" "}
+    <code>/guide/</code> and <code>/guide/index.html</code> already serve the
+    page Blume writes at <code>guide/index.html</code>. A redirect from{" "}
+    <code>/guide/index.html</code> fails the build, and one from{" "}
+    <code>/guide/</code> replaces the page. <code>npx blume preview</code>{" "}
+    serves the built pages and the <code>.html</code> redirect pages, so you
+    can also click through a few old URLs there. It answers a trailing-slash
+    URL like <code>/guide/</code> with a 404, where static hosts serve the
+    page.
+  </p>
+
+  <h2>Check the heading anchors</h2>
+  <p>
+    VitePress and Blume build heading ids differently. VitePress turns
+    punctuation into dashes, and Blume drops it, so{" "}
+    <code>## What's new?</code> moves from <code>#what-s-new</code> to{" "}
+    <code>#whats-new</code>. On a big site, hundreds change. The agent pins
+    each old id with a script that compares every heading in your old build
+    with the new one. To check its work, run it from the same folder:
+  </p>
+  <CodeBlock code={pinAnchors} lang="bash" />
+  <p>
+    After the agent's pass it should find nothing to pin. If it finds some,
+    add <code>--write</code>, rebuild, and run it again until it reports 0: a
+    pin can renumber a later heading with the same text. A <code>NOTE</code>{" "}
+    names a heading it couldn't pin, often one that went with a dropped
+    component. Pin one that still exists by hand with a trailing marker:{" "}
+    <code>## What's new? [#what-s-new]</code>. Then run{" "}
+    <code>npx blume validate --strict</code>, which checks every link to an
+    anchor, including ones that were already broken on your old site.
+  </p>
+
+  <h2>Deploy and switch over</h2>
+  <p>
+    Many VitePress sites deploy to GitHub Pages, and a Blume site can stay
+    there. Blume can't detect your URL on GitHub Pages, so set it as{" "}
+    <code>deployment.site</code>, and keep a VitePress <code>base</code> as{" "}
+    <code>deployment.base</code>:
+  </p>
+  <CodeBlock
+    code={`deployment: { site: "https://docs.acme.example" },`}
+    lang="ts"
+    title="blume.config.ts"
+  />
+  <p>
+    Point your workflow's upload at <code>dist</code> instead of{" "}
+    <code>.vitepress/dist</code>, and make sure it installs your docs package's
+    dependencies. <a href="/guides/markdown-docs-github-pages">Deploy Markdown docs to GitHub Pages</a>{" "}
+    has a complete workflow; for other hosts, see{" "}
+    <a href="/docs/deployment">Deployment</a>.
+  </p>
+  <p>
+    On Netlify, name the host even for a static build:{" "}
+    <code>{'deployment: netlify({ output: "static" })'}</code>, with{" "}
+    <code>netlify</code> imported from <code>blume/deploy</code>. Only then are
+    the <code>_redirects</code> rules forced, so an old <code>.html</code> URL
+    gets a real 301 instead of the redirect page.
+  </p>
+  <p>
+    Before switching your domain, deploy a preview and open a few old{" "}
+    <code>.html</code> URLs on it, since hosts differ in how they serve
+    redirects. Keep the old deployment until the new one passes, so rolling
+    back is a DNS or Pages-source change. Then submit the new{" "}
+    <code>sitemap.xml</code> in Google Search Console, since search engines
+    recrawl moved URLs on their own schedule.
+  </p>
+
+  <h2>What doesn't carry over</h2>
+  <ul>
+    <li>
+      <strong>The Vue app.</strong> Custom themes, layout slots, data loaders,
+      dynamic routes, and Vue syntax in pages (<code>{"{{ }}"}</code>,{" "}
+      <code>&lt;script setup&gt;</code>, <code>v-if</code>) become static
+      content, Blume components, or islands.
+    </li>
+    <li>
+      <strong>Some Markdown extensions.</strong> <code>[[toc]]</code>, emoji
+      shortcodes, <code>// [!code error]</code> and{" "}
+      <code>// [!code warning]</code>, line numbers that start past 1, snippet
+      regions, and include line ranges. Regions become their own snippet files.
+    </li>
+    <li>
+      <strong>Page settings.</strong> Per-page outline levels, one-sided{" "}
+      <code>prev</code> and <code>next</code> links, and the switches for the
+      navbar, footer, and edit link.
+    </li>
+    <li>
+      <strong>Site settings.</strong> <code>titleTemplate</code>, the footer
+      message and copyright, a forced color mode (Blume always shows the
+      toggle), and build hooks like <code>transformPageData</code>. Blume writes
+      its own canonical URLs, Open Graph images, and <code>llms.txt</code>.
+    </li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <h3>A page shows <code>::: tip</code> as text</h3>
+  <p>
+    Remove the space after the colons (<code>:::tip</code>), and make sure the
+    page is <code>.mdx</code>. A title goes in brackets:{" "}
+    <code>:::tip[Before you start]</code>.
+  </p>
+  <h3>The build fails with NoImageMetadata on an SVG</h3>
+  <p>
+    The SVG is usually a draw.io (diagrams.net) export, whose{" "}
+    <code>content</code> attribute the image optimizer can't read. Remove that attribute from the{" "}
+    <code>&lt;svg&gt;</code> tag, or move the file to <code>public/</code> and
+    link it with an absolute path.
+  </p>
+  <h3>The build fails with "Tsconfig not found"</h3>
+  <p>
+    The <code>tsconfig.json</code> beside <code>blume.config.ts</code> extends a
+    package that isn't installed there, often a workspace package. Install the
+    workspace from its root, or delete the file if only VitePress used it.
+  </p>
+  <h3>An image built but doesn't show</h3>
+  <p>
+    Look for a raw <code>&lt;img src="./…"&gt;</code> tag. Blume only copies
+    images written as Markdown, so rewrite it as <code>![alt](./…)</code>.
+  </p>
+  <h3>The build fails with EISDIR on an index.html</h3>
+  <p>
+    A redirect starts at an index URL like <code>/guide/index.html</code>.
+    Remove it: that URL already serves the page.
+  </p>
+</GuidePage>

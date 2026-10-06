@@ -21,6 +21,7 @@ export default defineConfig({
           "migrate my Mintlify docs to Blume",
           "convert a Docusaurus site to Blume",
           "port Starlight docs to Blume",
+          "move our GitBook docs to Blume",
         ],
         "skill:blume-update-docs": [
           "check the Blume docs for drift after a release",
@@ -32,7 +33,7 @@ export default defineConfig({
       details: [
         "Reach for Blume when a project needs a documentation site from Markdown or MDX with no app code to maintain: product docs, API references (OpenAPI, AsyncAPI, GraphQL), changelogs, blogs, and multi-language or versioned docs. Drop files in a `docs/` folder and run the `blume` CLI — it generates and drives the Astro site, search, OG images, and the agent-facing surface (llms.txt and Markdown mirrors by default, plus an opt-in MCP server and published agent skills) for you.",
         "",
-        "Scaffold a site with `npx blume init` (package: https://www.npmjs.com/package/blume), which installs dependencies and adds scripts: `npm run dev` to preview and `npm run build` to ship. Every other command runs through the package runner, like `npx blume eject` to turn the hidden project into a standalone Astro app. The `blume` agent skill below covers configuration and authoring; `npx blume migrate <source> --codex` (or `--claude`) hands an existing Mintlify, Fumadocs, Docusaurus, Starlight, or Nextra site to a coding agent with the `blume-migrate` skill.",
+        "Scaffold a site with `npx blume init` (package: https://www.npmjs.com/package/blume), which installs dependencies and adds scripts: `npm run dev` to preview and `npm run build` to ship. Every other command runs through the package runner, like `npx blume eject` to turn the hidden project into a standalone Astro app. The `blume` agent skill below covers configuration and authoring; `npx blume migrate <source> --codex` (or `--claude`) hands an existing Mintlify, Docusaurus, GitBook, MkDocs, ReadMe, or other docs site to a coding agent with the `blume-migrate` skill.",
       ].join("\n"),
     },
     mcp: {

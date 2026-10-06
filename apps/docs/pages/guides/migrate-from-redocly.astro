@@ -1,0 +1,535 @@
+---
+// Migrate from Redocly: written from an end-to-end run of the blume-migrate
+// skill (SKILL.md and references/redocly.md) on a real Realm project:
+// github.com/unstoppabledomains/dev-docs at 679aa689f11709b8408880e9b6c3e26126af4519
+// (`@redocly/realm` ^0.130.2, published at docs.unstoppabledomains.com: 39
+// Markdown pages, 8 partials, 2 React pages, 8 OpenAPI descriptions, two
+// sidebars.yaml files), with Blume 2.1.3 (main). The agent read only the skill
+// and the Blume docs it points to. Outcome: `blume build` passed (280 pages:
+// 39 docs, 8 API overviews, 233 operation and webhook pages; 319 redirects,
+// 233 of them generated per operation), `blume validate --strict` passed after
+// two OpenAPI overlays for spec bugs, and `blume audit --only redirects`
+// passed. Of the 370 URLs in the old sitemap, 37 are pages and 329 redirect in
+// one hop to a page; the 4 left are accidental pages Realm had published
+// (`.github/`, `.claude/`, planning notes). Also checked: `blume preview` and
+// `blume dev` spot checks, the live site's <title>s and trailing-slash
+// redirects (curl), and a CORS preflight against each API's servers. Not run:
+// `npx blume migrate redocly` itself (the agent was pointed at the skill
+// directly; detection landed after the run), a deploy, or the lockfile
+// regeneration. `scripts/operation-routes.mjs` was written after the run, from
+// what it needed, and checked against its build (all 233 operation routes
+// match the run's redirect targets). The reference was revised after the run
+// (titles, API routes, defaults); those revisions weren't rerun end to end.
+// Reviewer: reran the script's test and the script on the run's dist/ (233
+// endpoints in 8 references); joined the Reseller spec's 50 operationIds with
+// `--spec` (YAML bundled to JSON with @redocly/cli) and matched each to the
+// run's redirect; ran the sitemap and grep commands below against the probe;
+// checked the Blume claims in packages/blume/src and the Redocly claims in
+// Redocly's docs and the @redocly/realm and @redocly/theme sources. Not run by
+// the reviewer: a fresh migration, a build, or the curl URL check. So the
+// entry sets no `tested`: the guide's command and the revised reference
+// haven't run end to end.
+// The example project and snippets below are invented (Acme): the run's
+// content is under Redocly's template license.
+import Callout from "blume/components/content/Callout.astro";
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const sitemapCommand = [
+  "curl -s https://docs.acme.example/sitemap.xml \\",
+  "  | grep -o '<loc>[^<]*' \\",
+  "  | sed -e 's#<loc>https://docs.acme.example##' -e 's#\\(.\\)/$#\\1#' \\",
+  "  > ../old-urls.txt",
+].join("\n");
+
+const markdocPage = [
+  "---",
+  "title: Orders quick start | Acme Developer Portal",
+  "---",
+  "",
+  "# Orders quick start",
+  "",
+  '{% admonition type="warning" name="Sandbox only" %}',
+  "Test keys never charge a card.",
+  "{% /admonition %}",
+  "",
+  '{% partial file="/_partials/_api-key.md" /%}',
+  "",
+  "{% tabs %}",
+  '{% tab label="cURL" %}',
+  "```bash",
+  "curl https://api.acme.example/v1/orders",
+  "```",
+  "{% /tab %}",
+  "{% /tabs %}",
+].join("\n");
+
+const mdxPage = [
+  "---",
+  "title: Orders quick start",
+  "---",
+  "",
+  ":::warning[Sandbox only]",
+  "Test keys never charge a card.",
+  ":::",
+  "",
+  "<include>/_partials/_api-key.md</include>",
+  "",
+  "<CodeGroup>",
+  "",
+  '```bash title="cURL"',
+  "curl https://api.acme.example/v1/orders",
+  "```",
+  "",
+  "</CodeGroup>",
+].join("\n");
+
+const referenceConfig = [
+  'import { defineConfig } from "blume";',
+  'import { openapi } from "blume/reference";',
+  'import { redirects } from "./redirects.ts";',
+  "",
+  "export default defineConfig({",
+  '  title: "Acme Developer Portal",',
+  "  content: {",
+  '    root: ".",',
+  '    include: ["guides/**/*.{md,mdx}", "apis/**/*.{md,mdx}"],',
+  "  },",
+  "  reference: [",
+  "    openapi({",
+  "      // codeSamples.languages from redocly.yaml, in Blume's names.",
+  '      codeSamples: ["curl", "node", "python", "go"],',
+  "      sources: [",
+  "        // Beside its guides: keeps its old path.",
+  '        { spec: "apis/orders/openapi.yaml", route: "/apis/orders/openapi", label: "Orders API" },',
+  "        // Alone in its folder: the folder becomes the reference.",
+  '        { spec: "apis/billing/openapi.yaml", route: "/apis/billing", label: "Billing API" },',
+  "      ],",
+  "    }),",
+  "  ],",
+  "  redirects,",
+  "});",
+].join("\n");
+
+const tagMeta = [
+  'import { defineMeta } from "blume";',
+  "",
+  "// The tag's x-displayName, and its place in the spec's tag order.",
+  'export default defineMeta({ title: "Search & lookup", order: 0 });',
+].join("\n");
+
+const operationRoutesCommand = [
+  "npx blume build",
+  "node node_modules/blume/skills/blume-migrate/scripts/operation-routes.mjs dist \\",
+  "  > operation-routes.json",
+].join("\n");
+
+const operationRoutesOutput = [
+  "{",
+  '  "references": {',
+  '    "/apis/orders/openapi": {',
+  '      "endpoints": {',
+  '        "GET /orders/{id}": "/apis/orders/openapi/orders/get-orders-id",',
+  '        "POST /orders": "/apis/orders/openapi/orders/create-order"',
+  "      },",
+  '      "title": "Orders API",',
+  '      "webhooks": []',
+  "    }",
+  "  }",
+  "}",
+].join("\n");
+
+const urlCheck = [
+  "while read -r route; do",
+  '  code=$(curl -sL -o /dev/null -w "%{http_code}" "http://localhost:4321$route")',
+  '  [ "$code" = "200" ] || echo "$code $route"',
+  "done < ../old-urls.txt",
+].join("\n");
+
+const hashLinkGrep = [
+  "grep -rnE '\\{%|#operation/|#tag/' . \\",
+  "  --include='*.md' --include='*.mdx' --include='*.yaml' --include='*.json' \\",
+  "  --exclude-dir=node_modules --exclude-dir=dist --exclude-dir=.blume",
+].join("\n");
+
+const corsProbe = [
+  "curl -si -X OPTIONS https://api.acme.example/v1/orders \\",
+  "  -H 'Origin: https://docs.acme.example' \\",
+  "  -H 'Access-Control-Request-Method: GET' \\",
+  "  | grep -i '^access-control-allow-origin'",
+].join("\n");
+---
+
+<GuidePage guide={guideById("migrate-from-redocly")}>
+  <p>
+    By the end of this guide, your Redocly docs are a Blume project in the same
+    repository: your pages converted from Markdoc to MDX, your sidebars rebuilt
+    as folders and tabs, every OpenAPI description rendered as a native API
+    reference, and every old URL either still serving its page or redirecting
+    to it. A coding agent does the conversion, and you review it.
+  </p>
+  <p>
+    It covers projects built on Redocly's current platform, Realm (and Redoc,
+    Revel, and Reef, which share its project format), whether you edit them in
+    Reunite or locally. A repository whose <code>redocly.yaml</code> only
+    configures <code>redocly lint</code> isn't a docs site to migrate: Blume
+    leaves that file alone.
+  </p>
+
+  <h2>What carries over</h2>
+  <p>
+    Your content is Markdown either way, so the work is in Markdoc's tags,
+    Redocly's navigation files, and how API reference URLs are built. On one
+    real Realm site with 39 pages and 8 APIs, the run ended with every page
+    built and 366 of its 370 old URLs covered; the other 4 were pages Realm had
+    published by accident.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In Redocly</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>redocly.yaml</code> site settings</td>
+        <td>
+          <code>blume.config.ts</code>; the lint and bundle settings stay in a
+          trimmed <code>redocly.yaml</code>
+        </td>
+      </tr>
+      <tr>
+        <td><code>sidebars.yaml</code> groups</td>
+        <td>Folders, with a <code>meta.ts</code> for labels and order</td>
+      </tr>
+      <tr>
+        <td>One sidebar per section, or sidebar tabs</td>
+        <td>Header tabs, one folder each</td>
+      </tr>
+      <tr>
+        <td><code>{"{% admonition %}"}</code></td>
+        <td><code>:::info</code>, <code>:::warning</code>, and the other callouts</td>
+      </tr>
+      <tr>
+        <td><code>{"{% tabs %}"}</code></td>
+        <td><code>&lt;Tabs&gt;</code>, or <code>&lt;CodeGroup&gt;</code> when every tab is code</td>
+      </tr>
+      <tr>
+        <td><code>{"{% partial %}"}</code> and <code>_partials/</code></td>
+        <td><code>&lt;include&gt;</code> and the same <code>_partials/</code> folders</td>
+      </tr>
+      <tr>
+        <td>The page's first <code># H1</code></td>
+        <td>Its frontmatter <code>title</code></td>
+      </tr>
+      <tr>
+        <td>An OpenAPI file in the content tree</td>
+        <td>
+          An <code>openapi()</code> reference with a page per operation, at the
+          file's old path, or at its folder's when the file is alone there
+        </td>
+      </tr>
+      <tr>
+        <td>Tag labels from <code>x-displayName</code></td>
+        <td>A small <code>meta.ts</code> per tag</td>
+      </tr>
+      <tr>
+        <td><code>redirects</code>, in config and page frontmatter</td>
+        <td><code>redirects</code> in <code>blume.config.ts</code></td>
+      </tr>
+      <tr>
+        <td><code>static/</code></td>
+        <td><code>public/</code>, at the same URLs</td>
+      </tr>
+      <tr>
+        <td><code>@theme/styles.css</code></td>
+        <td><code>theme.accent</code>, plus a root <code>theme.css</code> for your own classes</td>
+      </tr>
+      <tr>
+        <td><code>index.page.tsx</code> and other React pages</td>
+        <td>Custom Astro pages, with interactive parts as React islands</td>
+      </tr>
+      <tr>
+        <td><code>scripts.head</code> and <code>analytics</code></td>
+        <td><code>script()</code> and analytics adapters</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Here's one page before and after the conversion:</p>
+  <CodeBlock code={markdocPage} lang="md" title="guides/orders.md (Redocly)" />
+  <CodeBlock code={mdxPage} lang="mdx" title="guides/orders.mdx (Blume)" />
+  <p>
+    Pages that end up with no directive, component, or Mermaid diagram stay{" "}
+    <code>.md</code>.
+    If you turn on Blume's "last updated" dates, expect nearly every page to
+    show the migration commit's date: moving each H1 edits the page, and Blume
+    doesn't follow renames back through git history.
+  </p>
+
+  <h2>Before you start</h2>
+  <p>
+    Start from a clean working tree on a new branch, so the migration is one
+    diff to review:
+  </p>
+  <CodeBlock code="git switch -c migrate-to-blume" lang="bash" />
+  <p>
+    Then save every URL your site serves today. Realm's sitemap lists each page
+    and also each API overview, tag page, and operation page, which is where
+    most of your URLs live:
+  </p>
+  <CodeBlock code={sitemapCommand} lang="bash" />
+  <p>
+    Replace <code>docs.acme.example</code> with your docs domain in both places.
+    Realm publishes a sitemap only when <code>seo.siteUrl</code> is set; without
+    one, list the URLs from your analytics or search console instead. Check
+    that you have Node.js 22.12 or later, and that Claude Code or Codex is
+    installed and signed in. If you edit in Reunite, note the settings that
+    live there rather than in the repository, such as environment variables
+    and your custom domain.
+  </p>
+
+  <h2>Run the migration</h2>
+  <p>From the root of your Redocly project, run:</p>
+  <CodeBlock code="npx blume migrate redocly --claude" lang="bash" />
+  <p>
+    To use Codex, swap <code>--claude</code> for <code>--codex</code>. Leave out{" "}
+    <code>redocly</code> and Blume detects the source from a root{" "}
+    <code>sidebars.yaml</code> or a Realm package in <code>package.json</code>;
+    it never treats a <code>redocly.yaml</code> alone as a docs site.
+  </p>
+  <p>
+    <code>blume migrate</code> converts nothing itself. It opens the agent on the{" "}
+    <code>blume-migrate</code> skill inside the package, pointed at its Redocly
+    reference. Following it, the agent:
+  </p>
+  <ol>
+    <li>
+      Writes <code>blume.config.ts</code> from <code>redocly.yaml</code>,
+      keeping your content folders where they are.
+    </li>
+    <li>
+      Converts every Markdoc tag, moves each H1 into <code>title</code>, and
+      fixes what MDX reads differently, such as <code>&lt;https://…&gt;</code>{" "}
+      autolinks and inline <code>style</code> strings.
+    </li>
+    <li>Rebuilds your sidebars as folders, <code>meta.ts</code> files, and tabs.</li>
+    <li>
+      Adds an <code>openapi()</code> reference for each description, with tag
+      labels and any overlays a spec needs.
+    </li>
+    <li>
+      Builds once, reads the new operation routes from the build with a bundled
+      script, and generates a redirect for every old API URL.
+    </li>
+    <li>
+      Moves <code>static/</code> to <code>public/</code>, swaps Realm for Blume in{" "}
+      <code>package.json</code>, trims <code>redocly.yaml</code> to its lint
+      settings, and runs <code>blume build</code>, <code>blume validate --strict</code>,
+      and <code>blume audit --only redirects</code> until they pass.
+    </li>
+  </ol>
+  <p>
+    It ends with a summary of what it migrated, dropped, and approximated. Keep
+    it for the review.
+  </p>
+  <Callout type="info">
+    The agent's work is judgment, so two runs on one repository can differ.
+    Read the diff rather than trusting it.
+  </Callout>
+
+  <h2>Review the changes</h2>
+  <p>
+    Start with <code>git diff --stat</code>, run <code>npx blume dev</code>, and
+    check these, which are where a Redocly migration most often needs a second
+    look.
+  </p>
+  <ul>
+    <li>
+      <strong>No Markdoc left.</strong> Blume doesn't read <code>{"{% … %}"}</code>{" "}
+      tags, so one the agent missed shows up as literal text while the build
+      still passes. The search below should print only code samples that show
+      Markdoc on purpose, files the migration left out of the site, and any
+      old operation links, covered next.
+    </li>
+    <li>
+      <strong>Titles.</strong> Realm showed each page's H1 and ignored a
+      frontmatter <code>title</code>, so the H1 becomes the title and the old
+      frontmatter one is dropped. Blume also appends your site title to each
+      page's browser tab title, which Realm didn't unless you set{" "}
+      <code>seo.projectTitle</code>.
+    </li>
+    <li>
+      <strong>Navigation.</strong> Click through each tab. A group that existed
+      only in <code>sidebars.yaml</code> becomes a real folder, and its moved
+      pages get redirects. Sidebar separators have no Blume equivalent.
+    </li>
+    <li>
+      <strong>API references.</strong> Each API should show its tags under their
+      display names. Operations within a tag sort alphabetically rather than in
+      spec order, and tags your <code>x-tagGroups</code> left out, which Realm
+      hid, now appear.
+    </li>
+    <li>
+      <strong>Old operation links.</strong> Realm resolved links like{" "}
+      <code>#operation/getOrder</code> in the browser. Blume can't redirect a
+      fragment, so every one should now point at a Blume route, including the
+      ones inside your OpenAPI descriptions.
+    </li>
+    <li>
+      <strong>Try it.</strong> Realm sent Try it requests through its own CORS
+      proxy. Blume sends them from the reader's browser, so an API that doesn't
+      allow your docs origin fails there until you set up a proxy (next
+      section).
+    </li>
+    <li>
+      <strong>Head scripts.</strong> Scripts from <code>scripts.head</code> become{" "}
+      <code>script()</code> adapters, which load only in production builds. A
+      script your pages need to work, like a support widget, belongs in a
+      layout slot instead.
+    </li>
+    <li>
+      <strong>The repository.</strong> <code>.gitignore</code> no longer hides{" "}
+      <code>public/</code> and now ignores <code>.blume/</code> and{" "}
+      <code>dist/</code>; <code>.nvmrc</code> and CI use Node 22.12 or later; the
+      lockfile is regenerated. If you run <code>redocly lint</code>, run it once and check it
+      still loads its config.
+    </li>
+  </ul>
+  <CodeBlock code={hashLinkGrep} lang="bash" />
+  <p>
+    If an API lost its display names, add a <code>meta.ts</code> in the tag's
+    folder under the reference route, for example{" "}
+    <code>apis/orders/openapi/search/meta.ts</code>. Include <code>order</code>,
+    or the group moves to the end:
+  </p>
+  <CodeBlock code={tagMeta} lang="ts" title="apis/orders/openapi/search/meta.ts" />
+
+  <h2>Keep every old URL working</h2>
+  <p>
+    Content pages keep their paths, apart from the few a rebuilt sidebar group
+    moved, which get redirects. API reference URLs don't, because Realm and
+    Blume build them differently:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Old Realm URL</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>/apis/orders/openapi</code></td>
+        <td>The same overview, when the route is kept</td>
+      </tr>
+      <tr>
+        <td><code>/apis/orders/openapi/orders/createorder</code></td>
+        <td><code>/apis/orders/openapi/orders/create-order</code>, by redirect</td>
+      </tr>
+      <tr>
+        <td><code>/apis/orders/openapi/orders/paths/~1orders~1%7Bid%7D/get</code></td>
+        <td><code>/apis/orders/openapi/orders/get-orders-id</code>, by redirect</td>
+      </tr>
+      <tr>
+        <td>
+          Tag and section pages, like <code>/apis/orders/openapi/section/authentication</code>
+        </td>
+        <td>A redirect to the API's overview</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    The agent generates one redirect per operation rather than typing them, and
+    reads Blume's side from the build. The script it uses ships with Blume, so
+    you can rerun it after changing a spec:
+  </p>
+  <CodeBlock code={operationRoutesCommand} lang="bash" />
+  <CodeBlock code={operationRoutesOutput} lang="json" title="operation-routes.json" />
+  <p>
+    Each endpoint, as written in the spec, maps to the page Blume built for it.
+    Match an old URL to its endpoint through the spec's <code>operationId</code>{" "}
+    or path, then look it up here. For a large site, keep the generated list in
+    its own module, as in this config:
+  </p>
+  <CodeBlock code={referenceConfig} lang="ts" title="blume.config.ts" />
+  <p>
+    Then, with <code>npx blume dev</code> running, check every URL you saved
+    and print the ones that don't land on a page:
+  </p>
+  <CodeBlock code={urlCheck} lang="bash" />
+  <p>
+    Redirects count as passing, since <code>-L</code> follows them. Add a
+    redirect for each path it prints and run it again until it prints nothing.
+    Leave out the pages Realm published by accident, like a{" "}
+    <code>.github</code> pull request template, unless you want them covered.
+    For status codes, patterns, and how each host serves them, see{" "}
+    <a href="/guides/documentation-url-migration-redirects">Move documentation URLs while preserving old links</a>.
+  </p>
+  <p>
+    Old links with a trailing slash need one more check. Realm redirected{" "}
+    <code>/page/</code> to <code>/page</code>; Blume's static build doesn't
+    answer the slashed form itself, so whether it works depends on your host.
+    Try one on your preview deployment.
+  </p>
+
+  <h2>Deploy and switch over</h2>
+  <p>
+    Build and run the checks the agent ran, so you see them pass yourself:
+  </p>
+  <CodeBlock
+    code={`npx blume build
+npx blume validate --strict
+npx blume audit --only redirects`}
+    lang="bash"
+  />
+  <p>
+    Pick a host and follow <a href="/docs/deployment">Deployment</a>. If any
+    API failed your CORS check, choose a host adapter with server output, such
+    as <code>vercel()</code>, and set <code>playground: {"{ proxy: true }"}</code>{" "}
+    in the <code>openapi()</code> entry that holds that API. To test an API's server, send a preflight from your docs
+    origin and look for an <code>access-control-allow-origin</code> header:
+  </p>
+  <CodeBlock code={corsProbe} lang="bash" />
+  <p>
+    Push the branch and check a preview deployment, rerunning the URL check
+    against it. Then point your custom domain's DNS at the new host, and keep
+    the Reunite project until production has passed the URL check, so rolling
+    back is a DNS change. Submit the new{" "}
+    <code>sitemap.xml</code> in Google Search Console, since search engines
+    recrawl moved URLs on their own schedule.
+  </p>
+
+  <h2>What doesn't carry over</h2>
+  <ul>
+    <li>
+      <strong>Login, RBAC, and SSO.</strong> Blume has no reader accounts. Use
+      your host's protection, such as Vercel Deployment Protection or
+      Cloudflare Access, which covers the whole site; mixing public and private
+      pages takes two sites.
+    </li>
+    <li>
+      <strong>The API explorer's extras.</strong> Blume's Try it panel takes a
+      token, an API key, or basic credentials, but has no saved environments,
+      mock server, or OAuth flow.
+    </li>
+    <li>
+      <strong>Reunite.</strong> The hosted editor, review and preview workflow,
+      and feedback and analytics dashboards stay with Redocly. In Blume, pages
+      are files reviewed in pull requests, and analytics come from the adapter
+      you choose.
+    </li>
+    <li>
+      <strong>Markdoc's dynamic features.</strong> Conditionals and per-reader
+      variables become the content the public site showed. PlantUML and
+      Excalidraw diagrams need exporting to images; Mermaid carries over.
+    </li>
+    <li>
+      <strong>Your lint setup.</strong> This one stays. <code>redocly.yaml</code>{" "}
+      keeps its <code>apis</code>, <code>extends</code>, and <code>rules</code>,
+      and <code>@redocly/cli</code> stays in your dependencies if it was there,
+      so <code>redocly lint</code> and <code>redocly bundle</code> run as before.
+    </li>
+  </ul>
+</GuidePage>

@@ -1,0 +1,555 @@
+---
+// Migrate from GitBook: written from an end-to-end run of the blume-migrate
+// skill (SKILL.md and references/gitbook.md) on a real Git Sync repository:
+// github.com/scepman/scepman-docs at a9467ba6e04516e835a55787af000ea47d47585c
+// (`.gitbook.yml` with `root: ./docs/`, published at docs.scepman.com: 134
+// pages in 5 SUMMARY.md groups, 7 reusable-content includes, 623 uploads, and
+// 5 GitBook-made translations that aren't in the repository), with Blume
+// 2.1.3 (main). The agent read only the skill and the Blume docs it points
+// to. Outcome: `blume build` passed (134 pages, 157 redirects), `blume
+// validate --strict` passed, `blume audit --only redirects` passed, 315
+// heading lines got their GitBook id pinned, and all 938 old URLs (134
+// pages, 670 translated pages, 134 Markdown URLs) reached a page from `blume
+// dev` with `curl -sL`; `blume preview` served 268 of them, since it doesn't
+// apply pattern redirects. The skill, the GitBook reference, and the
+// pin-heading-ids script came from the repository's working tree: blume
+// 2.1.3 on npm ships none of them, nor `gitbook` as a `blume migrate`
+// source. Also checked after the run: `blume migrate` with no agent flag
+// detects the source from `.gitbook.yml` (working-tree build); the shipped
+// `scripts/pin-heading-ids.mjs`, rewritten from the run's script, on a copy
+// of the migrated project with every pin stripped (321 heading lines pinned
+// in one pass; the run's tree has 324 pinned lines, and the 3 the script left
+// alone are headings whose GitBook id already equals Blume's; 0 after a
+// rebuild, against the run's cached live pages, and `validate --strict`
+// clean), and on a small built fixture whose `[#id]`
+// (`.mdx`), `{#id}` (`.md`), and `\{#id\}` (a partial included by both)
+// pins all rendered as the old ids; the troubleshooting errors below, each
+// from a one-page build; and this page's sitemap command against the live
+// site (804 URLs). Not run: `npx blume migrate gitbook --claude` itself (the
+// agent was pointed at the skill directly), turning off Git Sync, a deploy,
+// the lockfile regeneration, or the site-redirect export (no API token). The
+// reference was revised after the run (step headings, partial image paths,
+// parent rows, translated group slugs, the URL check, site-redirect
+// destinations); those revisions weren't rerun end to end. The examples
+// below are invented (Acme): scepman-docs carries no license.
+import Callout from "blume/components/content/Callout.astro";
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const gitbookPage = [
+  "---",
+  "description: Connect Acme to your identity provider.",
+  "---",
+  "",
+  "# Single sign-on",
+  "",
+  '{% hint style="warning" %}',
+  "SSO needs the **Business** plan.",
+  "{% endhint %}",
+  "",
+  "{% stepper %}",
+  "{% step %}",
+  "### Create the app",
+  "",
+  "In your identity provider, create a SAML app.",
+  "{% endstep %}",
+  "",
+  "{% step %}",
+  "### Paste the metadata URL",
+  "",
+  '{% code title="Metadata URL" %}',
+  "```",
+  "https://acme.example/saml/metadata",
+  "```",
+  "{% endcode %}",
+  "{% endstep %}",
+  "{% endstepper %}",
+  "",
+  '<figure><img src="../.gitbook/assets/image (3).png" alt="The SAML settings"><figcaption><p>Turn on SAML.</p></figcaption></figure>',
+  "",
+  '{% content-ref url="scim.md" %}',
+  "[scim.md](scim.md)",
+  "{% endcontent-ref %}",
+].join("\n");
+
+const mdxPage = [
+  "---",
+  "title: Single sign-on",
+  "description: Connect Acme to your identity provider.",
+  "---",
+  "",
+  ":::warning",
+  "SSO needs the **Business** plan.",
+  ":::",
+  "",
+  "<Steps>",
+  "<Step>",
+  "",
+  "### Create the app",
+  "",
+  "In your identity provider, create a SAML app.",
+  "",
+  "</Step>",
+  "<Step>",
+  "",
+  "### Paste the metadata URL",
+  "",
+  '```text title="Metadata URL"',
+  "https://acme.example/saml/metadata",
+  "```",
+  "",
+  "</Step>",
+  "</Steps>",
+  "",
+  '<Frame caption="Turn on SAML.">',
+  "",
+  "![The SAML settings](../assets/image%20(3).png)",
+  "",
+  "</Frame>",
+  "",
+  '<Card title="SCIM provisioning" href="/security/scim" />',
+].join("\n");
+
+const sitemapCommand = [
+  "curl -s https://docs.acme.example/sitemap.xml \\",
+  "  | grep -o '<loc>[^<]*' | sed 's#<loc>##' \\",
+  '  | while read -r sitemap; do curl -s "$sitemap"; done \\',
+  "  | grep -o '<loc>[^<]*' \\",
+  "  | sed -e 's#<loc>https://docs.acme.example##' -e 's#^$#/#' \\",
+  "  > ../old-urls.txt",
+].join("\n");
+
+const redirectsCommand = [
+  'curl -s -H "Authorization: Bearer $GITBOOK_TOKEN" \\',
+  '  "https://api.gitbook.com/v1/orgs/$ORG_ID/sites/$SITE_ID/redirects?limit=1000" \\',
+  "  > ../gitbook-redirects.json",
+].join("\n");
+
+const leftoverGrep =
+  "grep -rnE '\\{%|class=\"expression\"|data-gb-custom|\\.gitbook/' docs";
+
+const pinCommand = [
+  "npx blume build",
+  "node node_modules/blume/skills/blume-migrate/scripts/pin-heading-ids.mjs \\",
+  "  --old https://docs.acme.example",
+].join("\n");
+
+const pinOutput = [
+  '/api/auth  "API keys/tokens"  #api-keystokens → #api-keys-tokens  (docs/api/auth.mdx:42)',
+  '/changelog  "2.4 - May"  #24---may → #id-2.4-may  (docs/changelog.md:9)',
+  "412 heading(s) paired · 2 heading line(s) need a pin in 2 file(s) · 0 note(s)",
+  "Dry run: pass --write to apply.",
+].join("\n");
+
+const translationRedirects = [
+  "redirects: [",
+  "  // GitBook translated the group's slug, so map it before the catch-all.",
+  '  { from: "/de/zahlungen/:path*", to: "/payments/:path*", status: 307 },',
+  '  { from: "/de/:path*", to: "/:path*", status: 307 },',
+  "],",
+].join("\n");
+
+const urlCheck = [
+  "while read -r route; do",
+  '  code=$(curl -sL -o /dev/null -w "%{http_code}" "http://localhost:4321$route")',
+  '  [ "$code" = "200" ] || echo "$code $route"',
+  "done < ../old-urls.txt",
+].join("\n");
+---
+
+<GuidePage guide={guideById("migrate-from-gitbook")}>
+  <p>
+    By the end of this guide, your GitBook docs are a Blume project in the
+    repository GitBook already syncs to: every page at the URL it has today,
+    GitBook's blocks converted to Blume's components, reusable content as
+    includes, and a redirect for every URL GitBook still answers. A coding
+    agent does the conversion, and you review it.
+  </p>
+  <p>
+    It covers content that GitBook's Git Sync writes to GitHub or GitLab. A
+    book built with the old open-source GitBook CLI or HonKit, with a{" "}
+    <code>book.json</code>, migrates the same way, from the same skill.
+  </p>
+
+  <h2>What carries over</h2>
+  <p>
+    GitBook's content is already Markdown. The work is in three places: its
+    URLs follow <code>SUMMARY.md</code> rather than where files sit, its
+    blocks are <code>{"{% … %}"}</code> tags and HTML, and some of what readers
+    see lives only in the GitBook app. On one real site with 134 pages, the run
+    ended with every page built at its old URL and all 938 old URLs, translated
+    pages included, still landing on a page.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In GitBook</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>SUMMARY.md</code></td>
+        <td>
+          Folders laid out like your URLs, with a <code>meta.ts</code> per folder
+          for order and labels
+        </td>
+      </tr>
+      <tr>
+        <td><code>## Group</code> headings</td>
+        <td>Top-level folders, shown as plain sidebar headings</td>
+      </tr>
+      <tr>
+        <td>A page with subpages</td>
+        <td>A folder whose <code>index</code> page is the parent</td>
+      </tr>
+      <tr>
+        <td><code>{"{% hint %}"}</code></td>
+        <td><code>:::info</code>, <code>:::warning</code>, and the other callouts</td>
+      </tr>
+      <tr>
+        <td><code>{"{% tabs %}"}</code> and <code>{"{% stepper %}"}</code></td>
+        <td><code>&lt;Tabs&gt;</code> and <code>&lt;Steps&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>{"{% content-ref %}"}</code></td>
+        <td>
+          <code>&lt;Card&gt;</code>s, or a card listing Blume generates for a
+          section's landing page
+        </td>
+      </tr>
+      <tr>
+        <td><code>&lt;details&gt;</code></td>
+        <td><code>&lt;Accordion&gt;</code> or <code>&lt;Expandable&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>&lt;figure&gt;</code> images</td>
+        <td>Markdown images, optimized at build, in a <code>&lt;Frame&gt;</code> when captioned</td>
+      </tr>
+      <tr>
+        <td>Reusable content in <code>.gitbook/includes/</code></td>
+        <td><code>&lt;include&gt;</code> partials in <code>_includes/</code></td>
+      </tr>
+      <tr>
+        <td>Uploads in <code>.gitbook/assets/</code></td>
+        <td>An <code>assets/</code> folder beside your pages</td>
+      </tr>
+      <tr>
+        <td>Variables and expressions</td>
+        <td><code>variables</code>, or props on an include</td>
+      </tr>
+      <tr>
+        <td>Redirects in <code>.gitbook.yaml</code> and in site settings</td>
+        <td><code>redirects</code> in <code>blume.config.ts</code></td>
+      </tr>
+      <tr>
+        <td>Sections in <code>gitbook-docs.yaml</code></td>
+        <td>Header tabs, one folder each</td>
+      </tr>
+      <tr>
+        <td>Font Awesome icons</td>
+        <td>Lucide icons</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Here's one page before and after the conversion:</p>
+  <CodeBlock code={gitbookPage} lang="md" title="security/sso.md (GitBook)" />
+  <CodeBlock code={mdxPage} lang="mdx" title="security/sso.mdx (Blume)" />
+  <p>
+    The <code># Title</code> line becomes the <code>title</code>. Each step
+    keeps its heading, so it stays in the page's outline and keeps its anchor.
+    A code block with no language gets <code>text</code>, and the image path
+    points at the moved <code>assets/</code> folder.
+  </p>
+
+  <h2>Before you start</h2>
+  <p>Work on a new branch, so the migration is one diff to review:</p>
+  <CodeBlock code="git switch -c migrate-to-blume" lang="bash" />
+  <p>
+    Next, make sure every space you publish is in the repository. Site-wide Git
+    Sync maps each space to a directory in <code>gitbook-docs.yaml</code>; a
+    space marked <code>directory: null</code> there, or synced only to another
+    repository, has no files here. Translations GitBook made for you usually
+    aren't synced either. Turn on Git Sync for each space you want to keep, or
+    decide now to drop it. A dropped language can redirect to your default
+    one, and you can bring it back later with{" "}
+    <a href="/docs/cli/translate"><code>blume translate</code></a>.
+  </p>
+  <p>
+    Then save every URL your site serves. GitBook's <code>sitemap.xml</code> is
+    an index with one sitemap per published space, so read each of them:
+  </p>
+  <CodeBlock code={sitemapCommand} lang="bash" />
+  <p>
+    Replace <code>docs.acme.example</code> with your docs domain in both
+    places. Comparing the sitemaps' prefixes, like <code>/de</code>, with the
+    spaces in your repository is also the quickest way to spot one that isn't
+    synced.
+  </p>
+  <p>
+    Site redirects, set under <strong>Settings → Redirects</strong>, aren't in
+    the repository, and the app can import them from CSV but not export them.
+    With a GitBook API token, and the organization and site IDs from the
+    site's address in the app (<code>app.gitbook.com/o/ORG_ID/sites/SITE_ID</code>),
+    save them for the agent:
+  </p>
+  <CodeBlock code={redirectsCommand} lang="bash" />
+  <p>
+    If the response ends with a <code>next</code> page, fetch again with{" "}
+    <code>&amp;page=</code> and its value. Each redirect's destination is a
+    GitBook page, space, or section ID, or an external URL; the agent resolves
+    the IDs to your old URLs with the same token. Without a token, copy them
+    from the settings page. Also note what lives
+    only in the app and you want to keep: your logo and favicon, primary
+    color, fonts, header links, and footer. Finally, check that you have
+    Node.js 22.12 or later, and that Claude Code or Codex is installed and
+    signed in.
+  </p>
+
+  <h2>Run the migration</h2>
+  <p>From the root of your synced repository, run:</p>
+  <CodeBlock code="npx blume migrate gitbook --claude" lang="bash" />
+  <p>
+    To use Codex, swap <code>--claude</code> for <code>--codex</code>. Leave out{" "}
+    <code>gitbook</code> and Blume detects the source from a{" "}
+    <code>.gitbook.yaml</code>, <code>.gitbook.yml</code>, or{" "}
+    <code>gitbook-docs.yaml</code> at the root, or a <code>honkit</code> or{" "}
+    <code>gitbook-cli</code> dependency. A repository with only a{" "}
+    <code>SUMMARY.md</code> isn't detected, since other tools use that file too,
+    so name the source there.
+  </p>
+  <p>
+    <code>blume migrate</code> converts nothing itself. It opens the agent on
+    the <code>blume-migrate</code> skill inside the package, pointed at its
+    GitBook reference. Following it, the agent:
+  </p>
+  <ol>
+    <li>
+      Works out each page's old URL from <code>SUMMARY.md</code>, checks the
+      list against the live sitemap, and moves every file to its URL, renaming
+      each <code>README.md</code> to <code>index</code>.
+    </li>
+    <li>
+      Writes a <code>meta.ts</code> per folder so the sidebar keeps GitBook's
+      order, labels, and groups.
+    </li>
+    <li>
+      Converts every <code>{"{% … %}"}</code> tag and the HTML GitBook writes,
+      moves reusable content into <code>_includes/</code>, and renames pages
+      that need components to <code>.mdx</code>.
+    </li>
+    <li>
+      Writes <code>blume.config.ts</code> from what it can read off your
+      published site, and adds the redirects GitBook answers today.
+    </li>
+    <li>
+      Builds, pins GitBook's heading ids with a bundled script, and runs{" "}
+      <code>blume validate --strict</code> and{" "}
+      <code>blume audit --only redirects</code> until they pass.
+    </li>
+  </ol>
+  <p>
+    It ends with a summary of what it migrated, dropped, and approximated. Keep
+    it for the review.
+  </p>
+  <Callout type="info">
+    The agent's work is judgment, so two runs on one repository can differ.
+    Read the diff rather than trusting it.
+  </Callout>
+
+  <h2>Review the changes</h2>
+  <p>
+    Start with <code>git diff --stat</code>, run <code>npx blume dev</code>, and
+    check these, which are where a GitBook migration most often needs a second
+    look.
+  </p>
+  <ul>
+    <li>
+      <strong>URLs follow <code>SUMMARY.md</code>.</strong> In GitBook, a page's
+      URL comes from its place in the table of contents, so a page you once
+      dragged to another group kept its old file path. In Blume, the path is
+      the URL. Spot-check a few files that moved: each should sit at the URL
+      the page had, and the agent's summary should list every move.
+    </li>
+    <li>
+      <strong>The sidebar.</strong> Each group should be a plain heading and
+      each page with subpages a single expandable row labeled with its title.
+      Blume lists top-level pages above groups, so a page GitBook placed after
+      a divider moves up, unless the agent put it in a group folder.
+    </li>
+    <li>
+      <strong>No blocks left.</strong> A <code>{"{% … %}"}</code> tag left in a{" "}
+      <code>.md</code> page shows as literal text while the build passes. This
+      search should print only code samples that show the syntax on purpose:
+    </li>
+  </ul>
+  <CodeBlock code={leftoverGrep} lang="bash" />
+  <ul>
+    <li>
+      <strong>Includes.</strong> Open a page that uses reusable content.
+      Headings inside an include move down one level, since an include has no
+      title of its own, and its images use <code>%20</code> for spaces in file
+      names.
+    </li>
+    <li>
+      <strong>Accordions.</strong> An accordion's title is plain text, so code
+      formatting and links in a <code>&lt;summary&gt;</code> are gone. Links
+      that mattered should have moved into the body.
+    </li>
+    <li>
+      <strong>Translations.</strong> If you dropped a language, open one of its
+      old URLs. GitBook translates group names in URLs, like{" "}
+      <code>/de/zahlungen/…</code>, so each translated group needs its own
+      redirect ahead of the language's catch-all:
+    </li>
+  </ul>
+  <CodeBlock code={translationRedirects} lang="ts" title="blume.config.ts" />
+  <ul>
+    <li>
+      <strong>The repository.</strong> Look for CI and scripts that read{" "}
+      <code>.md</code> files or <code>.gitbook/assets/</code>. A Markdown link
+      checker won't understand Blume's routes or <code>.mdx</code> pages, so
+      replace it with <code>blume validate --strict</code>. A script that
+      removes unused uploads by searching <code>*.md</code> would now delete
+      images still in use.
+    </li>
+  </ul>
+
+  <h3>Heading anchors</h3>
+  <p>
+    GitBook and Blume build heading anchors differently. GitBook keeps dots
+    and turns colons and slashes into hyphens, so a link to{" "}
+    <code>#api-keys-tokens</code> or <code>#id-2.4-may</code> would land at the
+    top of the page in Blume. The agent pins each old anchor on its
+    heading with a script that ships in the package. After you edit headings,
+    rerun it against your live GitBook site:
+  </p>
+  <CodeBlock code={pinCommand} lang="bash" />
+  <CodeBlock code={pinOutput} lang="text" />
+  <p>
+    It reads the anchors GitBook published and the ones Blume built, and lists
+    each heading whose anchor changed. Add <code>--write</code> to pin them,
+    then rebuild and run it again until it reports none. Add{" "}
+    <code>--only-linked</code> to pin only the anchors your pages link to. It
+    fetches one page at a time and caches them in{" "}
+    <code>.pin-heading-ids-cache/</code>, which you can delete when you're done.
+  </p>
+
+  <h2>Check every old URL</h2>
+  <p>
+    With <code>npx blume dev</code> running, walk the list you saved and print
+    every old URL that doesn't land on a page:
+  </p>
+  <CodeBlock code={urlCheck} lang="bash" />
+  <p>
+    Redirects count as passing, since <code>-L</code> follows them. Use the dev
+    server rather than <code>blume preview</code>: preview serves a static
+    build, which doesn't apply pattern redirects like the translation ones, so
+    those URLs 404 there even when they're right. Add a redirect for each path
+    the loop prints and run it again until it prints nothing.
+  </p>
+  <p>
+    GitBook also redirects the old URL of every page you moved or renamed in
+    its editor, and keeps no list of them. The agent recovers the ones it can
+    from the history of <code>SUMMARY.md</code> and checks each against your
+    live site. If you know of other old links, such as from your analytics or
+    search console, add them to the list and run the loop again. For status
+    codes and patterns, see{" "}
+    <a href="/guides/documentation-url-migration-redirects">Move documentation URLs while preserving old links</a>.
+  </p>
+
+  <h2>Deploy and switch over</h2>
+  <p>Build and run the checks the agent ran, so you see them pass yourself:</p>
+  <CodeBlock
+    code={`npx blume build
+npx blume validate --strict
+npx blume audit --only redirects`}
+    lang="bash"
+  />
+  <p>
+    Pick a host and follow <a href="/docs/deployment">Deployment</a>. If you
+    have pattern redirects, choose one that applies them: Netlify, Cloudflare,
+    or Vercel with the <code>vercel()</code> adapter. A plain static host like
+    GitHub Pages serves only exact redirects. On Netlify, set{" "}
+    <code>deployment: netlify()</code> too, so exact redirects answer with an
+    HTTP redirect rather than a redirect page.
+  </p>
+  <p>
+    <strong>Turn off Git Sync before you merge.</strong> GitBook imports every
+    push to the synced branch, so merging would publish the converted files
+    on your GitBook site, and edits made in GitBook would keep landing in the
+    repository. Turn it off for every synced space, then merge and deploy.
+    Keep the GitBook site itself published until the switch is done.
+  </p>
+  <p>
+    Run the URL check against your preview deployment. Then add your docs
+    domain to the new host and update the DNS record you created for GitBook
+    so it points there instead. If your docs sit under a path on your main
+    site, like <code>example.com/docs</code>, point that proxy at the new
+    deployment and set <code>deployment.base</code> to the path. Rolling back
+    is changing the record or proxy back, while GitBook still serves the old
+    site. Once production passes the URL check, remove the custom domain from
+    your GitBook site, and submit the new <code>sitemap.xml</code> in Google
+    Search Console.
+  </p>
+
+  <h2>What doesn't carry over</h2>
+  <ul>
+    <li>
+      <strong>The hosted editor.</strong> GitBook's block editor and live edits
+      stay with GitBook. In Blume, pages are files you edit in your own editor.
+    </li>
+    <li>
+      <strong>Change requests.</strong> Reviews, comments, and merge rules
+      become pull requests in your Git host, with a preview deployment for each.
+    </li>
+    <li>
+      <strong>Site customization.</strong> Themes, tint colors, and sidebar
+      styles don't map. Your logo, primary color, fonts, header links, and
+      footer links move to <code>blume.config.ts</code>, your favicon to{" "}
+      <code>public/</code>, and anything else can go in a{" "}
+      <code>theme.css</code>.
+    </li>
+    <li>
+      <strong>AI search.</strong> Blume's search is built in. GitBook Assistant
+      has no direct replacement, but Blume's{" "}
+      <a href="/docs/configuration/assistant">assistant</a> runs on a model
+      provider you choose, with server output.
+    </li>
+    <li>
+      <strong>Access control.</strong> Share links, authenticated access, and
+      adaptive content have no Blume equivalent. Use your host's protection,
+      which covers the whole site, so mixing public and private pages takes two
+      sites.
+    </li>
+    <li>
+      <strong>GitBook's extras.</strong> Page covers, color highlights, and
+      button styles drop; embeds other than YouTube become link cards; and
+      insights come from the analytics adapter you choose.
+    </li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <h3>A page fails with "Could not parse expression"</h3>
+  <p>
+    A <code>{"{% … %}"}</code> tag or a bare brace is left in an{" "}
+    <code>.mdx</code> page. Convert the tag, or put text like{" "}
+    <code>{"{{DeviceId}}"}</code> in inline code. GitBook's escaped form,{" "}
+    <code>{"\\{{name\\}}"}</code>, still fails in MDX.
+  </p>
+  <h3>A page fails with "Expected a closing tag"</h3>
+  <p>
+    GitBook writes <code>&lt;br&gt;</code> and <code>&lt;img&gt;</code> without
+    closing them, which MDX rejects. Inside a <code>&lt;figure&gt;</code>, the
+    error reads "Unexpected closing tag" instead. Write <code>&lt;br /&gt;</code>,
+    or turn the image into Markdown.
+  </p>
+  <h3>The build can't resolve an image from an include</h3>
+  <p>
+    An image path with spaces inside an include must use <code>%20</code>, as
+    in <code>../assets/image%20(1).png</code>. The angle-bracket form,{" "}
+    <code>&lt;../assets/image (1).png&gt;</code>, works on a page but not in an
+    include, and the error names the page that includes it.
+  </p>
+</GuidePage>

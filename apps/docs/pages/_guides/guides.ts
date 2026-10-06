@@ -2908,30 +2908,258 @@ export const guides: Guide[] = [
       { href: "/docs/migrating", label: "Migrating" },
       { href: "/docs/content/syntax", label: "Syntax" },
       { href: "/docs/content/navigation", label: "Navigation" },
+      { href: "/docs/content/meta", label: "Folder meta" },
+      { href: "/docs/content/includes", label: "Includes" },
       { href: "/docs/deployment#redirects", label: "Redirects" },
     ],
     id: "migrate-from-mkdocs-material",
     image: { src: "/guides/migrate-from-mkdocs-material.webp" },
     meta: {
       description:
-        "Migrate from MkDocs Material to Blume: map mkdocs.yml and nav, rewrite admonitions, tabs, and snippets, replace plugins, and keep every old URL working.",
+        "Migrate from MkDocs Material with a coding agent: a codemod converts admonitions, tabs, and snippets, nav becomes folders, and every old URL keeps working.",
       title: "How to migrate from MkDocs Material to Blume",
     },
     nextStep: {
-      body: "Run it at the root of your MkDocs project, on a clean branch. With no MkDocs mappings, the agent inventories the repo first, so point it at the tables above.",
-      command: "npx blume migrate --claude",
+      body: "Run it in the folder that holds mkdocs.yml, on a clean branch, then check its work against the sections above.",
+      command: "npx blume migrate mkdocs --claude",
       link: { href: "/docs/migrating", label: "Read the migration reference" },
-      title: "Draft the migration",
+      title: "Migrate your docs",
     },
     prerequisites: [
-      "An MkDocs Material site's repository",
+      "An MkDocs, Material for MkDocs, or Zensical site's repository",
+      "The Python setup that builds it today",
       "Node.js 22.12 or later",
-      "Claude Code or Codex, if an agent drafts the first pass",
+      "Claude Code or Codex, signed in",
     ],
     published: "2026-09-27",
     summary:
-      "Move an MkDocs Material site's Markdown to Blume, rebuild its nav as folders, rewrite extension syntax, replace its plugins, and check that every old URL still works.",
+      "Move a Material for MkDocs site to Blume with a coding agent and a codemod, rebuild its nav as folders, keep its heading anchors, and check that every old URL still works.",
     title: "Migrate your docs from MkDocs Material",
+    topic: "migrate",
+    updated: "2026-10-05",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/migrating", label: "Migrating" },
+      { href: "/docs/content/navigation", label: "Navigation" },
+      { href: "/docs/content/includes", label: "Includes" },
+      { href: "/docs/deployment#redirects", label: "Redirects" },
+    ],
+    id: "migrate-from-gitbook",
+    image: { src: "/guides/migrate-from-gitbook.webp" },
+    meta: {
+      description:
+        "Move Git-synced GitBook docs to Blume with a coding agent: every page at its old URL, GitBook blocks as components, heading anchors kept, old links redirected.",
+      title: "How to migrate from GitBook to Blume",
+    },
+    nextStep: {
+      body: "Run it at the root of the repository GitBook syncs to, on a clean branch, then work through the review above.",
+      command: "npx blume migrate gitbook --claude",
+      link: { href: "/docs/migrating", label: "Read the migration reference" },
+      title: "Migrate your docs",
+    },
+    prerequisites: [
+      "GitBook docs synced to a GitHub or GitLab repository",
+      "Node.js 22.12 or later",
+      "Claude Code or Codex, signed in",
+    ],
+    published: "2026-10-05",
+    summary:
+      "Hand your Git-synced GitBook repository to a coding agent, keep every page at the URL it has today, convert GitBook's blocks to components, and deploy docs you host yourself.",
+    title: "Migrate your docs from GitBook",
+    topic: "migrate",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/migrating", label: "Migrating" },
+      { href: "/docs/references/openapi", label: "OpenAPI" },
+      { href: "/docs/content/islands", label: "Islands" },
+      { href: "/docs/deployment#redirects", label: "Redirects" },
+    ],
+    id: "migrate-from-readme",
+    image: { src: "/guides/migrate-from-readme.webp" },
+    meta: {
+      description:
+        "Move a ReadMe developer hub to Blume with a coding agent: a codemod converts ReadMe's syntax, your specs become the API reference, and every URL keeps working.",
+      title: "How to migrate from ReadMe to Blume",
+    },
+    nextStep: {
+      body: "Run it at the root of the repository ReadMe syncs to, on a branch named after none of your versions, then work through the review above.",
+      command: "npx blume migrate readme --claude",
+      link: { href: "/docs/migrating", label: "Read the migration reference" },
+      title: "Migrate your docs",
+    },
+    prerequisites: [
+      "A ReadMe project synced to Git, or exported to a repository",
+      "Node.js 22.12 or later",
+      "Claude Code or Codex, signed in",
+    ],
+    published: "2026-10-05",
+    summary:
+      "Hand your Git-synced ReadMe repository to a coding agent, keep every page at its flat URL, generate the API reference from your specs, and deploy docs you host yourself.",
+    title: "Migrate your docs from ReadMe",
+    topic: "migrate",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/migrating", label: "Migrating" },
+      { href: "/docs/content/syntax", label: "Syntax" },
+      { href: "/docs/content/includes", label: "Includes" },
+      { href: "/docs/deployment#redirects", label: "Redirects" },
+    ],
+    id: "migrate-from-vitepress",
+    image: { src: "/guides/migrate-from-vitepress.webp" },
+    meta: {
+      description:
+        "Move a VitePress site to Blume with a coding agent and a codemod: convert containers, code groups, and snippets, and keep every .html URL and anchor working.",
+      title: "How to migrate from VitePress to Blume",
+    },
+    nextStep: {
+      body: "Run it in the folder whose package.json runs VitePress, on a clean branch, after saving your old build. Then work through the review above.",
+      command: "npx blume migrate vitepress --claude",
+      link: { href: "/docs/migrating", label: "Read the migration reference" },
+      title: "Migrate your docs",
+    },
+    prerequisites: [
+      "A VitePress 1.x site's repository",
+      "Node.js 22.12 or later",
+      "Claude Code or Codex, signed in",
+    ],
+    published: "2026-10-05",
+    summary:
+      "Hand your VitePress site to a coding agent, convert its Markdown extensions with a codemod, rebuild sidebar groups without moving URLs, and keep every old .html address and heading anchor working.",
+    title: "Migrate your docs from VitePress",
+    topic: "migrate",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/migrating", label: "Migrating" },
+      { href: "/docs/references/openapi", label: "OpenAPI" },
+      { href: "/docs/content/navigation", label: "Navigation" },
+      { href: "/docs/deployment#redirects", label: "Redirects" },
+    ],
+    id: "migrate-from-fern",
+    image: { src: "/guides/migrate-from-fern.webp" },
+    meta: {
+      description:
+        "Move Fern Docs to Blume with a coding agent: keep every page URL, export a Fern Definition to OpenAPI, redirect every endpoint, and keep SDK generation.",
+      title: "How to migrate from Fern Docs to Blume",
+    },
+    nextStep: {
+      body: "Run it at the root of your repository, the folder that holds fern/, on a clean branch, then work through the review above.",
+      command: "npx blume migrate fern --claude",
+      link: { href: "/docs/migrating", label: "Read the migration reference" },
+      title: "Migrate your docs",
+    },
+    prerequisites: [
+      "A Fern Docs project (fern/docs.yml) in Git",
+      "Node.js 22.12 or later",
+      "Claude Code or Codex, signed in",
+    ],
+    published: "2026-10-05",
+    summary:
+      "Hand your Fern repository to a coding agent, keep every page URL and redirect every endpoint, export a Fern Definition to OpenAPI, and deploy docs you host yourself while Fern keeps generating your SDKs.",
+    title: "Migrate your docs from Fern",
+    topic: "migrate",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/migrating", label: "Migrating" },
+      { href: "/docs/references/openapi", label: "OpenAPI" },
+      { href: "/docs/content/includes", label: "Includes" },
+      { href: "/docs/deployment#redirects", label: "Redirects" },
+    ],
+    id: "migrate-from-redocly",
+    image: { src: "/guides/migrate-from-redocly.webp" },
+    meta: {
+      description:
+        "Move Redocly Realm docs to Blume with a coding agent: Markdoc to MDX, sidebars to folders and tabs, and redirects that keep every API reference URL working.",
+      title: "How to migrate from Redocly to Blume",
+    },
+    nextStep: {
+      body: "Run it at the root of your Redocly project, on a clean branch, then work through the review above.",
+      command: "npx blume migrate redocly --claude",
+      link: { href: "/docs/migrating", label: "Read the migration reference" },
+      title: "Migrate your docs",
+    },
+    prerequisites: [
+      "A Redocly Realm project in Git",
+      "Node.js 22.12 or later",
+      "Claude Code or Codex, signed in",
+    ],
+    published: "2026-10-05",
+    summary:
+      "Hand your Redocly project to a coding agent, convert Markdoc to MDX, keep every API reference URL with generated redirects, and deploy docs you host yourself.",
+    title: "Migrate your docs from Redocly",
+    topic: "migrate",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/migrating", label: "Migrating" },
+      { href: "/docs/content/syntax", label: "Syntax" },
+      { href: "/docs/content/i18n", label: "Internationalization" },
+      { href: "/docs/deployment#redirects", label: "Redirects" },
+    ],
+    id: "migrate-from-vuepress",
+    image: { src: "/guides/migrate-from-vuepress.webp" },
+    meta: {
+      description:
+        "Move a VuePress site to Blume with a coding agent: convert containers, badges, and code groups, redirect every .html URL, and keep every heading anchor.",
+      title: "How to migrate from VuePress to Blume",
+    },
+    nextStep: {
+      body: "Run it in the folder whose package.json runs VuePress, on a clean branch, after saving your old build. Then work through the review above.",
+      command: "npx blume migrate vuepress --claude",
+      link: { href: "/docs/migrating", label: "Read the migration reference" },
+      title: "Migrate your docs",
+    },
+    prerequisites: [
+      "A VuePress 1 site's repository",
+      "Node.js 22.12 or later",
+      "Claude Code or Codex, signed in",
+    ],
+    published: "2026-10-05",
+    summary:
+      "Hand your VuePress site to a coding agent, turn its Vue-flavored Markdown into Blume pages in every language, and keep every old .html URL and heading anchor working.",
+    title: "Migrate your docs from VuePress",
+    topic: "migrate",
+  },
+  {
+    author: "hayden",
+    docs: [
+      { href: "/docs/migrating", label: "Migrating" },
+      { href: "/docs/content/navigation", label: "Navigation" },
+      { href: "/docs/content/includes", label: "Includes" },
+      { href: "/docs/deployment#redirects", label: "Redirects" },
+    ],
+    id: "migrate-from-docsify",
+    image: { src: "/guides/migrate-from-docsify.webp" },
+    meta: {
+      description:
+        "Move a Docsify site to Blume with a coding agent and a codemod: convert callouts, tabs, and includes, and keep every old #/ link and ?id= anchor working.",
+      title: "How to migrate from Docsify to Blume",
+    },
+    nextStep: {
+      body: "Run it in the folder that holds your docs/ folder, on a clean branch, after saving your old routes. Then work through the review above.",
+      command: "npx blume migrate docsify --claude",
+      link: { href: "/docs/migrating", label: "Read the migration reference" },
+      title: "Migrate your docs",
+    },
+    prerequisites: [
+      "A Docsify site's repository",
+      "Node.js 22.12 or later",
+      "Claude Code or Codex, signed in",
+    ],
+    published: "2026-10-05",
+    summary:
+      "Hand your Docsify site to a coding agent, convert its callouts, tabs, and includes with a codemod, rebuild its sidebar as folders, and keep every old #/ link and heading anchor working.",
+    title: "Migrate your docs from Docsify",
     topic: "migrate",
   },
 ];

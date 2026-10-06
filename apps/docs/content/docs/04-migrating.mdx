@@ -1,6 +1,6 @@
 ---
 title: Migrate to Blume
-description: Move a Mintlify, Fumadocs, Docusaurus, Starlight, or Nextra site to Blume with one command that hands the migration to Codex or Claude Code.
+description: Move a Mintlify, Docusaurus, GitBook, MkDocs, ReadMe, or other docs site to Blume with one command that hands the migration to Codex or Claude Code.
 sidebar:
   label: Migrate to Blume
   order: 2.4
@@ -29,8 +29,16 @@ Name the framework you're migrating from, or leave it out and Blume detects it f
 | `docusaurus` | `docusaurus.config.*` | [Migrate from Docusaurus](/guides/migrate-from-docusaurus) |
 | `starlight` | `@astrojs/starlight` in `package.json` | [Migrate from Starlight](/guides/migrate-from-starlight) |
 | `nextra` | `nextra` in `package.json` | [Migrate from Nextra](/guides/migrate-from-nextra) |
+| `vitepress` | `.vitepress/config.ts` (or `.mts`, `.js`, `.mjs`) at the root or in `docs/`, or `vitepress` in `package.json` | [Migrate from VitePress](/guides/migrate-from-vitepress) |
+| `vuepress` | `.vuepress/config.ts` (or `.js`, `.mjs`, `.yml`, `.toml`) at the root or in `docs/`, `vuepress.config.*`, or `vuepress` (or `vuepress-vite`, `vuepress-webpack`) in `package.json` | [Migrate from VuePress](/guides/migrate-from-vuepress) |
+| `mkdocs` | `mkdocs.yml`, `mkdocs.yaml`, `zensical.toml`, `properdocs.yml`, or `properdocs.yaml` | [Migrate from MkDocs Material](/guides/migrate-from-mkdocs-material) |
+| `fern` | `fern/docs.yml` | [Migrate from Fern](/guides/migrate-from-fern) |
+| `gitbook` | `.gitbook.yaml`, `.gitbook.yml`, or `gitbook-docs.yaml`, or `honkit` or `gitbook-cli` in `package.json`; never `SUMMARY.md` alone | [Migrate from GitBook](/guides/migrate-from-gitbook) |
+| `redocly` | `sidebars.yaml`, or `@redocly/realm` or another Realm-family package in `package.json`; never `redocly.yaml` alone | [Migrate from Redocly](/guides/migrate-from-redocly) |
+| `readme` | `_order.yaml` in `docs/`, `reference/`, `recipes/`, or `custom_pages/`; a repository that uploads with `rdme` needs the source named | [Migrate from ReadMe](/guides/migrate-from-readme) |
+| `docsify` | `docsify-cli` or `docsify` in `package.json`; a site without a `package.json` needs the source named | [Migrate from Docsify](/guides/migrate-from-docsify) |
 
-Each source has its own mapping reference in the playbook. A site built with anything else still migrates: run the command without a source, and the agent inventories the repo first, then works from the playbook's general rules. The [MkDocs Material guide](/guides/migrate-from-mkdocs-material) walks through a migration that way.
+Detection checks the folder you run the command in. Each source has its own mapping reference in the playbook, and several also have a codemod the agent runs first for the mechanical rewrites, so its own effort goes to the judgment calls. A site built with anything else still migrates: run the command without a source, and the agent inventories the repo first, then works from the playbook's general rules.
 
 ## What the agent does
 
@@ -39,7 +47,7 @@ The agent follows the playbook's workflow from the source's config to a passing 
 1. Writes `blume.config.ts`, mapping only what your source declares and leaving Blume's defaults to cover the rest.
 2. Restructures content into [filesystem navigation](/docs/content/navigation), converting per-folder ordering files (Fumadocs `meta.json`, Nextra `_meta`) to `meta.ts`.
 3. Rewrites pages: frontmatter to Blume's schema, callout components to [directives](/docs/content/syntax), icons to Lucide, and snippets inlined.
-4. Adds a [redirect](/docs/deployment#redirects) for every URL that moves, so no link breaks.
+4. Adds a [redirect](/docs/deployment#redirects) for every URL that moves, so no link breaks. Docsify's `#/` URLs never reach the server, so for those it adds a small script that sends each one to its new page.
 5. Points your `package.json` scripts at `blume dev` and `blume build`, and swaps the old framework's dependencies for `blume`.
 6. Runs `blume build` and `blume validate` until both pass.
 

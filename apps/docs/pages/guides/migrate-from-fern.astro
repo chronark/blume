@@ -1,0 +1,684 @@
+---
+// Migrate from Fern: written from an end-to-end run of the blume-migrate
+// skill (SKILL.md and references/fern.md) on a real Fern project:
+// github.com/agentmail-to/agentmail-docs at 55b4ab574b657a44a6df4a8a813af615b4498d64
+// (Fern CLI 5.44.8, published at docs.agentmail.to: 115 MDX pages in a docs
+// tab, a Knowledge Base tab, and a changelog of 27 entries; an API Reference
+// from a Fern Definition with 149 endpoints and 8 webhooks; the same fern/
+// folder generates Python and TypeScript SDKs), with Blume 2.1.3 (main). The
+// agent read only the skill and the Blume docs it points to, and wrote
+// one-off scripts for the mechanical part. Outcome: `blume build` passed (273
+// pages: 115 content pages, 149 operation pages, 8 webhook pages, and the
+// reference overview; 281 redirects), its one warning BLUME_NAV_MISSING_PAGE
+// for the tab at "/" (no page lives there; the tab works through the "/"
+// redirect); `blume validate --strict` passed after the agent fixed 22 links
+// and 1 anchor that were already broken on the live site;
+// `blume audit --only redirects` passed; and `fern check` passed with the
+// SDK config left in fern/. Of the 270 old URLs (the sitemap's 268 plus 2
+// hidden pages), 89 are pages and 181 redirect in one hop; none is missing.
+// Also checked: `blume preview` with curl on 23 URLs, the live site's `/` and
+// API group redirects (curl), a CORS preflight against the API (no CORS
+// headers, so Try it is off), and a fresh `fern export` against the committed
+// spec (same 149 operations, but the committed one was stale).
+// After the run: scripts/fern-codemod.mjs, written from the run's scripts,
+// was applied to a fresh copy of the same repository with the reference's
+// workflow (plan, config, build, operation-routes.mjs, endpoints). With the
+// run's judgment calls applied by hand, its output built, passed
+// `validate --strict` and `audit --only redirects`, and covered all 270 old
+// URLs; `fern check` passed and fern/apis was untouched. On that build, the
+// sitemap command below returned the same 268 paths as the run, and the URL
+// check below (against `blume dev`) passed for all 270. The Acme before and
+// after sample is the codemod's real output on a four-page Fern project,
+// built and validated with Blume 2.1.3 (main).
+// In review, the codemod was revised for cases agentmail-docs doesn't have (a
+// file listed twice, a `# comment` in a fence on an untitled page, a linked
+// spec, a callout closed mid-line). Rerun on a fresh copy, its plan and
+// endpoints output was byte-identical, so the build above stands for it.
+// Rechecked on that build: `validate --strict` passed, `fern check` reported
+// 0 errors, the sitemap command returned the same 268 paths, and the URL
+// check passed for all 270 under zsh. The Acme sample is unchanged.
+// Not run: `npx blume migrate fern` itself (the agent was pointed at the
+// skill directly; detection landed after the run, and 2.1.3 doesn't ship
+// it), a deploy or DNS cutover, or the lockfile regeneration. Since the
+// front door never ran, the guide's entry sets no `tested`.
+// The reference was revised and trimmed after the run
+// (codemod first, `seo.noindex` for hidden pages, webhooks restored through
+// an overlay), and again in review; those revisions weren't rerun by an
+// agent end to end.
+// Examples are invented (Acme).
+import Callout from "blume/components/content/Callout.astro";
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const instancesYaml = [
+  "instances:",
+  "  - url: https://acme.docs.buildwithfern.com",
+  "    custom-domain: docs.acme.example",
+  "  - url: https://acme.docs.buildwithfern.com/docs",
+  "    custom-domain: acme.example/docs",
+].join("\n");
+
+const sitemapCommand = [
+  "curl -s https://docs.acme.example/sitemap.xml \\",
+  "  | grep -o '<loc>[^<]*' \\",
+  "  | sed -e 's#<loc>https://[^/]*##' -e 's#^$#/#' \\",
+  "  > ../old-urls.txt",
+].join("\n");
+
+const fernPage = [
+  "---",
+  "title: Send your first order",
+  "subtitle: Create an order with the Acme API in five minutes.",
+  "---",
+  "",
+  '<Note title="Sandbox keys">',
+  "  Test keys never charge a card.",
+  "</Note>",
+  "",
+  "<CodeBlocks>",
+  "```python",
+  "import acme",
+  "",
+  'client = acme.Client(api_key="sk_test_123")',
+  "```",
+  "",
+  "```typescript",
+  'import { AcmeClient } from "acme";',
+  "",
+  'const client = new AcmeClient({ apiKey: "sk_test_123" });',
+  "```",
+  "</CodeBlocks>",
+  "",
+  "<Cards>",
+  '  <Card title="Authentication" icon="fa-solid fa-key" href="/core-concepts/authentication">',
+  "    Create and rotate API keys.",
+  "  </Card>",
+  "</Cards>",
+].join("\n");
+
+const blumePage = [
+  "---",
+  "title: Send your first order",
+  "description: Create an order with the Acme API in five minutes.",
+  "sidebar:",
+  "  label: Quickstart",
+  "---",
+  "",
+  ":::note[Sandbox keys]",
+  "Test keys never charge a card.",
+  ":::",
+  "",
+  "<CodeGroup>",
+  '```python title="Python"',
+  "import acme",
+  "",
+  'client = acme.Client(api_key="sk_test_123")',
+  "```",
+  "",
+  '```typescript title="TypeScript"',
+  'import { AcmeClient } from "acme";',
+  "",
+  'const client = new AcmeClient({ apiKey: "sk_test_123" });',
+  "```",
+  "</CodeGroup>",
+  "",
+  "<CardGroup>",
+  '  <Card title="Authentication" icon="key" href="/core-concepts/authentication">',
+  "    Create and rotate API keys.",
+  "  </Card>",
+  "</CardGroup>",
+].join("\n");
+
+const fernTree = [
+  "fern/",
+  "├── fern.config.json      kept: pins the Fern CLI",
+  "├── apis/api/",
+  "│   ├── generators.yml    kept: SDK generation",
+  "│   └── definition/       kept: the API definition",
+  "├── docs.yml              removed",
+  "├── pages/                → docs/",
+  "├── changelog/            → docs/changelog/",
+  "├── snippets/             → docs/_snippets/",
+  "└── assets/               → public/assets/",
+].join("\n");
+
+const exportCommand = [
+  "npx fern-api@$(node -p \"require('./fern/fern.config.json').version\") \\",
+  "  export --api api openapi/openapi.yml",
+].join("\n");
+
+const overlay = [
+  "overlay: 1.1.0",
+  "info: { title: Docs fixes, version: 1.0.0 }",
+  "actions:",
+  "  # Fern packages become PascalCase tags: name them.",
+  "  - target: $.paths.*.*.tags[?@ == 'OrdersRefunds']",
+  "    update: Order Refunds",
+  "  # The export drops webhooks; their payload schemas stay in components.",
+  "  - target: $",
+  "    update:",
+  "      x-webhooks:",
+  "        orderShipped:",
+  "          post:",
+  "            summary: Order Shipped",
+  "            tags: [Webhook Events]",
+  "            requestBody:",
+  "              content:",
+  "                application/json:",
+  "                  schema:",
+  '                    $ref: "#/components/schemas/OrderShippedEvent"',
+  "            responses:",
+  '              "200":',
+  "                description: Return a 2xx status to acknowledge the event.",
+].join("\n");
+
+const referenceConfig = [
+  'import { defineConfig } from "blume";',
+  'import { openapi } from "blume/reference";',
+  "",
+  'import fernRedirects from "./fern-redirects.json" with { type: "json" };',
+  "",
+  "export default defineConfig({",
+  '  title: "Acme Docs",',
+  '  logo: { image: "/logo.svg", text: "", href: "/quickstart" },',
+  "  navigation: {",
+  "    tabs: [",
+  '      { label: "Documentation", path: "/", icon: "book" },',
+  '      { label: "API Reference", path: "/api-reference", icon: "terminal" },',
+  '      { label: "Changelog", path: "/changelog", icon: "clock" },',
+  "    ],",
+  "  },",
+  "  reference: [",
+  "    openapi({",
+  '      spec: "./openapi/openapi.yml",',
+  '      overlays: ["./openapi/docs.overlay.yaml"],',
+  '      route: "/api-reference",',
+  "      // Fern's default-language first.",
+  '      codeSamples: ["python", "typescript", "curl"],',
+  "      playground: false,",
+  "    }),",
+  "  ],",
+  "  // One entry per moved page, endpoint, API group, and changelog date.",
+  "  redirects: [...fernRedirects],",
+  "});",
+].join("\n");
+
+const leftoverGrep = [
+  "grep -rnE '<(Note|Tip|Info|Warning|Success|Error|Check|Launch|CodeBlocks?|Cards|AccordionGroup|Markdown|Endpoint[A-Za-z]*Snippet|Availability|Files)[ />]' docs",
+].join("\n");
+
+const hiddenUrls = [
+  "node -e \"console.log(require('./fern-migration.json').oldUrls.join('\\n'))\" \\",
+  "  | sort -u - ../old-urls.txt -o ../old-urls.txt",
+].join("\n");
+
+const urlCheck = [
+  "while read -r url; do",
+  '  code=$(curl -sL -o /dev/null -w "%{http_code}" "http://localhost:4321$url")',
+  '  [ "$code" = "200" ] || echo "$code $url"',
+  "done < ../old-urls.txt",
+].join("\n");
+
+const corsProbe = [
+  "curl -si -X OPTIONS https://api.acme.example/v1/orders \\",
+  "  -H 'Origin: https://docs.acme.example' \\",
+  "  -H 'Access-Control-Request-Method: GET' \\",
+  "  | grep -i '^access-control-allow-origin'",
+].join("\n");
+---
+
+<GuidePage guide={guideById("migrate-from-fern")}>
+  <p>
+    By the end of this guide, your Fern docs are a Blume project in the same
+    repository: every page at the URL it has today, your <code>docs.yml</code>{" "}
+    navigation rebuilt as folders and tabs, your API Reference rendered from
+    OpenAPI, and a redirect for every endpoint and changelog URL that moved. A
+    coding agent does the conversion, and you review it.
+  </p>
+  <p>
+    Only the docs move. The same <code>fern/</code> folder usually generates
+    your SDKs, and that part stays exactly as it is: your Fern Definition or
+    OpenAPI spec, <code>generators.yml</code>, and <code>fern check</code> in
+    CI keep working.
+  </p>
+
+  <h2>What carries over</h2>
+  <p>
+    Fern pages are MDX, so the content needs little more than component
+    renames. The work is elsewhere: Fern builds every URL from{" "}
+    <code>docs.yml</code> rather than from file paths, and its API Reference
+    URLs follow its own rules. On one real Fern site with 115 pages and 149
+    endpoints, every one of its 270 old URLs ended up either serving a page or
+    redirecting in one hop.
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In Fern</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>docs.yml</code> settings</td>
+        <td><code>blume.config.ts</code></td>
+      </tr>
+      <tr>
+        <td>Tabs, sections, and page order in <code>docs.yml</code></td>
+        <td>
+          Header tabs, folders placed so each page keeps its URL, and a{" "}
+          <code>meta.ts</code> per folder for titles, icons, and order
+        </td>
+      </tr>
+      <tr>
+        <td>
+          <code>&lt;Note&gt;</code>, <code>&lt;Warning&gt;</code>, and the other
+          callouts
+        </td>
+        <td><code>:::note</code>, <code>:::warning</code>, and the other directives</td>
+      </tr>
+      <tr>
+        <td><code>&lt;CodeBlocks&gt;</code>, <code>&lt;Cards&gt;</code>, <code>&lt;AccordionGroup&gt;</code></td>
+        <td><code>&lt;CodeGroup&gt;</code>, <code>&lt;CardGroup&gt;</code>, <code>&lt;Accordion&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>&lt;Markdown src&gt;</code> snippets</td>
+        <td><code>&lt;include&gt;</code> and a <code>_snippets/</code> folder</td>
+      </tr>
+      <tr>
+        <td>Font Awesome icons</td>
+        <td>Lucide icons, where one exists</td>
+      </tr>
+      <tr>
+        <td>A changelog folder of dated entries</td>
+        <td>Blume's changelog, with an RSS feed</td>
+      </tr>
+      <tr>
+        <td>A Fern Definition</td>
+        <td>
+          An OpenAPI file exported by the Fern CLI, rendered by{" "}
+          <code>openapi()</code> with a page per endpoint and webhook
+        </td>
+      </tr>
+      <tr>
+        <td><code>redirects</code> in <code>docs.yml</code></td>
+        <td><code>redirects</code> in <code>blume.config.ts</code></td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Here's one page before and after the conversion:</p>
+  <CodeBlock code={fernPage} lang="mdx" title="fern/pages/quickstart.mdx (Fern)" />
+  <CodeBlock code={blumePage} lang="mdx" title="docs/(get-started)/quickstart.mdx (Blume)" />
+  <p>
+    The page sat in a "Get Started" section that added nothing to its URL, so
+    it lands in a <code>(get-started)</code> folder, which groups pages in the
+    sidebar without changing their URLs, and still serves at{" "}
+    <code>/quickstart</code>. Fern's <code>subtitle</code> becomes Blume's{" "}
+    <code>description</code>, which renders under the title, and the{" "}
+    <code>page:</code> name from <code>docs.yml</code> stays the sidebar
+    label. The code tabs keep their language names, which Fern showed for
+    untitled blocks.
+  </p>
+
+  <h2>Before you start</h2>
+  <p>
+    Start from a clean working tree on a new branch, so the migration is one
+    diff to review:
+  </p>
+  <CodeBlock code="git switch -c migrate-to-blume" lang="bash" />
+  <p>
+    Then check where your docs are published. Each entry under{" "}
+    <code>instances</code> in <code>fern/docs.yml</code> is a deployment of
+    the same docs:
+  </p>
+  <CodeBlock code={instancesYaml} lang="yaml" title="fern/docs.yml" />
+  <p>
+    A Blume build serves one of them, so pick the one that stays canonical.
+    An instance with a path in its domain, like <code>acme.example/docs</code>,
+    is served under that path through a proxy; you'll decide what replaces it
+    when you switch over.
+  </p>
+  <p>
+    Save every URL your site serves today. Fern's sitemap lists each page, API
+    endpoint, webhook, and changelog date:
+  </p>
+  <CodeBlock code={sitemapCommand} lang="bash" />
+  <p>
+    Replace <code>docs.acme.example</code> with your docs domain. The sitemap
+    leaves out pages marked <code>hidden: true</code> in{" "}
+    <code>docs.yml</code>, which still serve at their URLs; you'll add those
+    after the migration. Check that you have Node.js 22.12 or later, and that
+    Claude Code or Codex is installed and signed in.
+  </p>
+
+  <h2>Run the migration</h2>
+  <p>From the root of your repository, the folder that holds <code>fern/</code>, run:</p>
+  <CodeBlock code="npx blume migrate fern --claude" lang="bash" />
+  <p>
+    To use Codex, swap <code>--claude</code> for <code>--codex</code>. Leave out{" "}
+    <code>fern</code> and Blume detects the source from{" "}
+    <code>fern/docs.yml</code>. A <code>fern/</code> folder without a{" "}
+    <code>docs.yml</code> only generates SDKs, so Blume doesn't treat it as a
+    docs site.
+  </p>
+  <p>
+    <code>blume migrate</code> converts nothing itself. It opens the agent on the{" "}
+    <code>blume-migrate</code> skill inside the package, pointed at its Fern
+    reference. Following it, the agent:
+  </p>
+  <ol>
+    <li>
+      Runs the skill's Fern codemod, which computes the URL of every page from{" "}
+      <code>docs.yml</code>, hidden ones included, and checks them against your
+      sitemap before it moves anything.
+    </li>
+    <li>
+      Moves each page to a path that reproduces its URL, writes the{" "}
+      <code>meta.ts</code> files and frontmatter, converts the components, and
+      moves your assets to <code>public/</code>.
+    </li>
+    <li>
+      Writes <code>blume.config.ts</code> from <code>docs.yml</code>, and
+      adds an <code>openapi()</code> reference, exporting a Fern Definition to
+      OpenAPI first.
+    </li>
+    <li>
+      Builds once, reads the new endpoint routes from the build, and generates
+      a redirect for every old endpoint, API group, changelog date, and moved
+      page.
+    </li>
+    <li>
+      Converts what the codemod left for judgment, like embedded endpoint
+      snippets and changelog titles, then removes the docs from{" "}
+      <code>fern/</code> and updates <code>package.json</code>, CI, and your
+      contributor docs.
+    </li>
+    <li>
+      Runs <code>blume build</code>, <code>blume validate --strict</code>,{" "}
+      <code>blume audit --only redirects</code>, and <code>fern check</code>{" "}
+      until they pass.
+    </li>
+  </ol>
+  <p>
+    It ends with a summary of what it migrated, dropped, and approximated. Keep
+    it for the review.
+  </p>
+  <Callout type="info">
+    The agent's work is judgment, so two runs on one repository can differ.
+    Read the diff rather than trusting it.
+  </Callout>
+
+  <h2>Keep SDK generation</h2>
+  <p>
+    The agent removes only what the docs used. Everything Fern needs to
+    generate SDKs stays in place:
+  </p>
+  <CodeBlock code={fernTree} lang="text" />
+  <p>
+    CI steps that run <code>fern check</code> or{" "}
+    <code>fern generate --group</code> for an SDK stay too, along with the{" "}
+    <code>FERN_TOKEN</code> secret if they use it. The steps that publish or
+    preview the docs (<code>fern generate --docs</code>) go, replaced by your
+    new host's deploy. After the migration, run <code>fern check</code>{" "}
+    yourself to confirm the SDK config still loads.
+  </p>
+
+  <h2>From a Fern Definition to an API reference</h2>
+  <p>
+    If your API is an OpenAPI spec, Blume renders it as it is. A Fern
+    Definition, the <code>definition/</code> folder of YAML files, Blume can't
+    read, so the agent exports it with the Fern CLI version your project pins.
+    The export runs locally, with no login (<code>api</code> is the API's
+    folder name under <code>fern/apis/</code>):
+  </p>
+  <CodeBlock code={exportCommand} lang="bash" />
+  <p>
+    If your repository already commits an OpenAPI file generated from the
+    definition, the agent points Blume at that file instead and checks it
+    against a fresh export. When they differ, it reports that the committed
+    file is stale rather than adding a second copy. Refresh it the way your
+    repository already does, and check first whether a release workflow runs
+    when that file changes.
+  </p>
+  <p>
+    The export leaves out webhooks, WebSocket channels, and idempotency
+    headers. The webhook payload schemas survive in it, so the agent restores
+    each webhook page with an OpenAPI Overlay, a file of edits applied at build
+    time, which keeps the export itself regenerable:
+  </p>
+  <CodeBlock code={overlay} lang="yaml" title="openapi/docs.overlay.yaml" />
+  <p>
+    The same overlay names Fern's nested packages, which the export turns into
+    tags like <code>OrdersRefunds</code>, and sets their order. A WebSocket
+    channel has no page in Blume, so its old URL redirects to the guide that
+    covers it. The config ends up like this:
+  </p>
+  <CodeBlock code={referenceConfig} lang="ts" title="blume.config.ts" />
+
+  <h2>Review the changes</h2>
+  <p>
+    Start with <code>git diff --stat</code>, run <code>npx blume dev</code>, and
+    check these, which are where a Fern migration most often needs a second
+    look.
+  </p>
+  <ul>
+    <li>
+      <strong>No Fern components left.</strong> A Fern tag Blume doesn't know
+      either warns in the build or breaks the page. The search below should
+      print nothing:
+    </li>
+  </ul>
+  <CodeBlock code={leftoverGrep} lang="bash" />
+  <ul>
+    <li>
+      <strong>Sidebar order.</strong> Click through each tab. Blume lists a
+      section's pages above its subsections, so a section that mixed them
+      shows its pages first. Labels match Fern's: a page's{" "}
+      <code>docs.yml</code> name becomes its sidebar label where it differs
+      from the title.
+    </li>
+    <li>
+      <strong>Callout icons.</strong> Callouts at the top level of a page become{" "}
+      <code>:::note</code>-style directives, which take no icon. Callouts
+      inside other components stay <code>&lt;Callout&gt;</code> and keep
+      theirs.
+    </li>
+    <li>
+      <strong>Icons.</strong> Font Awesome names map to Lucide where one
+      exists. Brand icons like Discord and Google have no Lucide equivalent and
+      are dropped; the agent's summary lists where.
+    </li>
+    <li>
+      <strong>Hidden pages.</strong> Each one keeps its URL, out of the
+      sidebar, search, and the sitemap, with a <code>noindex</code> tag.
+    </li>
+    <li>
+      <strong>Changelog titles.</strong> An entry with a name after its date,
+      like <code>2026-09-05-agentid-sign-in-keys.mdx</code>, takes its title
+      from the file name, so check the casing. Fern showed two entries from
+      the same day as one page; Blume gives each its own, and the old date URL
+      redirects to the one without a name after its date, when there is one.
+    </li>
+    <li>
+      <strong>The API reference.</strong> Tags carry readable names, webhook
+      pages are back, and operations within a tag are sorted alphabetically
+      rather than in your definition's order. Nested sections like Orders ›
+      Refunds become sibling groups.
+    </li>
+    <li>
+      <strong>Embedded endpoint snippets.</strong> Blume can't embed an
+      operation's request or response in a guide, so each{" "}
+      <code>&lt;EndpointRequestSnippet&gt;</code> becomes a written sample
+      plus a link to the endpoint's page. Check them against your API.
+    </li>
+    <li>
+      <strong>Drafts.</strong> Fern published only the files{" "}
+      <code>docs.yml</code> referenced, and only those move with the pages.
+      The agent moves the others into a <code>_drafts/</code> folder, which
+      Blume doesn't publish, or deletes them if you say so.
+    </li>
+    <li>
+      <strong>Links that were already broken.</strong>{" "}
+      <code>blume validate</code> checks every internal link, so it finds links
+      that 404 on your live Fern site too. The agent fixes them and lists them.
+    </li>
+    <li>
+      <strong>The repository.</strong> Contributor docs and scripts that wrote
+      into <code>fern/pages</code>, <code>fern/changelog</code>, or{" "}
+      <code>fern/snippets</code> point at the new paths;{" "}
+      <code>.gitignore</code> ignores <code>.blume/</code> and{" "}
+      <code>dist/</code>; and the lockfile is regenerated. A workflow that
+      stamps <code>last-updated</code> into frontmatter goes, replaced by
+      Blume's dates from git (<code>lastModified: "git"</code>).
+    </li>
+  </ul>
+  <p>
+    One build warning is expected: when your main tab's pages share no URL
+    prefix, it sits at <code>/</code>, and Blume warns{" "}
+    <code>BLUME_NAV_MISSING_PAGE</code> because no page lives at{" "}
+    <code>/</code> itself. The tab still works: Fern sent <code>/</code> to
+    your first page, and the migration keeps that redirect.
+  </p>
+
+  <h2>Keep every old URL working</h2>
+  <p>
+    Content pages keep their exact URLs. API and changelog URLs don't, because
+    Fern and Blume build them differently:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">Old Fern URL</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>/quickstart</code></td>
+        <td>The same page</td>
+      </tr>
+      <tr>
+        <td><code>/api-reference/orders/refunds/list</code></td>
+        <td><code>/api-reference/order-refunds/orders-refunds-list</code>, by redirect</td>
+      </tr>
+      <tr>
+        <td><code>/api-reference/orders/refunds</code>, a group</td>
+        <td>That tag on the API overview, <code>/api-reference#order-refunds</code></td>
+      </tr>
+      <tr>
+        <td><code>/api-reference/webhooks/events/order-shipped</code></td>
+        <td><code>/api-reference/webhook-events/order-shipped</code>, by redirect</td>
+      </tr>
+      <tr>
+        <td><code>/changelog/2026/9/5</code></td>
+        <td><code>/changelog/2026-09-05</code>, by redirect</td>
+      </tr>
+      <tr>
+        <td><code>/changelog.rss</code></td>
+        <td><code>/changelog/rss.xml</code>, by redirect</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>
+    The agent generates these rather than typing them: it reads each
+    endpoint's new route from the build and matches it to the URL Fern gave
+    it. The list lands in <code>fern-redirects.json</code>, which the config
+    imports, alongside the redirects from your <code>docs.yml</code>. A{" "}
+    <code>docs.yml</code> redirect whose destination already 404ed on Fern
+    gets pointed at the page it meant, and the summary lists it.
+  </p>
+  <p>
+    Add the hidden pages to your saved list first. The codemod recorded every
+    URL it computed from <code>docs.yml</code>, hidden pages included, in{" "}
+    <code>fern-migration.json</code>:
+  </p>
+  <CodeBlock code={hiddenUrls} lang="bash" />
+  <p>
+    Then, with <code>npx blume dev</code> running, check every URL you saved
+    and print the ones that don't land on a page:
+  </p>
+  <CodeBlock code={urlCheck} lang="bash" />
+  <p>
+    Redirects count as passing, since <code>-L</code> follows them. If it
+    prints a path, add a redirect for it and run it again until it prints
+    nothing. For status codes, patterns, and how each host serves them, see{" "}
+    <a href="/guides/documentation-url-migration-redirects">Move documentation URLs while preserving old links</a>.
+  </p>
+
+  <h2>Deploy and switch over</h2>
+  <p>
+    Build and run the checks the agent ran, so you see them pass yourself:
+  </p>
+  <CodeBlock
+    code={`npx blume build
+npx blume validate --strict
+npx blume audit --only redirects`}
+    lang="bash"
+  />
+  <p>
+    Pick a host and follow <a href="/docs/deployment">Deployment</a>. Vercel
+    and Netlify give Blume your domain automatically; on any other host, set{" "}
+    <code>deployment.site</code> to it, for canonical URLs, the sitemap, and
+    the RSS feed.
+  </p>
+  <p>
+    Fern's API Explorer sent requests through its own proxy. Blume's Try it
+    panel sends them from the reader's browser, so it only works if your API
+    allows your docs origin. Send a preflight from it and look for an{" "}
+    <code>access-control-allow-origin</code> header:
+  </p>
+  <CodeBlock code={corsProbe} lang="bash" />
+  <p>
+    If there's none, the agent turns Try it off. To keep it, choose a host
+    adapter with server output, such as <code>vercel()</code>, and set{" "}
+    <code>playground: {"{ proxy: true }"}</code> in the <code>openapi()</code>{" "}
+    entry, as <a href="/docs/references/openapi#cors-and-the-proxy">CORS and the proxy</a>{" "}
+    describes.
+  </p>
+  <p>
+    Push the branch and check a preview deployment, rerunning the URL check
+    against it. Then point your custom domain's DNS at the new host, and
+    unpublish the docs in the Fern dashboard only once production has passed
+    the URL check. If you had a second instance under a path, like{" "}
+    <code>acme.example/docs</code>, either redirect that path to your docs
+    domain where it's proxied, or serve a second build there with{" "}
+    <code>deployment: {"{ base: \"/docs\" }"}</code>. Submit the new{" "}
+    <code>sitemap.xml</code> in Google Search Console, since search engines
+    recrawl moved URLs on their own schedule.
+  </p>
+
+  <h2>What doesn't carry over</h2>
+  <ul>
+    <li>
+      <strong>API Explorer sign-in.</strong> Fern could fill in a reader's API
+      key after they logged in, and run an OAuth flow. Blume's Try it panel
+      takes a token, an API key, or basic credentials that the reader pastes.
+    </li>
+    <li>
+      <strong>Ask Fern.</strong> Fern's AI search and chat are hosted features.
+      Blume's search works out of the box, and its AI assistant is opt-in and
+      runs on your own provider key, with server output.
+    </li>
+    <li>
+      <strong>The hosted MCP server.</strong> Fern served one for your docs.
+      Blume has its own <a href="/docs/discoverability/mcp">MCP server</a>,
+      which needs server output; a static build has none. Update any page that
+      gives readers the old server's URL. The Markdown copy of each page and{" "}
+      <code>llms.txt</code> carry over on any host.
+    </li>
+    <li>
+      <strong>SDK snippets in the API reference.</strong> Fern showed calls
+      from your generated SDKs on each endpoint. Blume generates HTTP samples
+      (curl, JavaScript, Python, and more). To show SDK calls instead, add
+      them as <code>x-codeSamples</code> in the overlay, and Blume shows them
+      first.
+    </li>
+    <li>
+      <strong>The dashboard.</strong> Fern's editor, preview links, analytics,
+      and access controls stay with Fern. In Blume, pages are files reviewed in
+      pull requests, analytics come from the adapter you choose, and private
+      docs use your host's protection.
+    </li>
+  </ul>
+</GuidePage>

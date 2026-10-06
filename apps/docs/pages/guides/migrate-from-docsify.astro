@@ -1,0 +1,723 @@
+---
+// Migrate from Docsify: written from an end-to-end run of the blume-migrate
+// skill (SKILL.md and references/docsify.md) on a real Docsify site: the
+// Zenroom docs, github.com/dyne/Zenroom `docs/` at
+// 275325b108fa3364873c75a982053932127b6e59 (Docsify 4.13.1 code from the
+// unversioned CDN `lib/` build, hash routing, `relativePath: true`, published
+// on GitHub Pages at dev.zenroom.org: 68 content pages (67 flat in `pages/`,
+// plus the home page) under 9 sidebar groups, 584 includes (35 with
+// `:fragment=`), 13 docsify-tabs sets, a cover page and navbar, remote
+// `alias` pages, generated ldoc HTML),
+// with Blume 2.1.3 (main). The agent read only the skill and the Blume docs
+// it points to, and wrote one-off scripts for the mechanical part. Outcome:
+// `blume build` passed (74 content pages and the 404), `blume validate
+// --strict` passed, and `blume audit --only redirects` passed with 0 issues.
+// In Chromium against `blume preview`, all 78 old hash routes, 155 URL
+// variants (`#/x.md`, `/index.html#/x`), and 74 `?id=` deep links landed on
+// the right page and anchor, and 997 of 1,056 old heading ids exist on the
+// new pages (every miss is a title H1). 49 pages moved into a folder per
+// sidebar group, and one page that rendered blank on the old site (missing
+// include targets) was repaired.
+// After the run: the bundled codemod (scripts/docsify-codemod.mjs), written
+// from the run's scripts, was applied to a fresh copy of the same docs. Its
+// heading-id snapshot matched a real Docsify 4.13.1 render on every route
+// that rendered (1,281 ids on 68 routes), a second pass changed nothing, and
+// its build failed only on the MDX hazards and dead image it had reported.
+// With --group-folders and a GitHub emoji map (and the four reported pages
+// excluded), the build passed, and pin-heading-ids.mjs pinned 63 headings and
+// then reported 0, leaving 910 of 968 old ids on the built pages (every miss a
+// title H1). The redirect script and the old-site stub were checked in
+// Chromium against `blume dev` and `blume preview`, at the root and under a
+// base. The Acme example below is invented: its old site was rendered in
+// Docsify 4.13.1 for its ids, and its before/after is the codemod's real
+// output, built with Blume; the anchor script pinned 2 ids, then 0;
+// `validate --strict` and the redirect audit passed; and in Chromium every
+// old URL form below landed on its page and anchor, with the route check
+// printing nothing.
+// Review pass: the codemod was fixed to read leading-slash includes and
+// images from the page's folder (as Docsify 4.13.1 did in Chromium), to
+// include a Markdown `:fragment=` whole under v4 (Docsify 4 cut fragments
+// from code only), to leave indented code alone, to write a root meta.ts in
+// sidebar group order, to drop anchors that named a title H1, to map a
+// named `homepage` file's own route, and to read `coverpage` and
+// `loadNavbar` file names. The redirect script was hardened: it resolves
+// `./` and `../` segments, and it prepends `location.origin`, since
+// `#//other.host/` otherwise sent readers off the site (seen in Chromium).
+// After those changes, the Acme example was rebuilt from its Docsify commit
+// with this page's config: the codemod report and pages above were
+// unchanged; build, the anchor script (2, then 0), `validate --strict`, the
+// redirect audit, and check-routes.cjs passed; and in Chromium against
+// `blume preview` every old URL form above, `#/./install`, an old hash on
+// the 404 page, and `#//other.host/` (which now stays on the site) landed
+// right, as they did under `deployment.base: "/acme-docs"` and, for three
+// of them, under `blume dev`. The old-site stub above, pointed at that
+// preview, forwarded each case. On a fresh Zenroom copy, the snapshot still
+// matched Docsify on all 1,281 ids, a second pass changed nothing, the
+// build passed with the same four pages excluded, and the sidebar kept
+// Docsify's group order. On a second site, docsify-themeable's docs
+// (jhildenbiddle/docsify-themeable 8631fa45; Docsify 4, `homepage`,
+// `coverpage`, and `loadSidebar` file names), with Docsify's files and its
+// test harness removed, the build, the anchor script (1, then 0), and
+// `validate --strict` passed.
+// Not run: `npx blume migrate docsify` itself (2.1.3 has no docsify source;
+// the agent was pointed at the skill), a deploy to GitHub Pages, or a
+// lockfile regeneration. The reference was revised after the run (codemod,
+// split route table); those revisions weren't rerun on Zenroom end to end.
+import Callout from "blume/components/content/Callout.astro";
+import CodeBlock from "blume/components/content/CodeBlock.astro";
+import GuidePage from "../_guides/GuidePage.astro";
+import { guideById } from "../_guides/guides.ts";
+
+const saveRoutes = [
+  "d=docs   # the folder that holds index.html",
+  "{",
+  "  (cd \"$d\" && find . -name '*.md' ! -name '_*' ! -path '*/_*/*' ! -path '*/node_modules/*' | sed 's#^\\.##')",
+  "  find \"$d\" -maxdepth 2 \\( -name _sidebar.md -o -name _navbar.md -o -name _coverpage.md \\) \\",
+  "    -exec sed -E 's/!\\[[^]]*\\]\\([^)]*\\)//g' {} + | grep -oE '\\]\\([^)\" ]+' \\",
+  "    | sed 's#^\\](##' | grep -vE '^(https?:|mailto:|#)' | sed 's#^\\([^/]\\)#/\\1#'",
+  "} | sed -E -e 's#\\?.*$##' -e 's#\\.md$##' -e 's#(^|/)README$#\\1#' -e 's#/+$##' -e 's#^$#/#' \\",
+  "  | sort -u > ../old-routes.txt",
+].join("\n");
+const beforeSidebar = [
+  "- [Home](/)",
+  "- Getting started",
+  "  - [Install](install.md)",
+  "  - [Quickstart](quickstart.md)",
+  "- Guides",
+  "  - [Webhooks](webhooks.md \"Receive webhooks\")",
+].join("\n");
+const beforeInstall = [
+  "# Install",
+  "",
+  "Install the CLI, then sign in.",
+  "",
+  "<!-- tabs:start -->",
+  "",
+  "#### **macOS**",
+  "",
+  "```bash",
+  "brew install acme",
+  "```",
+  "",
+  "#### **Linux**",
+  "",
+  "```bash",
+  "curl -fsSL https://acme.example/install.sh | sh",
+  "```",
+  "",
+  "<!-- tabs:end -->",
+  "",
+  "!> The installer adds `acme` to your `PATH`.",
+  "",
+  "## Configure",
+  "",
+  "[](_media/acme.yml ':include :type=code yaml')",
+].join("\n");
+const afterInstall = [
+  "---",
+  "title: \"Install\"",
+  "---",
+  "",
+  "Install the CLI, then sign in.",
+  "",
+  "<Tabs>",
+  "",
+  "<Tab title=\"macOS\">",
+  "",
+  "```bash",
+  "brew install acme",
+  "```",
+  "",
+  "</Tab>",
+  "<Tab title=\"Linux\">",
+  "",
+  "```bash",
+  "curl -fsSL https://acme.example/install.sh | sh",
+  "```",
+  "",
+  "</Tab>",
+  "</Tabs>",
+  "",
+  ":::warning",
+  "The installer adds `acme` to your `PATH`.",
+  ":::",
+  "",
+  "## Configure",
+  "",
+  "<include lang=\"yaml\">../_media/acme.yml</include>",
+].join("\n");
+const beforeQuickstart = [
+  "# Quickstart",
+  "",
+  "?> Numbers that start with `+1555555` never leave the sandbox.",
+  "",
+  "Send your first message, then [configure the CLI](install.md?id=configure)",
+  "or [handle webhooks](webhooks.md?id=retries-amp-timeouts).",
+].join("\n");
+const afterQuickstart = [
+  "---",
+  "title: \"Quickstart\"",
+  "---",
+  "",
+  ":::tip",
+  "Numbers that start with `+1555555` never leave the sandbox.",
+  ":::",
+  "",
+  "Send your first message, then [configure the CLI](./install.md#configure)",
+  "or [handle webhooks](../guides/webhooks.md#retries-amp-timeouts).",
+].join("\n");
+const codemodReport = [
+  "README.md → index.md",
+  "  1 × H1 → frontmatter title",
+  "  1 × link → file link",
+  "",
+  "install.md → getting-started/install.mdx",
+  "  1 × !> → :::warning",
+  "  1 × H1 → frontmatter title",
+  "  1 × code include → <include lang>",
+  "  1 × tab set → <Tabs>",
+  "",
+  "quickstart.md → getting-started/quickstart.mdx",
+  "  1 × ?> → :::tip",
+  "  1 × H1 → frontmatter title",
+  "  2 × link → file link",
+  "",
+  "webhooks.md → guides/webhooks.md",
+  "  1 × H1 → frontmatter title",
+].join("\n");
+const routeTable = [
+  "{",
+  "  \"/install\": \"/getting-started/install\",",
+  "  \"/quickstart\": \"/getting-started/quickstart\",",
+  "  \"/webhooks\": \"/guides/webhooks\"",
+  "}",
+].join("\n");
+const redirectConfig = [
+  "import { defineConfig } from \"blume\";",
+  "",
+  "import moved from \"./docsify-routes.json\" with { type: \"json\" };",
+  "",
+  "// Old routes that now land on a file in public/: the script sends readers",
+  "// there, but a redirect can't, so they stay out of `redirects`.",
+  "const files = {}; // e.g. { \"/onepage\": \"/onepage.md\" }",
+  "",
+  "// Docsify served every page at /#/<route>; a server never sees the hash.",
+  "// Swap an old hash URL for its new route, and ?id=<heading> for #<heading>.",
+  "const base = \"\"; // the site's deployment.base plus basePath, if it has either",
+  "const docsifyRedirects = `(() => {",
+  "  const base = ${JSON.stringify(base)};",
+  "  const routes = ${JSON.stringify({ ...moved, ...files })};",
+  "  const go = () => {",
+  "    const hash = location.hash;",
+  "    if (!hash.startsWith(\"#/\")) return;",
+  "    const q = hash.indexOf(\"?\");",
+  "    let path = q === -1 ? hash.slice(1) : hash.slice(1, q);",
+  "    const id = q === -1 ? null : new URLSearchParams(hash.slice(q + 1)).get(\"id\");",
+  "    try { path = decodeURI(new URL(path, \"http://x\").pathname); } catch {}",
+  "    path = path.replace(/\\\\.md$/i, \"\").replace(/(^|\\\\/)README$/i, \"$1\");",
+  "    if (path.length > 1) path = path.replace(/\\\\/+$/, \"\");",
+  "    // location.origin keeps a crafted #//other.host/ link on this site.",
+  "    location.replace(location.origin + base + (routes[path] ?? path) + (id ? \"#\" + id : \"\"));",
+  "  };",
+  "  go();",
+  "  addEventListener(\"hashchange\", go);",
+  "})();`;",
+  "",
+  "export default defineConfig({",
+  "  title: \"Acme Docs\",",
+  "  redirects: Object.entries(moved).map(([from, to]) => ({ from, to })),",
+  "  integrations: [",
+  "    {",
+  "      name: \"docsify-hash-redirects\",",
+  "      hooks: {",
+  "        \"astro:config:setup\": ({ injectScript }) => {",
+  "          injectScript(\"head-inline\", docsifyRedirects);",
+  "        },",
+  "      },",
+  "    },",
+  "  ],",
+  "});",
+].join("\n");
+const historyMode = [
+  "if (!location.hash) {",
+  "  const id = new URLSearchParams(location.search).get(\"id\");",
+  "  if (id) location.replace(location.pathname + \"#\" + id);",
+  "}",
+].join("\n");
+const oldSiteStub = [
+  "<!doctype html>",
+  "<meta charset=\"utf-8\">",
+  "<title>These docs have moved</title>",
+  "<script>",
+  "  (() => {",
+  "    const site = \"https://docs.acme.example\";",
+  "    const routes = { \"/install\": \"/getting-started/install\" };",
+  "    const hash = location.hash;",
+  "    let path = \"/\";",
+  "    let id = null;",
+  "    if (hash.startsWith(\"#/\")) {",
+  "      const q = hash.indexOf(\"?\");",
+  "      path = q === -1 ? hash.slice(1) : hash.slice(1, q);",
+  "      id = q === -1 ? null : new URLSearchParams(hash.slice(q + 1)).get(\"id\");",
+  "      try { path = decodeURI(new URL(path, \"http://x\").pathname); } catch {}",
+  "      path = path.replace(/\\.md$/i, \"\").replace(/(^|\\/)README$/i, \"$1\");",
+  "      if (path.length > 1) path = path.replace(/\\/+$/, \"\");",
+  "    }",
+  "    location.replace(site + (routes[path] ?? path) + (id ? \"#\" + id : \"\"));",
+  "  })();",
+  "</script>",
+  "<noscript><meta http-equiv=\"refresh\" content=\"0; url=https://docs.acme.example/\"></noscript>",
+  "<p>These docs have moved to <a href=\"https://docs.acme.example/\">docs.acme.example</a>.</p>",
+].join("\n");
+const checkRoutes = [
+  "const routes = { ...require(\"./docsify-routes.json\") }; // and your files map",
+  "const old = require(\"fs\").readFileSync(\"../old-routes.txt\", \"utf8\").split(\"\\n\").filter(Boolean);",
+  "(async () => {",
+  "  for (const route of old) {",
+  "    const res = await fetch(\"http://localhost:4321\" + (routes[route] ?? route));",
+  "    if (res.status !== 200) console.log(res.status, route);",
+  "  }",
+  "})();",
+].join("\n");
+const pinAnchors = [
+  "npx blume build",
+  "node node_modules/blume/skills/blume-migrate/scripts/pin-heading-ids.mjs \\",
+  "  --old .docsify-old --map docsify-routes.json --write",
+  "npx blume build",
+].join("\n");
+---
+
+<GuidePage guide={guideById("migrate-from-docsify")}>
+  <p>
+    By the end of this guide, your Docsify site is a Blume project. Your
+    pages are built ahead of time instead of rendered in the browser. Your
+    sidebar is folders, your callouts, tabs, and includes are converted, and
+    every old <code>#/</code> link still lands on the right page and heading.
+    A coding agent does the conversion, starting with a codemod for the
+    mechanical part, and you review it.
+  </p>
+  <p>
+    It's written for Docsify 4 and 5 sites with the default hash routing. The
+    Markdown carries over. Vue widgets, comment plugins, and custom renderers
+    don't, and the agent lists each one.
+  </p>
+
+  <h2>What carries over</h2>
+  <p>
+    The run behind this guide migrated a real Docsify site: 68 pages in nine
+    sidebar groups, hundreds of code includes, tabs, and a cover page. Every
+    page carried over. All 78 old hash routes and every <code>?id=</code> deep
+    link tested landed on the right page and heading. Here's how the pieces
+    map:
+  </p>
+  <table>
+    <thead>
+      <tr>
+        <th scope="col">In Docsify</th>
+        <th scope="col">In Blume</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>window.$docsify</code> in <code>index.html</code></td>
+        <td><code>blume.config.ts</code></td>
+      </tr>
+      <tr>
+        <td><code>_sidebar.md</code> groups</td>
+        <td>A folder per group, with a <code>meta.ts</code> in sidebar order</td>
+      </tr>
+      <tr>
+        <td><code>_navbar.md</code></td>
+        <td>Header tabs and links</td>
+      </tr>
+      <tr>
+        <td><code>_coverpage.md</code></td>
+        <td>The top of your home page</td>
+      </tr>
+      <tr>
+        <td><code>README.md</code></td>
+        <td><code>index.md</code></td>
+      </tr>
+      <tr>
+        <td><code>!&gt;</code> and <code>?&gt;</code></td>
+        <td><code>:::warning</code> and <code>:::tip</code>, in <code>.mdx</code> pages</td>
+      </tr>
+      <tr>
+        <td><code>&gt; [!NOTE]</code> alerts</td>
+        <td><code>:::note</code> and the other callouts</td>
+      </tr>
+      <tr>
+        <td>docsify-tabs (<code>&lt;!-- tabs:start --&gt;</code>)</td>
+        <td><code>&lt;Tabs&gt;</code> and <code>&lt;Tab&gt;</code></td>
+      </tr>
+      <tr>
+        <td><code>[x](file ':include')</code>, with <code>:type=code</code></td>
+        <td><code>&lt;include&gt;</code>, with <code>lang</code></td>
+      </tr>
+      <tr>
+        <td><code>:fragment=</code> includes</td>
+        <td>The fragment copied to its own file, then included</td>
+      </tr>
+      <tr>
+        <td><code>## Title :id=custom</code></td>
+        <td><code>## Title [#custom]</code></td>
+      </tr>
+      <tr>
+        <td>The page's first <code># H1</code></td>
+        <td>Its frontmatter <code>title</code></td>
+      </tr>
+      <tr>
+        <td><code>/#/guide/setup?id=retries</code></td>
+        <td><code>/guide/setup#retries</code>, through a small redirect script</td>
+      </tr>
+      <tr>
+        <td>Search, copy-code, pagination, and zoom plugins</td>
+        <td>Built in</td>
+      </tr>
+    </tbody>
+  </table>
+  <p>Here's a sidebar and two pages, before and after the codemod:</p>
+  <CodeBlock code={beforeSidebar} lang="md" title="docs/_sidebar.md (Docsify)" />
+  <CodeBlock code={beforeInstall} lang="md" title="docs/install.md (Docsify)" />
+  <CodeBlock
+    code={afterInstall}
+    lang="mdx"
+    title="docs/getting-started/install.mdx (Blume)"
+  />
+  <CodeBlock code={beforeQuickstart} lang="md" title="docs/quickstart.md (Docsify)" />
+  <CodeBlock
+    code={afterQuickstart}
+    lang="mdx"
+    title="docs/getting-started/quickstart.mdx (Blume)"
+  />
+  <p>
+    The links now name files, so Blume checks them at build time. The{" "}
+    <code>#retries-amp-timeouts</code> anchor is the id Docsify gave that
+    heading. The agent pins it on the new page, so old links to it still
+    work.
+  </p>
+
+  <h2>Before you start</h2>
+  <p>
+    The agent edits your repository in place, so start on a new branch with a
+    clean working tree:
+  </p>
+  <CodeBlock code="git switch -c migrate-to-blume" lang="bash" />
+  <p>
+    Then save the list of URLs your site serves today. A Docsify site renders
+    in the browser, so there's no sitemap to read: every page lives after the{" "}
+    <code>#</code>. This builds the list from your Markdown files and the links
+    in your sidebar, navbar, and cover, and keeps it outside the repository.
+    Run it from the folder that holds your <code>docs/</code> folder:
+  </p>
+  <CodeBlock code={saveRoutes} lang="bash" />
+  <p>
+    Each line is the part after <code>#</code> in an old URL, like{" "}
+    <code>/guide/setup</code>. Add any route you know people link to that
+    isn't a file, like an <code>alias</code> from <code>index.html</code>.
+  </p>
+  <p>
+    Open a few pages on your live site too. In Docsify 4, a page whose include
+    points at a missing file renders blank, so some pages may never have
+    worked. The agent reports each one. You also need Node.js 22.12 or later,
+    and Claude Code or Codex installed and signed in.
+  </p>
+
+  <h2>Run the migration</h2>
+  <p>From the folder that holds your <code>docs/</code> folder, run:</p>
+  <CodeBlock code="npx blume migrate docsify --claude" lang="bash" />
+  <p>
+    To use Codex, swap <code>--claude</code> for <code>--codex</code>. Leave out{" "}
+    <code>docsify</code> and Blume detects the source from a{" "}
+    <code>docsify-cli</code> or <code>docsify</code> dependency in your{" "}
+    <code>package.json</code>. A Docsify site with no <code>package.json</code>{" "}
+    has to name it.
+  </p>
+  <p>
+    <code>blume migrate</code> converts nothing itself. It opens the agent on the{" "}
+    <code>blume-migrate</code> skill inside the package, pointed at its Docsify
+    reference. Following it, the agent:
+  </p>
+  <ol>
+    <li>
+      Runs the bundled Docsify codemod over your pages. It converts callouts,
+      tabs, includes, heading attributes, links, and emoji. It turns each
+      page's H1 into its title, moves pages into a folder per sidebar group,
+      and records the id Docsify gave every heading. Then it reports
+      everything it leaves.
+    </li>
+    <li>
+      Works through that report. That includes titles that may really be
+      sections, include targets that don't exist, MDX errors waiting to
+      happen, and files your pages link that have to move to{" "}
+      <code>public/</code>.
+    </li>
+    <li>
+      Writes <code>blume.config.ts</code> from <code>index.html</code>: title,
+      description, logo, theme color, repository, analytics, and the redirect
+      script for your old <code>#/</code> links.
+    </li>
+    <li>
+      Rebuilds your navbar as header links or tabs, and your cover page as the
+      top of your home page.
+    </li>
+    <li>
+      Pins each heading's old Docsify id where Blume's differs, then swaps
+      Docsify for Blume in <code>package.json</code>. It runs{" "}
+      <code>blume build</code>, <code>blume validate --strict</code>, and{" "}
+      <code>blume audit --only redirects</code> until they pass.
+    </li>
+  </ol>
+  <p>The codemod's report looks like this, one block per page:</p>
+  <CodeBlock code={codemodReport} lang="txt" />
+  <p>
+    After the pages, it lists site-wide items to review, the files that have
+    to move to <code>public/</code>, how many routes changed, and totals. Keep
+    it for the review.
+  </p>
+  <Callout type="info">
+    The codemod is deterministic, but the rest of the agent's work is judgment,
+    so two runs on one repository can differ. Read the diff rather than
+    trusting it.
+  </Callout>
+
+  <h2>How old links keep working</h2>
+  <p>
+    A Docsify URL like <code>https://docs.acme.example/#/install?id=configure</code>{" "}
+    asks the server for <code>/</code>. Everything after the <code>#</code>{" "}
+    stays in the browser, and Docsify read it there to pick the page. So no
+    server redirect, host rule, or Blume <code>redirects</code> entry can ever
+    see <code>/install</code> in that URL.
+  </p>
+  <p>
+    Instead, the agent adds a few lines of JavaScript to the{" "}
+    <code>&lt;head&gt;</code> of every page of your new site, the 404 page
+    included. When the address has an old <code>#/</code> route, the script
+    works out the page's new address on your site. It turns{" "}
+    <code>?id=configure</code> into <code>#configure</code> and replaces the
+    URL before the page's body loads. Readers land on{" "}
+    <code>/getting-started/install#configure</code>. Links inside your site
+    never use <code>#/</code>, so the script does nothing else.
+  </p>
+  <p>
+    When the codemod moves pages, it writes the old and new routes to{" "}
+    <code>docsify-routes.json</code>. A route that didn't move needs no entry:
+    the script keeps its path.
+  </p>
+  <CodeBlock code={routeTable} lang="json" title="docsify-routes.json" />
+  <p>
+    The config reads that table twice: once for the script, and once for
+    ordinary <code>redirects</code>, which cover a visit to{" "}
+    <code>/install</code> itself. It adds the script through a small inline
+    Astro integration, so it runs in <code>blume dev</code> and every build:
+  </p>
+  <CodeBlock code={redirectConfig} lang="ts" title="blume.config.ts" />
+  <p>
+    If your site deploys under a path, like a GitHub Pages project site at{" "}
+    <code>/acme-docs/</code>, set <code>base</code> in the script to that path
+    as well as in <code>deployment.base</code>. If an old route now lands on a
+    file in <code>public/</code> rather than a page, add it to{" "}
+    <code>files</code>: the script sends readers there, but it stays out of{" "}
+    <code>redirects</code>.
+  </p>
+  <p>
+    If your site used <code>routerMode: 'history'</code>, its URLs were real
+    paths, so <code>redirects</code> already cover moved pages. Its anchors
+    were still <code>?id=</code>, so the agent adds this inside the script,
+    after <code>go();</code>:
+  </p>
+  <CodeBlock code={historyMode} lang="js" />
+  <p>
+    If your docs move to a new address and the old one keeps serving, say an
+    old GitHub Pages URL while the new site lives on your own domain, replace
+    the old site's <code>index.html</code> with a page that sends each old link
+    to its new home:
+  </p>
+  <CodeBlock code={oldSiteStub} lang="html" title="index.html (on the old site)" />
+
+  <h2>Review the changes</h2>
+  <p>
+    Start with <code>git diff --stat</code>, run <code>npx blume dev</code>, and
+    work through these, which are where a Docsify migration most often needs a
+    second look.
+  </p>
+  <ul>
+    <li>
+      <strong>Titles.</strong> Docsify showed each page's Markdown as written,
+      so pages often start with a section heading or have several H1s. The
+      codemod takes a leading H1 as the title, and the sidebar label when text
+      comes first, and flags titles that may really be sections. Read each
+      flagged page's title in the browser tab and sidebar.
+    </li>
+    <li>
+      <strong>Pages that were blank.</strong> A missing include target blanked
+      the whole page in Docsify 4, and Blume refuses to build it. Point each
+      one at the file's new name, or drop it.
+    </li>
+    <li>
+      <strong>Files your pages link.</strong> Docsify served every file in its
+      folder, and Blume publishes pages and the images they use. Downloads,
+      PDFs, example files, and generated HTML move to <code>public/</code> at
+      the same path. A raw HTML link like{" "}
+      <code>&lt;a href="../_media/data.json"&gt;</code> resolved from your
+      docs root in Docsify, whatever page it was on, so the codemod rewrites it
+      to <code>/_media/data.json</code>, and the file has to be there. If a script
+      generates the files, link the folder into <code>public/</code> instead of
+      copying it.
+    </li>
+    <li>
+      <strong>MDX pages.</strong> Pages with callouts, tabs, or diagrams are now{" "}
+      <code>.mdx</code>, which is stricter than Markdown. An indented code
+      block renders as a plain paragraph, so fence it. HTML table cells that
+      share a line with text, headings inside <code>&lt;p&gt;</code> banners,
+      and braces in prose fail the build. The codemod lists each one, with its
+      line.
+    </li>
+    <li>
+      <strong>The sidebar and header.</strong> Click through each group.
+      Pages your sidebar didn't list are hidden but still built. External and
+      PDF links from the sidebar are pinned above it on every page. Navbar links
+      are in the header.
+    </li>
+    <li>
+      <strong>The home page.</strong> A cover page's title, tagline, and buttons
+      are now the top of <code>index.md</code>. Its background image or color
+      is gone.
+    </li>
+    <li>
+      <strong>Plugins.</strong> Search, copy buttons, previous and next links,
+      and image zoom are built in. Comment widgets, Vue components, and a
+      custom renderer, such as one that pretty-printed JSON, are listed for
+      you. Universal Analytics IDs (<code>UA-</code>) no longer collect data.
+    </li>
+    <li>
+      <strong>The repository.</strong> <code>package.json</code> runs{" "}
+      <code>blume dev</code> and <code>blume build</code>,{" "}
+      <code>.gitignore</code> lists <code>.blume</code> and <code>dist</code>,
+      and <code>index.html</code>, <code>_sidebar.md</code>, and the other
+      Docsify files are gone.
+    </li>
+  </ul>
+
+  <h2>Check old URLs and anchors</h2>
+  <p>
+    Start <code>npx blume preview</code>, then check that every route in your
+    saved list reaches a page through the route table. Save this beside{" "}
+    <code>blume.config.ts</code> and run <code>node check-routes.cjs</code>:
+  </p>
+  <CodeBlock code={checkRoutes} lang="js" title="check-routes.cjs" />
+  <p>
+    It prints nothing when every route works. It can't test the script itself,
+    because a request never carries the <code>#</code> part. So also open a few
+    old URLs in a browser, with and without <code>?id=</code>, like{" "}
+    <code>http://localhost:4321/#/install?id=configure</code>, and check that
+    you land on the heading.
+  </p>
+  <p>
+    Docsify and Blume build heading ids differently. Docsify 4 spells{" "}
+    <code>&amp;</code> as <code>amp</code> and <code>'</code> as{" "}
+    <code>39</code>, and adds a <code>_</code> before a leading digit, so{" "}
+    <code>## Retries &amp; timeouts</code> was{" "}
+    <code>#retries-amp-timeouts</code>. The agent pins every old id that
+    differs, using the ids the codemod recorded before it changed anything. To
+    check its work, run the anchor script again. It should find nothing to
+    pin:
+  </p>
+  <CodeBlock code={pinAnchors} lang="bash" />
+  <p>
+    Then run <code>npx blume validate --strict</code>, which checks every
+    internal link and anchor, including ones already broken on your old site.
+    A page's title H1 is no longer a heading on the page, so its old id can't
+    be pinned. The codemod drops that anchor from your own links, and an old
+    deep link to it lands at the top of the page, which is where it pointed
+    anyway.
+  </p>
+
+  <h2>Deploy and switch over</h2>
+  <p>
+    Most Docsify sites deploy to GitHub Pages from a <code>docs/</code> folder,
+    and a Blume site can stay there with a workflow that builds it.{" "}
+    <a href="/guides/markdown-docs-github-pages">Deploy Markdown docs to GitHub Pages</a>{" "}
+    has the workflow. Use <code>fetch-depth: 0</code> in the checkout if you
+    show last-updated dates, and commit a lockfile, since the workflow
+    installs from it. Then switch the Pages source from the branch folder to{" "}
+    <strong>GitHub Actions</strong>. Blume can't detect your URL on GitHub
+    Pages, so set it, with a project site's path as <code>base</code>:
+  </p>
+  <CodeBlock
+    code={`deployment: { site: "https://acme.github.io", base: "/acme-docs" },`}
+    lang="ts"
+    title="blume.config.ts"
+  />
+  <p>
+    Blume adds the base to Markdown links and images, but not to raw HTML. With
+    a base, start each root path the codemod wrote into an{" "}
+    <code>&lt;a href&gt;</code> or <code>&lt;img src&gt;</code> with it, like{" "}
+    <code>/acme-docs/_media/data.json</code>, and set the same base in the
+    redirect script.
+  </p>
+  <p>
+    A custom domain stays in your repository's Pages settings, and Blume
+    needs neither the <code>CNAME</code> nor the <code>.nojekyll</code> file.
+    Before you merge, keep a branch at your last Docsify commit, with{" "}
+    <code>git branch docsify-site main</code>. Rolling back is pointing the
+    Pages source at that branch's <code>docs/</code> folder. Once the new site
+    is live, open a handful of old <code>#/</code> links on the deployed site, and submit the new{" "}
+    <code>sitemap.xml</code> in Google Search Console: for the first time,
+    search engines can see each page at its own address.
+  </p>
+
+  <h2>What doesn't carry over</h2>
+  <ul>
+    <li>
+      <strong>Rendering in the browser.</strong> Virtual routes, Vue
+      components, global Vue options, and scripts in pages become static
+      content or islands. Docsify 4 ran page scripts only with{" "}
+      <code>executeScript</code> or Vue, so many never ran anyway.
+    </li>
+    <li>
+      <strong>Markdown options.</strong> A custom marked renderer, line breaks
+      on every newline (<code>breaks: true</code>), and link and image
+      attributes like <code>':target=_blank'</code> and{" "}
+      <code>':size=100'</code> go. Rewrite one that matters as raw HTML.
+    </li>
+    <li>
+      <strong>Live content.</strong> An <code>alias</code> or include that
+      fetched a file from another repository at view time becomes a copy, or a
+      remote content source. A <code>:fragment=</code> of a generated file
+      becomes a static copy, unless the generator writes the fragment itself.
+    </li>
+    <li>
+      <strong>Theme and chrome.</strong> The Docsify theme, a cover's
+      background, comment plugins, and new-tab external links (Docsify's
+      default).
+    </li>
+  </ul>
+
+  <h2>Troubleshooting</h2>
+  <h3>A page shows <code>!&gt;</code> or <code>:::warning</code> as text</h3>
+  <p>
+    The callout wasn't converted, or the page is still <code>.md</code>.
+    Directives work only in <code>.mdx</code> pages. Rename the page, and write
+    the callout as <code>:::warning</code> on its own line.
+  </p>
+  <h3>The build fails with "Expected a closing tag"</h3>
+  <p>
+    An HTML block in an <code>.mdx</code> page doesn't nest the way MDX needs.
+    A <code>&lt;td&gt;</code> that shares a line with text, or a heading inside
+    a <code>&lt;p&gt;</code>, is the usual cause. Put each table tag on its own
+    line, and make the <code>&lt;p&gt;</code> a <code>&lt;div&gt;</code>.
+  </p>
+  <h3>An old link shows the 404 page</h3>
+  <p>
+    Its route isn't in <code>docsify-routes.json</code> and no page has that
+    path, so the script sent the reader to a page that doesn't exist. Add the
+    old route and its new one to the table, then rebuild.
+  </p>
+  <h3>An old deep link lands at the top of the page</h3>
+  <p>
+    The heading's id changed and wasn't pinned. Run the anchor script with{" "}
+    <code>--write</code>, or pin the old id by hand at the end of the heading:{" "}
+    <code>## Retries &amp; timeouts [#retries-amp-timeouts]</code>.
+  </p>
+</GuidePage>
