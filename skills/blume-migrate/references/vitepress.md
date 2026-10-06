@@ -2,7 +2,7 @@
 
 VitePress is a Vue/Vite static site generator. Its config is a module in `.vitepress/`, navigation is **declared in `themeConfig.sidebar`**, every `.md` page compiles as a **Vue single-file component** (so it can hold Vue components, `{{ }}`, and `<script setup>`), and its Markdown is markdown-it plus VitePress plugins. Watch for five traps:
 
-- **Containers are written `::: tip`, with a space.** Blume renders that as literal text, with no diagnostic. Directives are also MDX-only.
+- **Containers are written `::: tip`, with a space.** Blume renders that as literal text, and warns (`BLUME_DIRECTIVE_SPACED_NAME`) only for a callout name in `.mdx`. Inside an open `:::` container, the same line closes the container and its text is dropped (`BLUME_DIRECTIVE_CLOSING_TEXT`). Directives are also MDX-only.
 - **Every page is `.md`, but most need to be `.mdx`.** A page with a callout, component, or math must be renamed, and MDX is stricter than Vue templates.
 - **URLs end in `.html` by default** (`cleanUrls: false`), so every page needs a redirect.
 - **The heading is the body `# H1`, not frontmatter.**

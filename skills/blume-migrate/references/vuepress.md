@@ -3,7 +3,7 @@
 VuePress is the Vue static site generator that VitePress succeeded. Its config is a module in `.vuepress/`, navigation is **declared in the theme's `sidebar`**, every `.md` page compiles as a **Vue single-file component**, and its Markdown is markdown-it with `::: name` containers. Most of that layer matches VitePress, so **this file covers only what differs, and sends you to a named section of `references/vitepress.md` for the rest. Keep that file open too.** Watch for six traps:
 
 - **`README.md` is a folder's index page in VuePress, but an ordinary page in Blume.** `guide/README.md` publishes at `/guide/README`, and the folder URL `/guide` has no page. Rename every `README.md` to `index.md` (or `.mdx`), then fix the links to it (see "URLs and redirects").
-- **Containers are written `::: tip`, with a space.** Blume renders that as literal text, with no diagnostic. See vitepress.md § "Markdown extensions".
+- **Containers are written `::: tip`, with a space.** Blume renders that as literal text, and warns only for a callout name in `.mdx`; inside an open `:::` container the line closes it instead. See vitepress.md § "Markdown extensions".
 - **URLs end in `.html`** (`/guide/getting-started.html`). Every non-index page needs a redirect.
 - **v1 sidebar groups are collapsible unless `collapsable: false`** (note the spelling). That's the opposite of VitePress and of VuePress 2.
 - **A page's title is its frontmatter `title`, falling back to the body `# H1`, and a page often has both, with different text.** See "Titles".

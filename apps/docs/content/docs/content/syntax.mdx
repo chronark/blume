@@ -682,6 +682,8 @@ Commit `blume.config.ts`, not `.blume/`.
 ::::
 ```
 
+Write the name right after the colons. `::: tip`, with a space (the spelling VitePress, VuePress, and Docusaurus v2 use), isn't a directive, so the page shows the line as text, and Blume warns about a callout name written that way as `BLUME_DIRECTIVE_SPACED_NAME`. Inside a container, a closing fence with text after its colons still closes it, and the text is dropped: a `::: card` line inside a `:::warning` ends the callout there, and `card` never shows. Blume warns about that line as `BLUME_DIRECTIVE_CLOSING_TEXT`. To keep it inside the callout as text, give the callout a longer fence, as above, or remove the text after the colons.
+
 ## Math
 
 Render LaTeX with KaTeX, useful for math-heavy or scientific docs. Put `$$…$$` on lines of its own for a centered block:
