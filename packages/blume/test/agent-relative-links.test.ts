@@ -157,6 +157,26 @@ describe("relative page links on the agent surfaces", () => {
     expect(raw["/fr/guides"]?.mdx).toContain("See [Setup](/getting-started).");
   });
 
+  it("lands a root-relative link to a content file on its page", async () => {
+    const project = await scanFixture({
+      "docs/guides/index.md": [
+        "# Guides",
+        "",
+        "See [Setup](/guides/setup.md#run) and [the copy](/guides/gone.md).",
+        "",
+        '<a href="/guides/setup.md">Raw</a>',
+        "",
+      ].join("\n"),
+      "docs/guides/setup.md": "---\nslug: guides/configure\n---\n# Setup\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/guides"]?.mdx).toContain(
+      "See [Setup](/guides/configure#run) and [the copy](/guides/gone.md)."
+    );
+    // A raw `<a href>` keeps it, as the rendered page does.
+    expect(raw["/guides"]?.mdx).toContain('<a href="/guides/setup.md">Raw</a>');
+  });
+
   it("leaves a page with no source file as written", async () => {
     const project = await scanFixture(FILES);
     const rewrite = relativeLinkRewriter(project);

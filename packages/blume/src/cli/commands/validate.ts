@@ -6,10 +6,12 @@ import {
   discoverPages,
   hasGeneratedChangelog,
 } from "../../astro/pages.ts";
+import { normalizeBasePath } from "../../core/base-path.ts";
 import { BlumeError } from "../../core/diagnostics.ts";
 import { validateLinks } from "../../core/links.ts";
 import { buildManifest } from "../../core/manifest.ts";
 import { scanProject } from "../../core/project-graph.ts";
+import { resolveDocsCollection } from "../../core/sources/collection.ts";
 import type { Diagnostic } from "../../core/types.ts";
 import { generatedFilePaths } from "../../deploy/generated-files.ts";
 import { referenceRoutes } from "../../openapi/references.ts";
@@ -96,6 +98,8 @@ export const validateCommand = defineCommand({
           basePath: project.config.basePath,
           checkExternal: Boolean(args.external),
           configFile: project.context.configFile ?? undefined,
+          contentRoot: resolveDocsCollection(project.config, root).base,
+          deployBase: normalizeBasePath(project.config.deployment.options.base),
           extraRoutes,
           generatedFiles: generatedFilePaths(project),
           i18n: project.config.i18n,

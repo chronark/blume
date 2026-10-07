@@ -3,7 +3,11 @@ import { fileURLToPath } from "node:url";
 import { dirname, normalize, relative, resolve } from "pathe";
 
 import { mountBasePath } from "../core/base-path.ts";
-import { isIndexFileName, resolveRelativeHref } from "../core/links.ts";
+import {
+  isIndexFileName,
+  resolveRelativeHref,
+  resolveRootFileHref,
+} from "../core/links.ts";
 import type { RelativeLinkBase } from "../core/links.ts";
 import type { MdastNode, MdastValue } from "./mdast.ts";
 import { routeSnapshotReader } from "./route-snapshot.ts";
@@ -70,6 +74,13 @@ interface LocatedPage extends RelativeLinkBase {
 
 /** A JSX component name (`Card`, `Tree.File`), as opposed to an HTML tag. */
 const COMPONENT_NAME = /^[A-Z]/u;
+
+/**
+ * A root-relative link to a Markdown file (`/guide/new.md#x`), never
+ * `//host`: the one root-relative shape this plugin rewrites, when it names a
+ * content file.
+ */
+const ROOT_FILE_LINK = /^\/(?!\/)[^?#]*\.mdx?(?:[?#]|$)/iu;
 
 /** A plain string attribute value; an expression value isn't a link target. */
 const isStringValue = (value: MdastValue): value is string =>
@@ -146,7 +157,10 @@ export interface RelativeLinksPluginOptions {
  * snapshot the CLI publishes (or, ejected, the file eject writes), keyed by
  * collection entry: `docs` entries by their path under `contentRoot`, staged
  * entries (remote sources) by the longest trailing path that names one. A file
- * the snapshot doesn't know keeps its links as written.
+ * the snapshot doesn't know keeps its links as written. A root-relative link
+ * to a content file (`/guide/new.md`, see `resolveRootFileHref`) lands on that
+ * file's page too, from any page; one naming no content file is left as
+ * written, since `/guide/new.md` is also a page's Markdown copy.
  *
  * A rewritten route already carries `basePath`, and the `deployment.base`
  * prefix goes on here, unconditionally: the route is one Blume serves, so
@@ -225,11 +239,32 @@ export const relativeLinksPlugin = (
     return undefined;
   };
 
+  /**
+   * The route a root-relative link to a content file (`/guide/new.md`)
+   * means, when it names one (see `resolveRootFileHref`).
+   */
+  const resolveRootFile = (url: string): string | undefined => {
+    const index = contentRoot ? routeIndex() : undefined;
+    if (!(contentRoot && index)) {
+      return undefined;
+    }
+    const route = resolveRootFileHref(url, {
+      contentRoot,
+      deployBase,
+      routeOfFile: (file) =>
+        index.routes.get(entryKey("docs", relative(contentRoot, file))),
+    });
+    return route === undefined ? undefined : mountBasePath(deployBase, route);
+  };
+
   /** The route `url` means on the page at `fileURL`, when it's relative. */
   const resolveUrl = (
     url: string,
     fileURL: URL | undefined
   ): string | undefined => {
+    if (ROOT_FILE_LINK.test(url)) {
+      return resolveRootFile(url);
+    }
     // Cheap first: a target that can't be relative never needs the index. A
     // dotted name (`./node.js`) passes, since only the index knows its route.
     if (

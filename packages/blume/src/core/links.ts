@@ -101,6 +101,9 @@ interface LinkContext {
   anchors: Map<string, Set<string>>;
   /** Site-wide route mount point (`""` or `/seg`); routes carry it, assets don't. */
   basePath: string;
+  /** The route a root-relative link to a content file (`/guide/new.md`)
+   * lands on, when it names one (see `resolveRootFileHref`). */
+  rootFileRoute: (href: string) => string | undefined;
   /** Servable routes outside the graph (custom pages, generated routes); their
    * headings are unknown, so anchors there are accepted unchecked. */
   extraRoutes: Set<string>;
@@ -244,6 +247,45 @@ export const resolveRelativeHref = (
     ? (resolveFile?.(file) ?? resolveFile?.(otherDocExtension(file)))
     : undefined;
   return `${fileRoute ?? toRoute(resolveRelative(from.route, path, from.isIndex))}${suffix}`;
+};
+
+/**
+ * Where a root-relative link to a content file (`/guide/new.md`, the way
+ * VitePress, Docsify, and TypeDoc write one) lands: the route of the source
+ * file it names under the content root, with the authored `?query#hash`
+ * kept, or `undefined` when it names no source file (or isn't a root-relative
+ * `.md`/`.mdx` link at all). It's read as written from the content root, or,
+ * when it starts with `deployment.base`, as including the base (see
+ * `withBasePath`). `routeOfFile` maps an absolute source path to the route
+ * that file publishes at. A link that names no source file is left alone:
+ * `/guide/new.md` is also the URL of a page's Markdown copy, which a link may
+ * mean on purpose.
+ */
+export const resolveRootFileHref = (
+  href: string,
+  options: {
+    contentRoot: string;
+    deployBase: string;
+    routeOfFile: (file: string) => string | undefined;
+  }
+): string | undefined => {
+  if (!isInternalPath(href)) {
+    return undefined;
+  }
+  const suffixAt = href.search(/[?#]/u);
+  const path = suffixAt === -1 ? href : href.slice(0, suffixAt);
+  if (!DOC_EXT.test(path)) {
+    return undefined;
+  }
+  const route = options.routeOfFile(
+    join(
+      options.contentRoot,
+      stripBasePath(options.deployBase, decodePercent(path))
+    )
+  );
+  return route === undefined
+    ? undefined
+    : `${route}${suffixAt === -1 ? "" : href.slice(suffixAt)}`;
 };
 
 /**
@@ -682,6 +724,28 @@ const relativeTarget = (
   );
 };
 
+/** The path a decoded, suffix-less internal link on `page` lands on. */
+const resolveLinkPath = (
+  page: PageRecord,
+  link: PageLink,
+  rawPath: string,
+  ctx: LinkContext
+): string => {
+  if (!rawPath.startsWith("/")) {
+    // A raw `<a href>` isn't rewritten, so the browser resolves it against
+    // the page's slashless URL: its parent directory, even on an index page.
+    return link.raw
+      ? resolveRelative(page.route, rawPath, false)
+      : relativeTarget(page, rawPath, ctx);
+  }
+  // A root-relative link naming a content file lands on that file's page,
+  // as the Markdown pipeline rewrites it; one naming no file stays as
+  // written (a page's Markdown copy, say).
+  return link.raw || link.image
+    ? rawPath
+    : (ctx.rootFileRoute(rawPath) ?? rawPath);
+};
+
 /** Classify a single link, queueing external refs via `onExternal`. */
 const classifyLink = (
   page: PageRecord,
@@ -743,14 +807,7 @@ const classifyLink = (
     return fragment ? checkAnchor(page.route, fragment, site, ctx, via) : null;
   }
 
-  let resolved = rawPath;
-  if (!rawPath.startsWith("/")) {
-    // A raw `<a href>` isn't rewritten, so the browser resolves it against
-    // the page's slashless URL: its parent directory, even on an index page.
-    resolved = link.raw
-      ? resolveRelative(page.route, rawPath, false)
-      : relativeTarget(page, rawPath, ctx);
-  }
+  const resolved = resolveLinkPath(page, link, rawPath, ctx);
   if (link.src) {
     return checkSourceLink(rawPath, resolved, page, link, site, ctx, via);
   }
@@ -897,14 +954,23 @@ export const validateLinks = async (
     redirects?: { from: string; to: string }[];
     /** The config file the redirects are written in, for their positions. */
     configFile?: string;
+    /**
+     * The `docs` collection's content root, which a root-relative link to a
+     * content file (`/guide/new.md`) is read from.
+     */
+    contentRoot?: string;
+    /** `deployment.base` (`""` or `/seg`), which such a link may start with. */
+    deployBase?: string;
   }
 ): Promise<Diagnostic[]> => {
   const basePath = options.basePath ?? "";
+  const fileRoutes = buildFileRouteIndex(graph.pages, options.i18n ?? null);
+  const { contentRoot } = options;
   const ctx: LinkContext = {
     anchors: buildAnchorIndex(graph.pages),
     basePath,
     extraRoutes: new Set((options.extraRoutes ?? []).map(toRoute)),
-    fileRoutes: buildFileRouteIndex(graph.pages, options.i18n ?? null),
+    fileRoutes,
     i18n: options.i18n ?? null,
     redirectPatterns: (options.redirects ?? []).flatMap((redirect) =>
       isPatternPath(redirect.from)
@@ -916,6 +982,14 @@ export const validateLinks = async (
         toRoute(withBasePath(basePath, redirect.from))
       )
     ),
+    rootFileRoute: (href) =>
+      contentRoot === undefined
+        ? undefined
+        : resolveRootFileHref(href, {
+            contentRoot,
+            deployBase: options.deployBase ?? "",
+            routeOfFile: (file) => fileRoutes.bySource.get(file),
+          }),
     routes: new Set(graph.routes.keys()),
     servesFile: staticFileResolver(options.publicDir, options.generatedFiles),
   };

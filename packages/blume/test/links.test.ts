@@ -8,6 +8,7 @@ import { extractLinks } from "../src/core/content.ts";
 import {
   isIndexFileName,
   resolveRelativeHref,
+  resolveRootFileHref,
   validateLinks,
 } from "../src/core/links.ts";
 import { pageMetaSchema } from "../src/core/schema.ts";
@@ -1476,5 +1477,62 @@ describe("validateLinks — relative file links", () => {
         (diagnostic) => diagnostic.code === "BLUME_BROKEN_LINK"
       )
     ).toHaveLength(0);
+  });
+});
+
+/** A guides index with `links`, beside a prefixed setup page and an about page. */
+const rootLinkPages = (links: PageLink[]) => [
+  makePage({ id: "guides/index.mdx", links, route: "/guides" }),
+  makePage({
+    headings: [heading("Run", "run")],
+    id: "guides/01-setup.md",
+    route: "/getting-started",
+  }),
+  makePage({ id: "about.mdx", route: "/about" }),
+];
+
+describe("validateLinks — root-relative file links", () => {
+  it("checks a link naming a content file at that file's page", async () => {
+    const diagnostics = await validateLinks(
+      makeGraph(
+        rootLinkPages([
+          link("/guides/01-setup.md#run"),
+          { ...link("/base/about.mdx"), line: 2 },
+          { ...link("/about.md"), line: 3 },
+          { ...link("/guides/01-setup.md"), line: 4, raw: true },
+          { ...link("/guides/gone.md"), line: 5 },
+        ])
+      ),
+      { contentRoot: "/abs", deployBase: "/base", publicDir: null }
+    );
+    // `/about.md` names no file: a page's Markdown copy, served as the page
+    // is. A raw `<a href>` ships as written, onto a copy that isn't served.
+    expect(diagnostics.map((d) => [d.line, d.message])).toStrictEqual([
+      [
+        4,
+        "Broken link to /guides/01-setup.md: no page resolves to /guides/01-setup.",
+      ],
+      [5, "Broken link to /guides/gone.md: no page resolves to /guides/gone."],
+    ]);
+  });
+
+  it("resolves only a root-relative link to a Markdown file", () => {
+    const options = {
+      contentRoot: "/abs",
+      deployBase: "",
+      routeOfFile: (file: string) =>
+        file === "/abs/a b.md" ? "/a-b" : undefined,
+    };
+    expect(resolveRootFileHref("/a%20b.md?x#y", options)).toBe("/a-b?x#y");
+    expect(resolveRootFileHref("//cdn.dev/a b.md", options)).toBeUndefined();
+    expect(resolveRootFileHref("./a b.md", options)).toBeUndefined();
+    expect(resolveRootFileHref("/a b", options)).toBeUndefined();
+  });
+
+  it("reads such a link as a route without a content root", async () => {
+    const diagnostics = await validate(
+      rootLinkPages([link("/guides/01-setup.md")])
+    );
+    expect(diagnostics.map((d) => d.code)).toStrictEqual(["BLUME_BROKEN_LINK"]);
   });
 });

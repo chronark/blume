@@ -12,11 +12,13 @@ import {
   buildFileRouteIndex,
   isIndexFileName,
   resolveRelativeHref,
+  resolveRootFileHref,
   routeOfLinkedFile,
 } from "../core/links.ts";
 import type { RelativeLinkBase } from "../core/links.ts";
 import { localizeHref, servesRoute } from "../core/locale-links.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
+import { resolveDocsCollection } from "../core/sources/collection.ts";
 import { extractLinks } from "../core/sources/normalize.ts";
 
 /**
@@ -33,7 +35,9 @@ import { extractLinks } from "../core/sources/normalize.ts";
  * `basePath` prefix, a public file (`/spec.pdf`) or image the
  * `deployment.base` alone, and, on a page in a prefixed locale, a page link
  * that locale's copy of the route when it is served
- * (`components/layout/LocaleLinks.astro`). Inline links, images, component
+ * (`components/layout/LocaleLinks.astro`). A root-relative link to a content
+ * file (`/guide/new.md`) lands on that file's page, as on the rendered page
+ * (`resolveRootFileHref`). Inline links, images, component
  * `href`s, and reference definitions are rewritten; fenced and inline code,
  * relative images and asset links, and external URLs are left as written.
  */
@@ -64,6 +68,13 @@ const MAYBE_RELATIVE =
 const MAYBE_PAGE_LINK =
   /\]\([\t ]*<?(?![a-z][\d+.a-z-]*:|\/\/|#)|^ {0,3}\[[^\]\n]+\]:[\t ]*<?(?![a-z][\d+.a-z-]*:|\/\/|#)|\shref=["'](?![a-z][\d+.a-z-]*:|\/\/|#)/imu;
 
+/**
+ * Whether a text could hold a root-relative link to a Markdown file
+ * (`[x](/guide/new.md)`), which lands on that file's page whatever the base.
+ */
+const MAYBE_ROOT_FILE =
+  /(?:\]\(|\]:|\shref=["'])[\t ]*<?\/(?!\/)[^\s"'()<>]*\.mdx?\b/imu;
+
 interface Splice {
   column: number;
   length: number;
@@ -85,11 +96,12 @@ const spliceLine = (line: string, splices: readonly Splice[]): string => {
 /**
  * Every routed splice in `text`, by 0-based line: links, images, and
  * reference definitions, as `extractLinks` finds them. An image target goes
- * through `imaged`, everything else through `routed`.
+ * through `imaged`, everything else through `routed`, told whether it's a
+ * raw HTML element's.
  */
 const collectSplices = (
   text: string,
-  routed: (target: string) => string | undefined,
+  routed: (target: string, raw: boolean) => string | undefined,
   imaged: (target: string) => string | undefined
 ): Map<number, Splice[]> => {
   const splices = new Map<number, Splice[]>();
@@ -97,7 +109,9 @@ const collectSplices = (
     splices.set(index, [...(splices.get(index) ?? []), splice]);
   };
   for (const link of extractLinks(text)) {
-    const route = (link.image ? imaged : routed)(link.target);
+    const route = link.image
+      ? imaged(link.target)
+      : routed(link.target, link.raw === true);
     if (route !== undefined) {
       add(link.line - 1, {
         column: link.column - 1,
@@ -120,6 +134,10 @@ export const relativeLinkRewriter = (
 ): RelativeLinkRewriter => {
   const { basePath, deployment, i18n } = project.config;
   const deployBase = normalizeBasePath(deployment.options.base);
+  const contentRoot = resolveDocsCollection(
+    project.config,
+    project.context.root
+  ).base;
   const localeTokens = i18n
     ? ["$", ...i18n.locales.map((locale) => locale.code)]
     : [];
@@ -179,7 +197,10 @@ export const relativeLinkRewriter = (
       deployBase !== "" || basePath !== "" || localize !== undefined;
     if (
       !(page.sourcePath || rootLinks) ||
-      !(rootLinks ? MAYBE_PAGE_LINK : MAYBE_RELATIVE).test(text)
+      !(
+        (rootLinks ? MAYBE_PAGE_LINK : MAYBE_RELATIVE).test(text) ||
+        MAYBE_ROOT_FILE.test(text)
+      )
     ) {
       return text;
     }
@@ -197,8 +218,27 @@ export const relativeLinkRewriter = (
       const href = localize ? localizeHref(based, localize) : based;
       return href === target ? undefined : href;
     };
-    const routed = (target: string): string | undefined =>
-      isInternalPath(target) ? rooted(target) : relative?.(target);
+    // A root-relative link naming a content file (`/guide/new.md`) means
+    // that file's page, as a relative one does; a raw `<a href>` keeps it,
+    // as the rendered page's does.
+    const rootFile = (target: string): string | undefined => {
+      const route = resolveRootFileHref(target, {
+        contentRoot,
+        deployBase,
+        routeOfFile: (file) => fileRoutes.bySource.get(file),
+      });
+      if (route === undefined) {
+        return undefined;
+      }
+      const based = mountBasePath(deployBase, route);
+      return localize ? localizeHref(based, localize) : based;
+    };
+    const routed = (target: string, raw: boolean): string | undefined => {
+      if (!isInternalPath(target)) {
+        return relative?.(target);
+      }
+      return (raw ? undefined : rootFile(target)) ?? rooted(target);
+    };
     // An image is always a file: `public/` (or a generated asset endpoint),
     // served under the deployment base but never `basePath`. A relative one
     // is left to `core/content-assets.ts`.

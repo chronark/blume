@@ -383,3 +383,66 @@ describe("relative page links", () => {
     expect(html).toContain('href="/fr/guides/gone"');
   });
 });
+
+describe("root-relative links to content files", () => {
+  it("lands on the page the named file publishes, from any page", async () => {
+    publishData(snapshot(ROUTES));
+    const html = await render(
+      [
+        "[Setup](/guides/01-setup.mdx#run) [About](/about.md?x=1)",
+        "[Copy](/guides/missing.md) [Other](/about.mdx) [Route](/about)",
+        "",
+        "[ref]: /guides/install.md",
+        "",
+        "[By ref][ref]",
+      ].join("\n"),
+      `${ROOT}/guides/page.md`
+    );
+    expect(html).toContain('href="/getting-started#run"');
+    expect(html).toContain('href="/about?x=1"');
+    expect(html).toContain('href="/guides/install"');
+    // No source file by that name: a page's Markdown copy, kept as written.
+    expect(html).toContain('href="/guides/missing.md"');
+    expect(html).toContain('href="/about.mdx"');
+    expect(html).toContain('href="/about"');
+  });
+
+  it("reads a link that starts with deployment.base as including it", async () => {
+    publishData(snapshot(ROUTES));
+    const html = await render(
+      "[About](/about.md) [Based](/base/guides/install.md) [Base](/base.md)",
+      `${ROOT}/guides/page.md`,
+      { contentRoot: ROOT, deployBase: "/base" }
+    );
+    expect(html).toContain('href="/base/about"');
+    expect(html).toContain('href="/base/guides/install"');
+    expect(html).toContain('href="/base/base.md"');
+  });
+
+  it("rewrites a component's href too, but not a raw <a>", async () => {
+    publishData(snapshot(ROUTES));
+    const processor = blumeMdxProcessor({ contentRoot: ROOT });
+    if (!processor.createMdxRenderer) {
+      throw new Error("The satteri processor has no MDX renderer.");
+    }
+    const renderer = await processor.createMdxRenderer({}, { optimize: false });
+    const { code } = await renderer.process(
+      '<Card href="/about.md" />\n\n<a href="/guides/install.md">Copy</a>',
+      `${ROOT}/guides/index.mdx`,
+      {}
+    );
+    expect(String(code)).toContain('href: "/about"');
+    expect(String(code)).toContain('href: "/guides/install.md"');
+  });
+
+  it("leaves them alone with no content root or no snapshot", async () => {
+    publishData(snapshot(ROUTES));
+    expect(
+      await render("[About](/about.md)", `${ROOT}/guides/page.md`, {})
+    ).toContain('href="/about.md"');
+    publishData(null);
+    expect(
+      await render("[About](/about.md)", `${ROOT}/guides/page.md`)
+    ).toContain('href="/about.md"');
+  });
+});
