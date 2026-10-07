@@ -18,6 +18,7 @@ import { codeTitleTransformer } from "./code-title.ts";
 import { directiveToCalloutPlugin } from "./directives.ts";
 import { externalLinksPlugin } from "./external-links.ts";
 import { MARKDOWN_BODY_FEATURES, MDX_BODY_FEATURES } from "./features.ts";
+import { fenceLanguagePlugin } from "./fence-language.ts";
 import { headingAnchorPlugin } from "./heading-anchors.ts";
 import { includePlugin } from "./include.ts";
 import { inlineCodeHighlightPlugin } from "./inline-code.ts";
@@ -362,6 +363,7 @@ export const blumeMarkdownProcessor = (options: BlumeMarkdownOptions = {}) =>
     hastPlugins: blumeHastPlugins(options),
     mdastPlugins: [
       blumeIncludePlugin(options),
+      asMdastPlugin(fenceLanguagePlugin()),
       ...(hasVariables(options.variables)
         ? [asMdastPlugin(variablesPlugin(options.variables))]
         : []),
@@ -396,6 +398,7 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
     hastPlugins: blumeHastPlugins(options),
     mdastPlugins: [
       blumeIncludePlugin(options),
+      asMdastPlugin(fenceLanguagePlugin()),
       asMdastPlugin(packageInstallPlugin()),
       asMdastPlugin(ts2jsPlugin()),
       asMdastPlugin(directiveToCalloutPlugin()),

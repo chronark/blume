@@ -204,6 +204,8 @@ export default defineConfig({
 ```
 ````
 
+The language is any [Shiki language](https://shiki.style/languages) id or alias, in any case: ` ```JSON ` highlights like ` ```json `.
+
 Inline code can be highlighted too: add a `{:lang}` marker inside a backtick span and it's colored like a tiny code block — `useState(){:js}` or `T extends object{:ts}`. It only kicks in when you add the marker, so plain inline code stays untouched — nothing to switch on.
 
 Highlighting uses the `github-light`/`github-dark` themes by default. Swap in any [bundled Shiki theme](https://shiki.style/themes) per color mode with `markdown.code.theme` — it colors every code surface at once (fences, inline snippets, `<CodeBlock>`, and `<Diff>`):
@@ -354,7 +356,7 @@ export default defineConfig({
 });
 ```
 
-Or highlight lines by **number** instead of comments — useful when you can't edit the code. Put a brace range after the language; single lines, comma lists, and `start-end` spans all work:
+Or highlight lines by **number** instead of comments — useful when you can't edit the code. Put a brace range after the language, with or without a space between them (` ```ts{1,4-5} ` works too); single lines, comma lists, and `start-end` spans all work:
 
 ```ts {1,4-5}
 import { defineConfig } from "blume";
