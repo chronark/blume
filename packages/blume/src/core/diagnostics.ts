@@ -77,6 +77,7 @@ const DOCS_PATHS = new Map(
     BLUME_SOURCE_UNAVAILABLE: DOCS_CONTENT_SOURCES,
     BLUME_SOURCE_UNRESOLVED_LINK: "/docs/content/sources/contentful",
     BLUME_SOURCE_UNSUPPORTED_NODE: "/docs/content/sources/payload",
+    BLUME_THEME_COLOR_INVALID: "/docs/configuration/theming",
     BLUME_TRANSLATE_MISSING: "/docs/cli/translate",
     BLUME_TRANSLATE_STALE: "/docs/cli/translate",
     BLUME_UNKNOWN_CODE_LANGUAGE: "/docs/content/syntax",

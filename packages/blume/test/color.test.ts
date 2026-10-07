@@ -3,6 +3,7 @@ import { describe, expect, it } from "bun:test";
 import {
   composite,
   contrastRatio,
+  isCssColor,
   luminance,
   parseColor,
 } from "../src/theme/color.ts";
@@ -88,6 +89,39 @@ describe(parseColor, () => {
       "not a color",
     ]) {
       expect(parseColor(value)).toBeNull();
+    }
+  });
+});
+
+describe(isCssColor, () => {
+  it("takes what parseColor reads and the color syntax it leaves unread", () => {
+    for (const value of [
+      "#6340ac",
+      " rebeccapurple ",
+      "transparent",
+      "oklch(0.6 0.2 290)",
+      "var(--brand)",
+      "color-mix(in oklab, red, blue)",
+      "color(display-p3 1 0 0)",
+      "light-dark(#fff, #000)",
+      "oklch(from var(--brand) l c h)",
+      "currentColor",
+    ]) {
+      expect(isCssColor(value)).toBe(true);
+    }
+  });
+
+  it("rejects words that name no color and malformed hex", () => {
+    for (const value of [
+      "deep purple",
+      "purpel",
+      "6340ac",
+      "#12345",
+      "",
+      "#fff;",
+      "url(x.png)",
+    ]) {
+      expect(isCssColor(value)).toBe(false);
     }
   });
 });

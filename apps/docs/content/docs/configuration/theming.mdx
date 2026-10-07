@@ -36,6 +36,8 @@ Named presets: `blue` (default), `green`, `orange`, `pink`, `purple`, `red`, and
 
 A string applies to both color modes; pass an object for [a different accent per mode](#dark-mode-colors).
 
+A value that's neither a preset nor a CSS color, like `"deep purple"` or a hex value without its `#`, warns `BLUME_THEME_COLOR_INVALID` at the line in `blume.config.ts` that sets it, since browsers ignore the styles that use it. The same check covers `action`, `background`, and the [Open Graph card's](/docs/discoverability/open-graph) `seo.og.palette`. Custom properties (`var(--brand)`), `color-mix()`, and the other color functions pass as written.
+
 Text on an accent or action fill, like a button label or a step number, is white while white meets AA on that color, and dark otherwise. A light accent gets dark labels without any extra config. [`blume audit`](/docs/cli/audit#theme-contrast-low) checks a custom accent, action, or background against the same bar.
 
 ### Radius

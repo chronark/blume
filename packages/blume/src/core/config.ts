@@ -3,6 +3,7 @@ import { existsSync, readFileSync } from "node:fs";
 import { basename } from "pathe";
 import { z } from "zod";
 
+import { ACCENTS, invalidColorSettings } from "../theme/palette.ts";
 import type { BlumeConfig } from "./config-input.ts";
 import { applyDeploymentEnv } from "./deployment-env.ts";
 import {
@@ -261,6 +262,50 @@ const configIssues = (
     );
 };
 
+const COLOR_FORMS =
+  "a hex value like #6340ac, rgb(), hsl(), oklch(), or a color name like rebeccapurple";
+
+/**
+ * A warning for each configured color that isn't a CSS color, at the line
+ * that sets it. The schema has always taken any string, so this warns rather
+ * than failing a build that used to pass.
+ */
+const colorDiagnostics = (
+  config: ResolvedConfig,
+  configFile: string | null
+): Diagnostic[] => {
+  const invalid = invalidColorSettings(config);
+  if (invalid.length === 0) {
+    return [];
+  }
+  const source =
+    configFile && existsSync(configFile)
+      ? readFileSync(configFile, "utf-8")
+      : undefined;
+  const located = diagnosticsFromIssues(
+    invalid.map((setting) => ({
+      message: `${JSON.stringify(setting.value)} isn't a CSS color, so ${
+        setting.path[0] === "seo"
+          ? "the social card renderer rejects it"
+          : "browsers ignore the styles that use it"
+      }.`,
+      path: setting.path,
+    })),
+    {
+      code: "BLUME_THEME_COLOR_INVALID",
+      file: configFile ?? undefined,
+      source,
+    }
+  );
+  return located.map((diagnostic, index) => ({
+    ...diagnostic,
+    severity: "warning",
+    suggestion: invalid[index]?.presets
+      ? `Use a preset (${Object.keys(ACCENTS).join(", ")}) or a CSS color: ${COLOR_FORMS}.`
+      : `Use a CSS color: ${COLOR_FORMS}.`,
+  }));
+};
+
 /**
  * Load and validate the project config. When no config file exists, schema
  * defaults produce a fully resolved config so the zero-boilerplate path works.
@@ -364,7 +409,7 @@ export const loadConfig = async (
       seo: { ...config.seo, og: { ...config.seo.og, enabled: ogEnabled } },
     },
     configFile,
-    diagnostics: [],
+    diagnostics: colorDiagnostics(config, configFile),
     themeFontsConfigured,
   };
 };

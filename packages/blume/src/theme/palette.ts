@@ -1,5 +1,5 @@
 import type { ResolvedConfig } from "../core/schema.ts";
-import { composite, contrastRatio, parseColor } from "./color.ts";
+import { composite, contrastRatio, isCssColor, parseColor } from "./color.ts";
 import type { Rgba } from "./color.ts";
 
 /** Per-mode CSS colors. */
@@ -242,4 +242,77 @@ export const buildThemeCss = (theme: ResolvedConfig["theme"]): string => {
 ${root}
 }
 ${dark}`;
+};
+
+/** A configured color: where the config sets it, and its value. */
+export interface ColorSetting {
+  /** The config path, e.g. `["theme", "accent", "dark"]`. */
+  path: string[];
+  /** Whether the field also takes an accent preset name (`teal`). */
+  presets: boolean;
+  value: string;
+}
+
+const MODES = ["light", "dark"] as const;
+
+/**
+ * A per-mode field's settings. Both modes holding one value (a string, which
+ * the schema copies into each) is one setting at the field itself, so a
+ * mistake is reported once, at the key that set it.
+ */
+const modeSettings = (
+  path: string[],
+  value: { dark?: string; light?: string } | undefined,
+  presets: boolean
+): ColorSetting[] => {
+  if (value?.light !== undefined && value.light === value.dark) {
+    return [{ path, presets, value: value.light }];
+  }
+  return MODES.flatMap((mode) => {
+    const color = value?.[mode];
+    return color === undefined
+      ? []
+      : [{ path: [...path, mode], presets, value: color }];
+  });
+};
+
+const OG_PALETTE_KEYS = [
+  "accent",
+  "background",
+  "border",
+  "foreground",
+  "muted",
+] as const;
+
+/**
+ * The configured colors that aren't CSS colors (`"deep purple"`, a hex value
+ * missing its `#`): `theme.accent`, `theme.action`, and `theme.background`,
+ * and the OG card's `seo.og.palette`. The schema takes any string, so a
+ * mistake would otherwise reach the stylesheet, where browsers drop it, or
+ * the card renderer, which rejects it. Preset names are CSS color names too.
+ */
+export const invalidColorSettings = (
+  config: ResolvedConfig
+): ColorSetting[] => {
+  const { theme } = config;
+  const palette = config.seo.og.palette ?? {};
+  return [
+    ...modeSettings(["theme", "accent"], theme.accent, true),
+    ...(theme.action === undefined
+      ? []
+      : [{ path: ["theme", "action"], presets: true, value: theme.action }]),
+    ...modeSettings(["theme", "background"], theme.background, false),
+    ...OG_PALETTE_KEYS.flatMap((key) => {
+      const value = palette[key];
+      return value === undefined
+        ? []
+        : [
+            {
+              path: ["seo", "og", "palette", key],
+              presets: key === "accent",
+              value,
+            },
+          ];
+    }),
+  ].filter((setting) => !isCssColor(setting.value));
 };

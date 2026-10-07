@@ -49,7 +49,7 @@ seo:
 ```
 
 :::note
-Every palette color accepts any CSS color — hex, `oklch(…)`, `rgb(…)`, and so on. The accent also accepts a named preset (`blue`, `teal`, …), matching [`theme.accent`](/docs/configuration/theming#accent). A color the renderer can't parse fails the build rather than silently shipping a default-colored card.
+Every palette color accepts any CSS color — hex, `oklch(…)`, `rgb(…)`, and so on. The accent also accepts a named preset (`blue`, `teal`, …), matching [`theme.accent`](/docs/configuration/theming#accent). A color the renderer can't parse fails the build rather than silently shipping a default-colored card, and one that isn't a CSS color at all also warns `BLUME_THEME_COLOR_INVALID` with the line that sets it, before the card renders.
 :::
 
 Emoji in a page title or site title render as [Twemoji](https://github.com/jdecked/twemoji) glyphs, fetched from a CDN while the card renders — so a build whose titles contain emoji needs network access. Each glyph is fetched once per build, however many pages use it.

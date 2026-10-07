@@ -470,6 +470,20 @@ export const parseColor = (value: string): Rgba | null => {
     : null;
 };
 
+// Color syntax `parseColor` leaves unread but a browser takes: a custom
+// property, `color-mix()`, `color()`, `light-dark()`, a relative color
+// (`oklch(from var(--x) l c h)`), and the `currentcolor` keyword.
+const UNREAD_COLOR =
+  /^(?:currentcolor|(?:color|color-mix|hsla?|hwb|lab|lch|light-dark|oklab|oklch|rgba?|var)\(.*\))$/isu;
+
+/**
+ * Whether `value` is a CSS color: one `parseColor` reads, or a color function
+ * or keyword it leaves unread. Words that name no color (`deep purple`), and
+ * hex values with a wrong digit count or no `#`, are not.
+ */
+export const isCssColor = (value: string): boolean =>
+  parseColor(value) !== null || UNREAD_COLOR.test(value.trim());
+
 /** `color` painted over an opaque `backdrop`. */
 export const composite = (color: Rgba, backdrop: Rgba): Rgba => {
   const mix = (top: number, bottom: number): number =>
