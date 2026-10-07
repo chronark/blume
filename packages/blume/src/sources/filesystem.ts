@@ -7,12 +7,37 @@ import { DEFAULT_CONTENT_GLOB, sharedSourceOptionsSchema } from "./shared.ts";
 
 /** What `include` defaults to: every Markdown/MDX file under the root. */
 export const DEFAULT_CONTENT_INCLUDE = [DEFAULT_CONTENT_GLOB];
-/** What `exclude` defaults to: underscore- and dot-prefixed paths. */
+/** What `exclude` always holds: underscore- and dot-prefixed paths. */
 export const DEFAULT_CONTENT_EXCLUDE = ["**/_*", "**/.*"];
+
+/**
+ * A source's `exclude` as the scan applies it: the defaults, plus the
+ * author's patterns. A `!pattern` entry takes that exact pattern back out, a
+ * default included, so `["!**\/_*"]` publishes `_`-prefixed files. The glob
+ * library can't negate an ignore pattern itself.
+ */
+export const resolveContentExclude = (
+  patterns: readonly string[]
+): string[] => {
+  const kept = new Set(
+    patterns.flatMap((pattern) =>
+      pattern.startsWith("!") ? [pattern.slice(1)] : []
+    )
+  );
+  return [
+    ...new Set([
+      ...DEFAULT_CONTENT_EXCLUDE,
+      ...patterns.filter((pattern) => !pattern.startsWith("!")),
+    ]),
+  ].filter((pattern) => !kept.has(pattern));
+};
 
 /** Options for {@link filesystem}. */
 export interface FilesystemOptions extends SharedSourceOptions {
-  /** Glob patterns to ignore. Defaults to `["**\/_*", "**\/.*"]`. */
+  /**
+   * Glob patterns to ignore, on top of `["**\/_*", "**\/.*"]`. A `!pattern`
+   * entry stops ignoring that pattern, a default included.
+   */
   exclude?: string[];
   /** Glob patterns to include. Defaults to `["**\/*.{md,mdx}"]`. */
   include?: string[];
@@ -21,7 +46,7 @@ export interface FilesystemOptions extends SharedSourceOptions {
 }
 
 export const filesystemOptionsSchema = sharedSourceOptionsSchema.extend({
-  exclude: z.array(z.string()).default(DEFAULT_CONTENT_EXCLUDE),
+  exclude: z.array(z.string()).default([]).transform(resolveContentExclude),
   include: z.array(z.string()).default(DEFAULT_CONTENT_INCLUDE),
   root: z.string().default("docs"),
 });

@@ -181,7 +181,7 @@ export interface ChangelogConfig {
 export interface ContentConfig {
   /** Default page `type` for content that sets none. Defaults to `doc`. */
   defaultType?: string;
-  /** Glob patterns to ignore. Defaults to `["**\/_*", "**\/.*"]`. Shorthand; not allowed beside `sources`. */
+  /** Glob patterns to ignore, on top of `["**\/_*", "**\/.*"]`; a `!pattern` entry stops ignoring that pattern, a default included. Shorthand; not allowed beside `sources`. */
   exclude?: string[];
   /** Glob patterns to include. Defaults to `["**\/*.{md,mdx}"]`. Shorthand; not allowed beside `sources`. */
   include?: string[];

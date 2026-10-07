@@ -23,7 +23,7 @@ Here it is live — this next callout is spliced from a shared snippet:
 
 ## Partials
 
-Any file whose name (or folder) starts with an underscore is excluded from routing, navigation, search, and sitemaps by default — that convention is the natural home for shared snippets:
+Any file whose name (or folder) starts with an underscore is excluded from routing, navigation, search, and sitemaps — that convention is the natural home for shared snippets. Patterns you add to [`content.exclude`](/docs/configuration#content) add to this rule rather than replacing it; to publish underscore files after all, add `"!**/_*"` to `exclude`:
 
 ```text
 docs/

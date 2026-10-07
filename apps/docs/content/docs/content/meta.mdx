@@ -23,7 +23,7 @@ export default defineMeta({
 
 Every field is optional — set only what you want to override.
 
-Blume only reads `meta.ts` files from folders your content covers: one under a folder your content `exclude` globs skip, or outside every `include` glob, is never imported. With `root: "."` and `exclude: ["**/_*", "**/.*", "src/**"]`, an unrelated `src/lib/meta.ts` is left alone. An `exclude` replaces the default `["**/_*", "**/.*"]` rather than adding to it, so list those two as well to keep `_`-prefixed partials and dot-files unpublished.
+Blume only reads `meta.ts` files from folders your content covers: one under a folder your content `exclude` globs skip, or outside every `include` glob, is never imported. With `root: "."` and `exclude: ["src/**"]`, an unrelated `src/lib/meta.ts` is left alone.
 
 A `meta.ts` outside every `include` glob is still ignored when its folder is a sidebar group, like a reference's [tag folder](#generated-groups) on a site whose `include` lists only `guides/**`. Blume warns about that one as `BLUME_META_OUTSIDE_INCLUDE`: add an `include` glob that reaches the folder, such as `"api/**/*.{md,mdx}"`, so Blume reads it.
 

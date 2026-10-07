@@ -357,7 +357,8 @@ describe("content shorthand", () => {
       {
         kind: "filesystem",
         options: {
-          exclude: ["drafts/**"],
+          // An `exclude` adds to the defaults rather than replacing them.
+          exclude: ["**/_*", "**/.*", "drafts/**"],
           include: ["**/*.mdx"],
           root: "content",
         },
@@ -415,7 +416,7 @@ describe("resolveDocsCollection", () => {
     ]);
     expect(resolveDocsCollection(config, "/p")).toStrictEqual({
       base: "/abs",
-      exclude: ["vault/**"],
+      exclude: ["**/_*", "**/.*", "vault/**"],
       include: ["**/*.mdx"],
     });
     // The project context's content root is that same base.
@@ -438,9 +439,18 @@ describe("resolveDocsCollection", () => {
     ]);
     expect(resolveDocsCollection(config, "/p")).toStrictEqual({
       base: "/p",
-      exclude: ["**/_*"],
+      exclude: ["**/_*", "**/.*"],
       include: ["docs/**", "guides/**"],
     });
+  });
+
+  it("drops an excluded pattern a negated entry names, a default included", () => {
+    const config = parse([
+      filesystem({ exclude: ["!**/_*", "vault/**", "!vault/**", "!x/**"] }),
+    ]);
+    expect(resolveDocsCollection(config, "/p").exclude).toStrictEqual([
+      "**/.*",
+    ]);
   });
 
   it("anchors an all-staged project at the default docs directory", () => {
