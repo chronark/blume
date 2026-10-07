@@ -66,6 +66,7 @@ import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ProjectContext } from "../src/core/types.ts";
 import { getBlumeVersion } from "../src/core/version.ts";
 import { cloudflare, node, vercel } from "../src/deploy/adapters/index.ts";
+import { TITLE_ID_KEY } from "../src/markdown/title-heading.ts";
 import {
   cloudflare as cloudflareRateLimit,
   memory,
@@ -168,7 +169,7 @@ describe("catchAllPageTemplate", () => {
     expect(out).toContain(
       "const pageChrome = pageModeLayout(frontmatter.mode).chrome;"
     );
-    expect(out).toContain("{pageChrome && <h1>{title}</h1>}");
+    expect(out).toContain("{pageChrome && <h1 id={titleId}>{title}</h1>}");
     expect(out).toContain("pageMode={frontmatter.mode}");
   });
 
@@ -387,6 +388,12 @@ return localeSwitch.map((option) => [option.code, option.href, option.untranslat
     // constant, and only a string under a heading's slug replaces its text.
     expect(out).toContain(`remarkPluginFrontmatter?.${TOC_TEXT_KEY}`);
     expect(out).toContain('typeof tocText[heading.slug] === "string"');
+  });
+
+  it("gives the title <h1> the id of the heading the title-heading plugin dropped", () => {
+    const out = catchAllPageTemplate({ ...exportOpts, mathEnabled: false });
+    expect(out).toContain(`remarkPluginFrontmatter?.${TITLE_ID_KEY}`);
+    expect(out).toContain("<h1 id={titleId}>{title}</h1>");
   });
 
   it("serializes the island-hooks snapshot only when React is enabled", () => {

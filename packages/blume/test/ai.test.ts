@@ -155,6 +155,7 @@ beforeAll(async () => {
       '---\ntitle: Lifecycle\nstatus: retracted\n---\n# F\n\n<Callout type="warning" title={frontmatter.status}>Withdrawn.</Callout>\n',
     "t.md":
       '---\ntitle: Table\n---\n# Table\n\n<Callout type="warning">Mind the gap.</Callout>\n',
+    "u.md": "# Install `blume`\n\nBody U.\n",
     "v.md": [
       "---",
       "title: Vis",
@@ -174,6 +175,8 @@ beforeAll(async () => {
       "```",
       "",
     ].join("\n"),
+    "w.md": "Wiki page\n=========\n\nBody W.\n\n# Wiki page\n",
+    "x.md": "# Overview\n\nBody X.\n",
   };
   await Promise.all(
     Object.entries(files).map(async ([rel, content]) => {
@@ -655,6 +658,28 @@ describe("buildLlmsFiles — full", () => {
     // The section separator joins page bodies.
     expect(full).toContain("\n---\n");
     expect(full).not.toContain("Draft body.");
+  });
+
+  it("drops the opening heading a page's title came from, which the section already opens with", async () => {
+    const { full } = await buildLlmsFiles(
+      makeProject([
+        makePage("u.md", "/u", "Install blume"),
+        makePage("w.md", "/w", "Wiki page"),
+        makePage("x.md", "/x", "Getting started"),
+      ])
+    );
+    expect(full).toContain(
+      "# Install blume\nSource: https://example.com/u\n\nBody U."
+    );
+    expect(full).not.toContain("# Install `blume`");
+    // A setext heading goes the same way; a later one with the same text stays.
+    expect(full).toContain(
+      "# Wiki page\nSource: https://example.com/w\n\nBody W.\n\n# Wiki page"
+    );
+    // A heading that isn't the title stays.
+    expect(full).toContain(
+      "# Getting started\nSource: https://example.com/x\n\n# Overview\n\nBody X."
+    );
   });
 });
 

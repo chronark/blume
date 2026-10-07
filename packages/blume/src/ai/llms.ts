@@ -5,6 +5,7 @@ import { isHiddenPage } from "../core/hidden-pages.ts";
 import { metaDescription } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { absoluteUrl } from "../core/site-url.ts";
+import { extractHeadings } from "../core/sources/normalize.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
 import type { NavNode, Navigation, PageRecord } from "../core/types.ts";
 import { buildRssFeeds } from "../deploy/rss.ts";
@@ -311,6 +312,26 @@ export const buildLlmsIndex = (
   return `${[lead, ...blocks].join("\n\n")}\n`;
 };
 
+// A line an ATX heading opens (`# Title`); any other first line can only open
+// a setext heading, underlined on the line after it.
+const ATX_HEADING = /^ {0,3}#/u;
+
+/**
+ * A page body without the `# Heading` it opens with, when that heading's text
+ * is the page's title. An untitled page takes its title from that heading,
+ * and its `llms-full.txt` section already opens with `# <title>`, so the
+ * heading would show twice; the rendered page drops it the same way (see
+ * `markdown/title-heading.ts`).
+ */
+const withoutTitleHeading = (body: string, title: string): string => {
+  const lines = body.split("\n");
+  const span = ATX_HEADING.test(lines[0] ?? "") ? 1 : 2;
+  const [heading] = extractHeadings(lines.slice(0, span).join("\n"));
+  return heading?.depth === 1 && heading.text === title
+    ? lines.slice(span).join("\n").trimStart()
+    : body;
+};
+
 /** Build `llms-full.txt`: the full Markdown body of every current-docs page. */
 const buildFull = async (project: BlumeProject): Promise<string> => {
   const { config } = project;
@@ -351,7 +372,12 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
         config.deployment.options.site,
         normalizeBasePath(config.deployment.options.base)
       );
-      return [`# ${page.title}`, `Source: ${url}`, "", body].join("\n");
+      return [
+        `# ${page.title}`,
+        `Source: ${url}`,
+        "",
+        withoutTitleHeading(body, page.title),
+      ].join("\n");
     })
   );
 

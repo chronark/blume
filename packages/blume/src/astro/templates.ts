@@ -33,6 +33,7 @@ import {
   withMirrorRedirects,
 } from "../deploy/redirects.ts";
 import { API_RAIL_KEY } from "../markdown/api-rail.ts";
+import { TITLE_ID_KEY } from "../markdown/title-heading.ts";
 import { VIEWS_KEY } from "../markdown/views.ts";
 import type { OgCache } from "../og/cache.ts";
 import type { OgFont, OgFontFamilies, OgGoogleFont } from "../og/card.ts";
@@ -2563,6 +2564,12 @@ const headings = (
     ? { ...heading, text: tocText[heading.slug] }
     : heading
 );
+// An untitled page's opening \`# Heading\` is its title, so the title-heading
+// plugin drops it from the body and reports its id here: the title \`<h1>\`
+// below takes it, so links to the heading's anchor still land (see
+// markdown/title-heading.ts).
+const titleIdRaw = remarkPluginFrontmatter?.${TITLE_ID_KEY};
+const titleId = typeof titleIdRaw === "string" ? titleIdRaw : undefined;
 const frontmatter = entry.data;
 
 const seo = frontmatter.seo;
@@ -2855,7 +2862,7 @@ const LayoutComponent = resolveSlot(layoutOverrides.Layout, RootLayout);
   noindex={effectiveNoindex}
   structuredDataEnabled={data.config.structuredData}
 >
-  {pageChrome && <h1>{title}</h1>}
+  {pageChrome && <h1 id={titleId}>{title}</h1>}
   {pageChrome && frontmatter.description && <p class="text-lg text-muted-foreground">{frontmatter.description}</p>}
   {narration && (
     <NarrationPlayer

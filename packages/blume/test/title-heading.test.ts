@@ -5,7 +5,11 @@ import { mdxToJs } from "satteri";
 import { MDX_BODY_FEATURES } from "../src/markdown/features.ts";
 import { headingAnchorPlugin } from "../src/markdown/heading-anchors.ts";
 import { blumeMarkdownProcessor } from "../src/markdown/index.ts";
-import { titleHeadingPlugin } from "../src/markdown/title-heading.ts";
+import {
+  TITLE_ID_KEY,
+  titleHeadingPlugin,
+} from "../src/markdown/title-heading.ts";
+import type { TitleHeadingPlugin } from "../src/markdown/title-heading.ts";
 
 /** A `.md` page's HTML, rendered with this front matter. */
 const renderMarkdown = async (
@@ -93,18 +97,33 @@ describe("titleHeadingPlugin", () => {
     ).toStrictEqual(["Task", "Setup"]);
   });
 
+  it("hands the dropped heading's id to the page's title through the front matter", async () => {
+    const frontmatter: Record<string, string> = {};
+    await renderMarkdown("# Set up the CLI [#cli]\n\nText.\n", frontmatter);
+    expect(frontmatter[TITLE_ID_KEY]).toBe("cli");
+    // A render that keeps its heading clears an id an earlier one left.
+    await renderMarkdown("Intro.\n\n# Setup\n", frontmatter);
+    expect(frontmatter[TITLE_ID_KEY]).toBeUndefined();
+  });
+
+  it("hands on an .mdx page's dropped heading id too", async () => {
+    const frontmatter: Record<string, string> = {};
+    await mdxHeadings("# Setup\n\nText.\n", frontmatter);
+    expect(frontmatter[TITLE_ID_KEY]).toBe("setup");
+  });
+
   it("does nothing outside an Astro render, which carries no front matter", () => {
     let removed = false;
-    titleHeadingPlugin().element.visit(
-      { type: "element" },
-      {
-        indexOf: () => 0,
-        parent: () => {},
-        removeNode: () => {
-          removed = true;
-        },
-      }
-    );
+    const ctx: Parameters<TitleHeadingPlugin["before"]>[1] = {
+      indexOf: () => 0,
+      parent: () => {},
+      removeNode: () => {
+        removed = true;
+      },
+    };
+    const plugin = titleHeadingPlugin();
+    plugin.before({ type: "root" }, ctx);
+    plugin.element.visit({ type: "element" }, ctx);
     expect(removed).toBe(false);
   });
 });

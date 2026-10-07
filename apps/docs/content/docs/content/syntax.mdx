@@ -7,7 +7,7 @@ Blume renders standard Markdown and MDX with a curated, GitHub-flavored feature 
 
 ## Headings
 
-Structure a page with headings. Blume renders your frontmatter `title` as the page heading, so start your content at `##` — `##` and `###` become entries in the table of contents. A page without a `title` takes its first `#` heading as its title, and when the page opens with that heading, it shows once, as the page heading. Every `##`–`######` heading is also wrapped in a link to its own anchor, so readers can click a heading to copy, bookmark, or share a permalink straight to that section (hover to reveal the `#`). Turn this off with `markdown: { headingAnchors: false }` in `blume.config.ts`.
+Structure a page with headings. Blume renders your frontmatter `title` as the page heading, so start your content at `##` — `##` and `###` become entries in the table of contents. A page without a `title` takes its first `#` heading as its title, and when the page opens with that heading, it shows once, as the page heading, which keeps the heading's anchor so links to it still land. `llms-full.txt` lists it once too. Every `##`–`######` heading is also wrapped in a link to its own anchor, so readers can click a heading to copy, bookmark, or share a permalink straight to that section (hover to reveal the `#`). Turn this off with `markdown: { headingAnchors: false }` in `blume.config.ts`.
 
 ```md
 ## Section

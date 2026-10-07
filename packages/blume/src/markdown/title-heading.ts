@@ -10,21 +10,34 @@
  * (`custom`, `frame`) renders no title, so its heading stays too.
  *
  * It runs after `heading-anchors`, so every other heading keeps the id the
- * scan gave it (`setup`, `setup-1`): only the title's own element goes.
+ * scan gave it (`setup`, `setup-1`): only the title's own element goes. Its
+ * id doesn't: the anchor index lists it, and links to `#setup` still land,
+ * because the dropped heading's id goes out through the render's front matter
+ * under {@link TITLE_ID_KEY}, which the page template sets on its `<h1>`.
  */
 
 import { pageModeLayout } from "../core/page-modes.ts";
 import type { PageMode } from "../core/page-modes.ts";
 
+/**
+ * Front matter key carrying the id of the heading this plugin dropped out of
+ * a render. The page template reads it back via `remarkPluginFrontmatter` and
+ * gives the title `<h1>` it renders in the heading's place that id.
+ */
+export const TITLE_ID_KEY = "blumeTitleId";
+
 /** A minimal hast node (avoids a hast type dependency). */
 interface HastNode {
   children?: HastNode[];
+  /** An element's properties: a heading's `id` is the slug `heading-anchors` set. */
+  properties?: { id?: string };
   type: string;
   value?: string;
 }
 
-/** The front matter keys this plugin reads. */
+/** The front matter keys this plugin reads and writes. */
 interface TitleFrontmatter {
+  [TITLE_ID_KEY]?: string;
   mode?: PageMode;
   title?: string;
 }
@@ -39,6 +52,7 @@ interface TitleHeadingContext {
 
 /** A Satteri hast plugin, typed structurally to avoid a Satteri dep. */
 export interface TitleHeadingPlugin {
+  before: (root: HastNode, ctx: TitleHeadingContext) => void;
   name: string;
   element: {
     filter: string[];
@@ -79,6 +93,14 @@ const rendersNothing = (node: HastNode): boolean => {
 const seen = new WeakSet<object>();
 
 export const titleHeadingPlugin = (): TitleHeadingPlugin => ({
+  // A render of an entry Astro rendered before can get the front matter
+  // object that render wrote to, so a heading dropped then leaves no id.
+  before(_root, ctx) {
+    const frontmatter = ctx.data?.astro?.frontmatter;
+    if (frontmatter) {
+      Reflect.deleteProperty(frontmatter, TITLE_ID_KEY);
+    }
+  },
   element: {
     filter: ["h1"],
     visit(node, ctx) {
@@ -100,6 +122,10 @@ export const titleHeadingPlugin = (): TitleHeadingPlugin => ({
         before.every(rendersNothing) &&
         pageModeLayout(frontmatter.mode).chrome
       ) {
+        const id = node.properties?.id;
+        if (id) {
+          frontmatter[TITLE_ID_KEY] = id;
+        }
         ctx.removeNode(node);
       }
     },
