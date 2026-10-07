@@ -126,6 +126,25 @@ describe("relative page links on the agent surfaces", () => {
     expect(guides).toContain('<Card title="Install" href="/guides/install" />');
   });
 
+  it("rewrites an escaped or angle-bracketed target in place", async () => {
+    // The target is read as the renderer reads it (`\_` is `_`), and the
+    // route replaces exactly what was written, inside any `<…>`.
+    const project = await scanFixture({
+      "docs/guides/index.md": [
+        "# Guides",
+        "",
+        String.raw`See [Set up](./set\_up.md) and [Install](<./install>).`,
+        "",
+      ].join("\n"),
+      "docs/guides/install.md": "# Install\n",
+      "docs/guides/set_up.md": "# Set up\n",
+    });
+    const raw = await buildRawMarkdown(project);
+    expect(raw["/guides"]?.mdx).toContain(
+      "See [Set up](/guides/set_up) and [Install](</guides/install>)."
+    );
+  });
+
   it("reads a sibling a locale hasn't translated from the default tree", async () => {
     const project = await scanFixture({
       "blume.config.ts":

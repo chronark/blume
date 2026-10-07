@@ -101,7 +101,7 @@ const collectSplices = (
     if (route !== undefined) {
       add(link.line - 1, {
         column: link.column - 1,
-        length: link.target.length,
+        length: link.sourceLength ?? link.target.length,
         text: route,
       });
     }

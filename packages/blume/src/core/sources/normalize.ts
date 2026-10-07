@@ -286,6 +286,12 @@ const BARE_CURLY_MARKER =
 // text in `.md` and `.mdx` alike.
 const HTML_ID =
   /(?<=(?:^|[^\\])(?:\\\\)*)<[a-z][a-z0-9-]*(?:\s[^<>]*?)?\sid=(?:(?<quote>["'])(?<quoted>[^"'<>]+)\k<quote>|\{(?<jsxQuote>["'])(?<jsx>[^"'<>]+)\k<jsxQuote>\}|(?<bare>[^\s"'=<>`{}]+))/gu;
+// An `<a name="…">`, read like `HTML_ID`: a browser scrolls a fragment to an
+// `a` element whose `name` matches it (the HTML spec's indicated part of the
+// document), so it's an anchor target too. On any other element, `name` is
+// no target.
+const HTML_A_NAME =
+  /(?<=(?:^|[^\\])(?:\\\\)*)<a(?:\s[^<>]*?)?\sname=(?:(?<quote>["'])(?<quoted>[^"'<>]+)\k<quote>|\{(?<jsxQuote>["'])(?<jsx>[^"'<>]+)\k<jsxQuote>\}|(?<bare>[^\s"'=<>`{}]+))/gu;
 // Commented-out markup renders nothing; matched across lines once the
 // scannable lines are joined back together. Shared with the search
 // extractor so both agree on what a comment is.
@@ -409,6 +415,10 @@ const SMART_PUNCTUATION = /['"]|--|\.\.\./u;
 const REF_DEFINITION =
   /^(?: {0,3}|[ \t]*(?:(?:>|(?:[-*+]|\d{1,9}[.)])[ \t])[ \t]*)+)\[(?<label>[^\]]+)\]:[ \t]*(?<rest>.*)$/u;
 
+/** A link label as CommonMark matches it: case-folded, whitespace collapsed. */
+const labelKey = (label: string): string =>
+  label.trim().replaceAll(/\s+/gu, " ").toLowerCase();
+
 /**
  * The normalized labels of every link-reference definition in the body
  * (outside fenced code), footnote definitions (`^1`) included. A heading
@@ -443,7 +453,7 @@ const refDefinitionLabels = (lines: readonly string[]): Set<string> => {
     if (destination === "" && (lines[index + 1] ?? "").trim() === "") {
       continue;
     }
-    labels.add(groups.label.trim().replaceAll(/\s+/gu, " ").toLowerCase());
+    labels.add(labelKey(groups.label));
   }
   return labels;
 };
@@ -838,10 +848,10 @@ export interface HeadingSite {
 /** Everything one walk over a body yields for the anchor index. */
 export interface BodyScan {
   /**
-   * Raw HTML element ids (`<a id="…">`) outside headings, fences, inline
-   * code, comments, and `<Prompt>` regions — fragment-link targets that
-   * `blume validate` accepts alongside heading slugs. Deduplicated, in
-   * document order.
+   * Raw HTML element ids (`<a id="…">`) and `<a name="…">` names outside
+   * headings, fences, inline code, comments, and `<Prompt>` regions —
+   * fragment-link targets that `blume validate` accepts alongside heading
+   * slugs. Deduplicated, in document order.
    */
   anchors: string[];
   /** Headings whose trailing `{#id}` marker is unescaped, for `.mdx` pages. */
@@ -894,7 +904,10 @@ export const scanBody = (body: string): BodyScan => {
   // can splice its neighbors into a new `<!--` (`<!-<!-- x -->->`), and a
   // space keeps a tag from fusing with an `id=` that only a comment separated.
   const markup = state.anchorLines.join("\n").replaceAll(HTML_COMMENT, " ");
-  for (const match of markup.matchAll(HTML_ID)) {
+  for (const match of [
+    ...markup.matchAll(HTML_ID),
+    ...markup.matchAll(HTML_A_NAME),
+  ].toSorted((a, b) => a.index - b.index)) {
     const id = match.groups?.quoted ?? match.groups?.jsx ?? match.groups?.bare;
     if (id !== undefined) {
       anchors.add(id);
@@ -911,15 +924,37 @@ export const scanBody = (body: string): BodyScan => {
 export const extractHeadings = (body: string): Heading[] =>
   scanBody(body).headings;
 
+// A backslash escape: before ASCII punctuation, a backslash makes the
+// character literal (CommonMark), and the renderer drops it.
+const ESCAPED = /\\(?<char>[!-/:-@[-`{-~])/gu;
+// One character of a bare link destination: an escape (`\(` is a literal
+// parenthesis, opening no group), a backslash that escapes nothing, or any
+// other character but a parenthesis or whitespace. The alternatives never
+// overlap, so a long run can't backtrack.
+const DESTINATION_CHAR = String.raw`\\[!-/:-@[-\x60{-~]|\\(?![!-/:-@[-\x60{-~])|[^()\s\\]`;
+// A link destination as written (CommonMark): `<…>`, which may hold spaces
+// and unbalanced parentheses (Prettier writes this form for a URL with
+// either), or a run that doesn't start with `<` and admits one level of
+// balanced parens, so a Wikipedia-style URL (`/wiki/Foo_(bar)`) isn't
+// truncated at its first `)`. {@link destinationLink} reads it.
+const DESTINATION = String.raw`<(?:\\[!-/:-@[-\x60{-~]|\\(?![!-/:-@[-\x60{-~])|[^<>\n\\])*>|(?!<)(?:${DESTINATION_CHAR}|\((?:${DESTINATION_CHAR})*\))+`;
+
 // The label admits one level of nested brackets so an image-wrapped link
 // (`[![alt](/img.png)](/target)`) matches as the *outer* link — with a flat
 // `[^\]]*` label the match stopped at the image's `]` and the outer target was
-// never seen. The target admits one level of balanced parens so a Wikipedia-
-// style URL (`/wiki/Foo_(bar)`) isn't truncated at its first `)`.
-const MD_LINK =
-  /\[(?<label>(?:[^[\]]|\[[^\]]*\])*)\]\((?<target>(?:[^()\s]|\([^()\s]*\))+)(?<title>\s+"[^"]*")?\)/gu;
+// never seen. The target is the destination as written (see `DESTINATION`).
+const MD_LINK = new RegExp(
+  String.raw`\[(?<label>(?:[^[\]]|\[[^\]]*\])*)\]\((?<target>${DESTINATION})(?<title>\s+"[^"]*")?\)`,
+  "gu"
+);
 // An image inside a link label; its target was matched (and so validated) as a
 // link of its own before labels admitted nesting, and still should be.
+const LABEL_IMAGE = new RegExp(
+  String.raw`!\[[^\]]*\]\((?<target>${DESTINATION})(?<title>\s+"[^"]*")?\)`,
+  "gu"
+);
+// The image embeds the include and content-asset rewriters move: a bare
+// destination with balanced parens, spliced back as written.
 export const MD_IMAGE =
   /!\[[^\]]*\]\((?<target>(?:[^()\s]|\([^()\s]*\))+)(?<title>\s+"[^"]*")?\)/gu;
 
@@ -930,112 +965,152 @@ export const targetOffsetIn = (
   title: string | undefined
 ): number => matched.length - 1 - (title?.length ?? 0) - target.length;
 
+/**
+ * The link a destination written at `at` (the 1-based position of its first
+ * character) leads to, as the renderer reads it: angle brackets dropped and
+ * backslash escapes resolved, so `<https://x.dev/a(b>` is
+ * `https://x.dev/a(b` and `image%20\(1\).png` is `image%20(1).png`. It's
+ * located where the target's text starts, inside any brackets. An empty `<>`
+ * leads nowhere.
+ */
+const destinationLink = (
+  written: string,
+  at: Pick<PageLink, "column" | "line">
+): PageLink | undefined => {
+  const angled = written.startsWith("<");
+  const source = angled ? written.slice(1, -1) : written;
+  const target = source.replaceAll(ESCAPED, "$<char>");
+  if (target === "") {
+    return undefined;
+  }
+  const link: PageLink = {
+    column: at.column + (angled ? 1 : 0),
+    line: at.line,
+    target,
+  };
+  if (source.length !== target.length) {
+    link.sourceLength = source.length;
+  }
+  return link;
+};
+
 // A link-reference definition's destination, at the start of what follows its
-// `[label]:` (see `REF_DEFINITION`): `<…>`, which may hold spaces, or else the
-// run up to the first space, before any title.
-const DEFINITION_DESTINATION = /^(?:<(?<angle>[^<>]*)>|(?<bare>\S+))/u;
+// `[label]:` (see `REF_DEFINITION`), and only when whitespace or the end of
+// the line follows it: `[1]: <src/x.ts` has an unclosed `<…>`, so it defines
+// nothing (CommonMark).
+const DEFINITION_DESTINATION = new RegExp(
+  String.raw`^(?:${DESTINATION})(?=\s|$)`,
+  "u"
+);
 
 // A CommonMark autolink (`<https://example.com>`). Only http(s) targets are
 // ever checked, so no other scheme is read. MDX rejects the syntax, so in
-// practice it's a `.md` page's.
-const AUTOLINK = /<(?<target>https?:\/\/[^\s<>]*)>/giu;
+// practice it's a `.md` page's. A link's `<…>` destination
+// (`[x](<https://…>)`) is no autolink.
+const AUTOLINK = /(?<!\]\()<(?<target>https?:\/\/[^\s<>]*)>/giu;
 
 /**
  * Record the destination of a link-reference definition on `line`: a
  * reference link (`[text][label]`, `[label]`) renders with it, so it's the
- * target to check, once for every link that cites it. A footnote definition
- * (`[^1]: …`) is no link; the links inside it are read like any others.
+ * target to check, once for every link that cites it. Only the first
+ * definition of a label counts (CommonMark), so a later one is skipped:
+ * `defined` holds the labels defined so far. A footnote definition (`[^1]: …`)
+ * is no link; the links inside it are read like any others. Returns whether
+ * the line is a definition.
  */
 const scanDefinition = (
   line: string,
   lineNumber: number,
-  links: PageLink[]
-): void => {
+  links: PageLink[],
+  defined: Set<string>
+): boolean => {
   const groups = line.match(REF_DEFINITION)?.groups;
   if (groups?.label === undefined || groups.label.startsWith("^")) {
-    return;
+    return false;
   }
   const rest = groups.rest ?? "";
-  const destination = rest.match(DEFINITION_DESTINATION)?.groups;
-  const target = destination?.angle ?? destination?.bare;
-  if (target) {
-    // `rest` runs to the end of the line; an angle-bracketed target starts
-    // one past its `<`.
-    const at = line.length - rest.length + (destination?.angle ? 1 : 0);
-    links.push({ column: at + 1, line: lineNumber, target });
+  const written = rest.match(DEFINITION_DESTINATION)?.[0];
+  const key = labelKey(groups.label);
+  if (written === undefined || key === "") {
+    return false;
   }
+  if (!defined.has(key)) {
+    defined.add(key);
+    // `rest` runs to the end of the line, so the destination starts where it
+    // does.
+    const link = destinationLink(written, {
+      column: line.length - rest.length + 1,
+      line: lineNumber,
+    });
+    if (link) {
+      links.push(link);
+    }
+  }
+  return true;
 };
 
 /**
- * Extract link targets from a markdown body for later validation, recording the
- * 1-based line/column of each target. Skips fenced code blocks and inline code.
- * `lineOffset` shifts every recorded line: the body is frontmatter-stripped, so
- * diagnostics that point into the raw file must add the stripped block's height.
+ * Scan one line for link targets. The line comes masked (see `maskCode`):
+ * code and comments are blanked with same-length padding, so recorded
+ * columns stay accurate.
  */
-/** Scan one line for link targets; returns the next fenced-block state. */
 const scanLinkLine = (
-  line: string,
+  masked: string,
   lineNumber: number,
-  fence: FenceState,
-  links: PageLink[]
-): FenceState => {
-  const next = nextFenceState(line, fence);
-  // Skip fence delimiter lines themselves and anything inside a fence.
-  if (fence !== null || next !== null) {
-    return next;
-  }
-  // Blank out inline code spans (`[label](/x)` shown as syntax, not a link)
-  // with same-length padding so recorded columns stay accurate.
-  const masked = line.replaceAll(INLINE_CODE, (span) =>
-    " ".repeat(span.length)
-  );
+  links: PageLink[],
+  defined: Set<string>
+): void => {
   for (const match of masked.matchAll(MD_LINK)) {
-    const target = match.groups?.target;
-    if (target === undefined || match.index === undefined) {
+    const written = match.groups?.target;
+    if (written === undefined || match.index === undefined) {
       continue;
     }
     // Locate the target by arithmetic from the match end rather than searching
     // for its text — a label that contains the same text (e.g. `[/a/b](/a/b)`)
     // would otherwise report the column inside the label.
-    const targetOffset = targetOffsetIn(match[0], target, match.groups?.title);
-    const entry: PageLink = {
+    const targetOffset = targetOffsetIn(match[0], written, match.groups?.title);
+    const entry = destinationLink(written, {
       column: match.index + targetOffset + 1,
       line: lineNumber,
-      target,
-    };
-    // `MD_LINK` matches the `[label](target)` tail of an image embed too; the
-    // preceding `!` is what marks the target as going through the image
-    // pipeline rather than resolving as a site route.
-    if (masked[match.index - 1] === "!") {
-      entry.image = true;
+    });
+    if (entry) {
+      // `MD_LINK` matches the `[label](target)` tail of an image embed too;
+      // the preceding `!` is what marks the target as going through the
+      // image pipeline rather than resolving as a site route.
+      if (masked[match.index - 1] === "!") {
+        entry.image = true;
+      }
+      links.push(entry);
     }
-    links.push(entry);
     // An image nested in the label (`[![alt](/img.png)](/target)`) carries its
     // own target; surface it too so a missing image is still caught.
     const label = match[0].slice(0, targetOffset - "](".length);
-    for (const image of label.matchAll(MD_IMAGE)) {
-      const imageTarget = image.groups?.target;
-      if (imageTarget === undefined || image.index === undefined) {
+    for (const image of label.matchAll(LABEL_IMAGE)) {
+      const imageWritten = image.groups?.target;
+      if (imageWritten === undefined || image.index === undefined) {
         continue;
       }
-      links.push({
+      const imageLink = destinationLink(imageWritten, {
         column:
           match.index +
           image.index +
-          targetOffsetIn(image[0], imageTarget, image.groups?.title) +
+          targetOffsetIn(image[0], imageWritten, image.groups?.title) +
           1,
-        image: true,
         line: lineNumber,
-        target: imageTarget,
       });
+      if (imageLink) {
+        links.push({ ...imageLink, image: true });
+      }
     }
+  }
+  // A definition's `<…>` destination is no autolink either.
+  if (scanDefinition(masked, lineNumber, links, defined)) {
+    return;
   }
   for (const match of masked.matchAll(AUTOLINK)) {
     const target = match.groups?.target ?? "";
     links.push({ column: match.index + 2, line: lineNumber, target });
   }
-  scanDefinition(masked, lineNumber, links);
-  return next;
 };
 
 /**
@@ -1055,11 +1130,23 @@ const ELEMENT_HREF =
  * it. The label holds a line break but no blank line (which would end the
  * paragraph) and no brackets, so a match never repeats a one-line link.
  */
-const WRAPPED_LINK =
-  /\[[^[\]\n]*(?:\n(?![ \t]*(?:\n|$))[^[\]\n]*)+\]\((?<target>(?:[^()\s]|\([^()\s]*\))+)(?<title>\s+"[^"]*")?\)/gu;
+const WRAPPED_LINK = new RegExp(
+  String.raw`\[[^[\]\n]*(?:\n(?![ \t]*(?:\n|$))[^[\]\n]*)+\]\((?<target>${DESTINATION})(?<title>\s+"[^"]*")?\)`,
+  "gu"
+);
 
-/** The body with fenced blocks and inline code blanked, shape preserved. */
-const maskCode = (lines: readonly string[]): string => {
+// An MDX comment (`{/* … */}`): JavaScript, so nothing in it renders.
+const JSX_COMMENT = /\{\s*\/\*[\s\S]*?\*\/\s*\}/gu;
+
+// What each format reads as a comment. `.md` renders a `{/* … */}` as text,
+// links and all, and MDX rejects `<!-- … -->` outright.
+const COMMENTS = { md: HTML_COMMENT, mdx: JSX_COMMENT } as const;
+
+/**
+ * The body with fenced blocks and inline code blanked, shape preserved — and,
+ * given the page's format, its comments too.
+ */
+const maskCode = (lines: readonly string[], format?: "md" | "mdx"): string => {
   let fence: FenceState = null;
   const masked = lines.map((line) => {
     const next = nextFenceState(line, fence);
@@ -1069,7 +1156,12 @@ const maskCode = (lines: readonly string[]): string => {
       ? " ".repeat(line.length)
       : line.replaceAll(INLINE_CODE, (span) => " ".repeat(span.length));
   });
-  return masked.join("\n");
+  const text = masked.join("\n");
+  return format === undefined
+    ? text
+    : text.replaceAll(COMMENTS[format], (comment) =>
+        comment.replaceAll(/[^\n]/gu, " ")
+      );
 };
 
 /** The offset each of `lines` starts at once they're joined with `\n`. */
@@ -1110,18 +1202,18 @@ const positionIn = (
 };
 
 /**
- * Every link in `body` that can span lines, with its 1-based position: an
- * element's `href` (see `ELEMENT_HREF`) and a link whose label wraps (see
- * `WRAPPED_LINK`). A lowercase `<a>` is raw HTML in `.md` and a plain element
- * in `.mdx`; the Markdown pipeline passes either through as written, so its
- * target is marked `raw`.
+ * Every link in the masked `text` (see `maskCode`) of `lines` that can span
+ * lines, with its 1-based position: an element's `href` (see `ELEMENT_HREF`)
+ * and a link whose label wraps (see `WRAPPED_LINK`). A lowercase `<a>` is raw
+ * HTML in `.md` and a plain element in `.mdx`; the Markdown pipeline passes
+ * either through as written, so its target is marked `raw`.
  */
 const multilineLinks = (
+  text: string,
   lines: readonly string[],
   lineOffset: number
 ): PageLink[] => {
   const links: PageLink[] = [];
-  const text = maskCode(lines);
   const lineStarts = lineStartsOf(lines);
   for (const match of text.matchAll(ELEMENT_HREF)) {
     const target = match.groups?.double ?? match.groups?.single ?? "";
@@ -1137,34 +1229,44 @@ const multilineLinks = (
     links.push(link);
   }
   for (const match of text.matchAll(WRAPPED_LINK)) {
-    const target = match.groups?.target ?? "";
+    const written = match.groups?.target ?? "";
     const at =
-      match.index + targetOffsetIn(match[0], target, match.groups?.title);
-    const link: PageLink = {
-      ...positionIn(lineStarts, at, lineOffset),
-      target,
-    };
-    // As on one line, a preceding `!` makes it an image embed.
-    if (text[match.index - 1] === "!") {
-      link.image = true;
+      match.index + targetOffsetIn(match[0], written, match.groups?.title);
+    const link = destinationLink(
+      written,
+      positionIn(lineStarts, at, lineOffset)
+    );
+    if (link) {
+      // As on one line, a preceding `!` makes it an image embed.
+      if (text[match.index - 1] === "!") {
+        link.image = true;
+      }
+      links.push(link);
     }
-    links.push(link);
   }
   return links;
 };
 
-export const extractLinks = (body: string, lineOffset = 0): PageLink[] => {
+/**
+ * Extract link targets from a markdown body for later validation, recording the
+ * 1-based line/column of each target. Skips fenced code blocks, inline code,
+ * and — given the page's `format` — comments, none of which render a link.
+ * `lineOffset` shifts every recorded line: the body is frontmatter-stripped, so
+ * diagnostics that point into the raw file must add the stripped block's height.
+ */
+export const extractLinks = (
+  body: string,
+  lineOffset = 0,
+  format?: "md" | "mdx"
+): PageLink[] => {
   const links: PageLink[] = [];
-  let fence: FenceState = null;
-  let lineNumber = lineOffset;
-
+  const defined = new Set<string>();
   const lines = body.split("\n");
-  for (const line of lines) {
-    lineNumber += 1;
-    fence = scanLinkLine(line, lineNumber, fence, links);
+  const text = maskCode(lines, format);
+  for (const [index, line] of text.split("\n").entries()) {
+    scanLinkLine(line, lineOffset + index + 1, links, defined);
   }
-
-  return [...links, ...multilineLinks(lines, lineOffset)];
+  return [...links, ...multilineLinks(text, lines, lineOffset)];
 };
 
 /**
@@ -1741,7 +1843,9 @@ export const normalizeEntry = (
     includes: entryIncludes(entry),
     lastModified: meta.lastModified ?? entry.lastModified,
     links: [
-      ...entryLinks(entry, extractLinks),
+      ...entryLinks(entry, (text, lineOffset) =>
+        extractLinks(text, lineOffset, format)
+      ),
       ...relatedPageLinks(meta.related),
     ],
     meta,

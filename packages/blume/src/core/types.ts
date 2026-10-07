@@ -56,8 +56,13 @@ export interface Heading {
 
 /** A link target discovered in page content, anchored to its source line. */
 export interface PageLink {
-  /** Raw link target as written, e.g. `./foo`, `/api#auth`, `https://x.dev`. */
+  /** Raw link target as written, e.g. `./foo`, `/api#auth`, `https://x.dev`.
+   * A Markdown destination is read as the renderer reads it: without its
+   * `<…>` brackets, and with backslash escapes resolved. */
   target: string;
+  /** Length of the target's text in the source, when escapes make it differ
+   * from `target`'s (`image\(1\).png` is read as `image(1).png`). */
+  sourceLength?: number;
   /** Set when the target was written as an image embed (`![alt](target)`) —
    * only those go through the image pipeline; a plain link to the same path
    * resolves as a site route. */
