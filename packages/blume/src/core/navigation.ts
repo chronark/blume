@@ -631,10 +631,16 @@ const hoistPages = (
  * group's *children*, not the tree root — so hoisting only the root leaves a
  * tab section's loose pages interleaved with its groups. Hoist the top level of
  * every group that owns a tab (matched on its URL path), mirroring the root.
+ *
+ * The section is the outermost group at the tab's path, the one render-time
+ * scoping shows (`sectionChildren`). A `(group)` folder inside it adds no
+ * route segment, so it shares that path, but it is a group in the section, not
+ * the section itself: below a matched group its path no longer matches, and
+ * the (group)'s own level hoists only by the `hoistPages` rules.
  */
 const hoistTabSections = (
   nodes: MutableNode[],
-  tabPaths: Set<string>,
+  tabPaths: ReadonlySet<string>,
   display: SidebarDisplay
 ): void => {
   for (const node of nodes) {
@@ -643,6 +649,10 @@ const hoistTabSections = (
     }
     if (node.routePath !== undefined && tabPaths.has(node.routePath)) {
       hoistPages(node.children, display, true);
+      const inner = new Set(tabPaths);
+      inner.delete(node.routePath);
+      hoistTabSections(node.children, inner, display);
+      continue;
     }
     hoistTabSections(node.children, tabPaths, display);
   }

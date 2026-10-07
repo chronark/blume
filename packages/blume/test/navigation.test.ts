@@ -219,6 +219,45 @@ describe("buildNavigation — filesystem sidebar", () => {
     ]);
   });
 
+  it("keeps authored interleaving inside a (group) folder of a tab section", () => {
+    // `docs/(data)` adds no route segment, so its group shares the `/docs`
+    // section's path — but it is a group inside the section, not the section
+    // itself. Only the section's own top level hoists; inside the (group), a
+    // `group` subgroup is self-delimiting and the meta `pages` order stands.
+    const folderMeta = new Map<string, FolderMeta>([
+      ["docs/(data)", { pages: ["accounts", "reports", "statements"] }],
+      ["docs/(data)/reports", { display: "group" }],
+    ]);
+    const nav = buildNavigation(
+      [
+        page("docs/index.mdx", "/docs", "Overview"),
+        page("docs/zebra.mdx", "/docs/zebra", "Zebra"),
+        page("docs/(data)/accounts.mdx", "/docs/accounts", "Accounts"),
+        page("docs/(data)/statements.mdx", "/docs/statements", "Statements"),
+        page("docs/(data)/reports/daily.mdx", "/docs/reports/daily", "Daily"),
+      ],
+      {
+        display: "group",
+        folderMeta,
+        tabs: [{ label: "Docs", path: "/docs" }],
+      }
+    );
+    const section = asGroup(nav.sidebar[0]);
+    // The section's own top level still hoists its loose pages.
+    expect(labels(section.children)).toStrictEqual([
+      "Overview",
+      "Zebra",
+      "Data",
+    ]);
+    const data = asGroup(section.children[2]);
+    expect(data.path).toBe("/docs");
+    expect(labels(data.children)).toStrictEqual([
+      "Accounts",
+      "Reports",
+      "Statements",
+    ]);
+  });
+
   it("excludes the root tab from tab-section scoping under a basePath", () => {
     // A `path: "/"` tab spans the whole tree. Tab paths are rebased before
     // tab-section matching, so under `basePath: "/docs"` the root tab becomes
