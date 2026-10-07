@@ -7,6 +7,7 @@ import type { FenceState } from "./code-fences.ts";
 import matter from "./frontmatter.ts";
 import { resolveRelativeFile } from "./relative-files.ts";
 import {
+  INLINE_CODE,
   isLinkElementUrl,
   rewriteCardImages,
   rewriteElementUrls,
@@ -452,6 +453,58 @@ const rebaseImages = (
   ).split("\n");
 };
 
+/**
+ * A `.md` partial's HTML comments (`<!-- … -->`), written as MDX comments
+ * (`{/* … *\/}`), for splicing into an `.mdx` page. The partial is read in
+ * the page's format, and MDX has no HTML comments: it shows one as text, so
+ * a note meant to stay hidden would render. A comment can span lines, and
+ * its text keeps every line (with any `*\/` broken up so it can't end the
+ * comment early), so line origins hold. Fenced code and inline code show a
+ * comment rather than make one, so they're left as written.
+ */
+const htmlCommentsAsMdx = (lines: readonly string[]): string[] => {
+  let fence: FenceState = null;
+  let inComment = false;
+  return lines.map((line) => {
+    if (!inComment) {
+      const next = nextFenceState(line, fence);
+      const inFence = fence !== null || next !== null;
+      fence = next;
+      if (inFence) {
+        return line;
+      }
+    }
+    const masked = line.replaceAll(INLINE_CODE, (span) =>
+      " ".repeat(span.length)
+    );
+    let out = "";
+    let at = 0;
+    while (at < line.length) {
+      if (inComment) {
+        const close = line.indexOf("-->", at);
+        const end = close === -1 ? line.length : close;
+        out += line.slice(at, end).replaceAll("*/", "* /");
+        if (close === -1) {
+          break;
+        }
+        out += "*/}";
+        at = close + "-->".length;
+        inComment = false;
+      } else {
+        const open = masked.indexOf("<!--", at);
+        if (open === -1) {
+          out += line.slice(at);
+          break;
+        }
+        out += `${line.slice(at, open)}{/*`;
+        at = open + "<!--".length;
+        inComment = true;
+      }
+    }
+    return out;
+  });
+};
+
 /** Wrap raw file content as a fenced code block that can't be broken by the
  * content's own backtick runs. */
 const codeBlockLines = (
@@ -567,12 +620,17 @@ const expandStatement = async (
   // Props replace their `{{name}}` references line by line, so every line
   // keeps its origin; they reach the file's own nested includes too.
   const { props } = statement.attributes;
+  const rebased = rebaseImages(
+    props ? lines.map((text) => substituteVariables(text, props)) : lines,
+    dirname(path),
+    dirname(filePath)
+  );
   return {
-    lines: rebaseImages(
-      props ? lines.map((text) => substituteVariables(text, props)) : lines,
-      dirname(path),
-      dirname(filePath)
-    ),
+    lines:
+      extname(path).toLowerCase() === ".md" &&
+      extname(filePath).toLowerCase() === ".mdx"
+        ? htmlCommentsAsMdx(rebased)
+        : rebased,
     origins,
   };
 };

@@ -28,7 +28,10 @@ import { readExpandedEntryText } from "../src/core/sources/read.ts";
 import type { ContentSource } from "../src/core/sources/types.ts";
 import type { PageRecord } from "../src/core/types.ts";
 import { includePlugin } from "../src/markdown/include.ts";
-import { blumeMarkdownProcessor } from "../src/markdown/index.ts";
+import {
+  blumeMarkdownProcessor,
+  blumeMdxProcessor,
+} from "../src/markdown/index.ts";
 import type { MdastNode } from "../src/markdown/mdast.ts";
 import { buildSearchDocuments } from "../src/search/documents.ts";
 
@@ -543,6 +546,65 @@ describe("expandIncludes", () => {
       "",
       "[spec]: ../_snippets/spec.pdf",
     ]);
+  });
+
+  it("writes a .md partial's HTML comments as MDX comments in an .mdx page", async () => {
+    const partial = [
+      "Before <!-- a note */ here --> after `<!-- shown -->`.",
+      "<!--",
+      "A block comment.",
+      "-->",
+      "```html",
+      "<!-- fenced -->",
+      "```",
+      "",
+    ].join("\n");
+    const root = await fixture({
+      "_p.md": partial,
+      "_q.mdx": "<!-- an .mdx partial's is its own -->\n",
+      "page.md": "unused",
+      "page.mdx": "unused",
+    });
+    const expand = async (target: string, page: string) => {
+      const expanded = await expandIncludes(`<include>${target}</include>`, {
+        contentRoot: root,
+        sourcePath: join(root, page),
+      });
+      return expanded.text;
+    };
+    const intoMdx = await expand("./_p.md", "page.mdx");
+    expect(intoMdx.split("\n")).toStrictEqual([
+      "Before {/* a note * / here */} after `<!-- shown -->`.",
+      "{/*",
+      "A block comment.",
+      "*/}",
+      "```html",
+      "<!-- fenced -->",
+      "```",
+    ]);
+    expect(await expand("./_p.md", "page.md")).toBe(partial.trimEnd());
+    expect(await expand("./_q.mdx", "page.mdx")).toBe(
+      "<!-- an .mdx partial's is its own -->"
+    );
+  });
+
+  it("hides a .md partial's HTML comment on a rendered .mdx page", async () => {
+    const root = await fixture({
+      "_p.md": "Shown <!-- hidden --> text.\n\n<!--\nAlso hidden.\n-->\n",
+      "page.mdx": "u",
+    });
+    const processor = blumeMdxProcessor({ contentRoot: root });
+    if (!processor.createMdxRenderer) {
+      throw new Error("The satteri processor has no MDX renderer.");
+    }
+    const renderer = await processor.createMdxRenderer({}, { optimize: false });
+    const { code } = await renderer.process(
+      "<include>./_p.md</include>\n",
+      join(root, "page.mdx"),
+      {}
+    );
+    expect(String(code)).toContain("Shown ");
+    expect(String(code)).not.toContain("hidden");
   });
 
   it("trims blank edge lines off a splice", async () => {
