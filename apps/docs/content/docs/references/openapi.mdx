@@ -114,7 +114,11 @@ Each value is quoted by its own language's rules, so a header like `If-Match: "3
 
 An id Blume doesn't generate a sample for, such as ReadMe's `objectivec`, is left out of every page, with a `BLUME_OPENAPI_UNKNOWN_CODE_SAMPLE` warning that lists the ids above. To show a sample in another language, write it into the spec as [your own sample](#your-own-samples).
 
-Schema tables follow the way the data travels, as the examples do: a request body leaves out `readOnly` properties, which the server sets, and a response leaves out `writeOnly` ones, which it never returns. A [webhook or callback](#webhooks-and-callbacks) body is a request your API sends, so it reads like a response.
+Schema tables follow the way the data travels, as the examples do: a request body leaves out `readOnly` properties, which the server sets, and a response leaves out `writeOnly` ones, which it never returns. A [webhook or callback](#webhooks-and-callbacks) body is a request your API sends, so it reads like a response. The same goes for the request samples, the [Try it](#try-it-playground) form and its prefill, and the response examples, including examples written into the spec, such as a model-level `example` that holds the model's `id`.
+
+A body or response whose `examples` map names two or more examples shows each one, labeled by its `summary`, or by its key when it has none. A response gets a tab per example after its status (`200 · A cat`), a webhook payload one per example after its media type, and a request body an **Examples** block under its schema. The code samples and Try it start from the first.
+
+A property written as a `$ref` with keywords beside it, which OpenAPI 3.1 allows, reads those keywords over the referenced schema's. Its own `description` is the one its row shows, and its own `example` or `default` is the one the samples use.
 
 ### Your own samples
 

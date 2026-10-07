@@ -268,6 +268,7 @@ const callbackParts = (entry: CallbackEntry) => ({
           <ParametersTable parameters={params} schemas={schemas} />
           {requestBody && (
             <RequestBody
+              components={components}
               direction={bodyDirection}
               expandAll={spec.expandSchemas}
               requestBody={requestBody}
@@ -321,9 +322,11 @@ const callbackParts = (entry: CallbackEntry) => ({
                       />
                       {parts.requestBody && (
                         <RequestBody
+                          components={components}
                           direction="response"
                           expandAll={spec.expandSchemas}
                           level={4}
+                          name={`callback-${entry.key}`}
                           requestBody={parts.requestBody}
                           schemas={schemas}
                         />

@@ -28,16 +28,22 @@ interface Props {
   copy?: boolean;
   /** Render tab labels in a monospace face (status codes). */
   mono?: boolean;
+  /**
+   * Names this tab set in its element ids, for a heading that repeats on
+   * the page (a callback's request body examples). Defaults to the heading.
+   */
+  name?: string;
 }
 
-const { heading, panels, copy = false, mono = false } = Astro.props;
+const { heading, panels, copy = false, mono = false, name = heading } =
+  Astro.props;
 
 // A stable per-instance id prefix so tab/tabpanel pairs can reference each
 // other without colliding across the multiple PanelTabs on one page (the
-// heading is unique per rail group; panel keys are unique within a group).
+// name is unique per tab set; panel keys are unique within a set).
 const NON_ID = /[^a-z0-9]+/gu;
 const idFor = (kind: "tab" | "panel", key: string): string =>
-  ["panel-tabs", heading, kind, key]
+  ["panel-tabs", name, kind, key]
     .map((part) => part.toLowerCase().replace(NON_ID, "-"))
     .join("-");
 

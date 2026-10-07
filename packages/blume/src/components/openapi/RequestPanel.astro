@@ -4,26 +4,20 @@ import data from "blume:data";
 import { highlightCode } from "../../markdown/index.ts";
 import {
   type ComponentsLike,
-  responseExample,
+  type MediaLike,
   type SchemaLike,
-  type SpecValue,
   toJson,
 } from "./helpers.ts";
 import type { CustomCodeSample } from "./code-samples.ts";
+import {
+  type ExamplePanel,
+  payloadPanels as payloadExamples,
+  type ResponseLike,
+  responsePanels as responseExamples,
+} from "./example-panels.ts";
 import { languageSamplePanels } from "./sample-panels.ts";
 import PanelTabs from "./PanelTabs.astro";
 import type { RequestSample, SampleLanguage } from "./snippets.ts";
-
-interface MediaTypeLike {
-  schema?: SchemaLike;
-  example?: SpecValue;
-  examples?: SpecValue;
-}
-
-interface ResponseLike {
-  description?: string;
-  content?: Record<string, MediaTypeLike>;
-}
 
 interface Props {
   /** The document's `components`, which `$ref`'d examples resolve against. */
@@ -34,7 +28,7 @@ interface Props {
    * A webhook's body: the rail shows it as a "Payload" example per media
    * type in place of client code, since the API sends the request.
    */
-  payload?: Record<string, MediaTypeLike>;
+  payload?: Record<string, MediaLike>;
   sample?: RequestSample;
   languages?: SampleLanguage[];
   responses: Record<string, ResponseLike>;
@@ -51,18 +45,26 @@ const {
   schemas,
 } = Astro.props;
 
-/** A media type's example, highlighted, or null when it has none. */
-const highlightExample = async (media: MediaTypeLike, type: string) => {
-  const example = responseExample(media, schemas, components);
-  if (example === undefined || example === null) {
-    return null;
-  }
-  const json = type.includes("json");
-  return highlightCode(
-    json || typeof example !== "string" ? toJson(example) : example,
-    json ? "json" : "text",
-    { icons: false, themes: data.config.codeThemes }
-  );
+/**
+ * One example tab, highlighted. A payload that isn't JSON shows a string
+ * example as written; a response example always reads as JSON.
+ */
+const highlightPanel = async (panel: ExamplePanel, asText: boolean) => {
+  const { value } = panel;
+  const text = asText && typeof value === "string";
+  return {
+    html:
+      value === undefined || value === null
+        ? null
+        : await highlightCode(
+            text ? value : toJson(value),
+            text ? "text" : "json",
+            { icons: false, themes: data.config.codeThemes }
+          ),
+    key: panel.key,
+    label: panel.label,
+    text: panel.text,
+  };
 };
 
 // Hand-written samples carry no `lang` key, so the playground leaves them
@@ -78,12 +80,9 @@ const customPanels = await Promise.all(
   }))
 );
 const payloadPanels = await Promise.all(
-  Object.entries(payload ?? {}).map(async ([type, media]) => ({
-    html: await highlightExample(media, type),
-    key: type,
-    label: type,
-    text: "No example payload.",
-  }))
+  payloadExamples(payload, schemas, components).map((panel) =>
+    highlightPanel(panel, !panel.type.includes("json"))
+  )
 );
 const requestPanels = [
   ...customPanels,
@@ -91,28 +90,10 @@ const requestPanels = [
     ? await languageSamplePanels(languages, sample, data.config.codeThemes)
     : []),
 ];
-
 const responsePanels = await Promise.all(
-  Object.entries(responses).map(async ([status, response]) => {
-    const media =
-      Object.entries(response.content ?? {}).find(([type]) =>
-        type.includes("json")
-      )?.[1] ?? Object.values(response.content ?? {})[0];
-    const example = media ? responseExample(media, schemas, components) : undefined;
-    const html =
-      example === undefined || example === null
-        ? null
-        : await highlightCode(toJson(example), "json", {
-            icons: false,
-            themes: data.config.codeThemes,
-          });
-    return {
-      html,
-      key: status,
-      label: status,
-      text: response.description || "No example response.",
-    };
-  })
+  responseExamples(responses, schemas, components).map((panel) =>
+    highlightPanel(panel, false)
+  )
 );
 ---
 

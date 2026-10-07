@@ -5,6 +5,8 @@ import { normalize, upgrade } from "@scalar/openapi-parser";
 import {
   declaredExample,
   exampleValue,
+  forDirection,
+  resolveSchema,
   responseExample,
 } from "../src/components/openapi/helpers.ts";
 import type {
@@ -197,7 +199,7 @@ describe("response samples", () => {
 });
 
 describe("flat body fields", () => {
-  it("never marks a readOnly property required in a request", () => {
+  it("leaves out a readOnly property, as the request body's table does", () => {
     const model = operationModel({
       method: "post",
       parameters: [],
@@ -223,10 +225,165 @@ describe("flat body fields", () => {
     });
     expect(
       model.body?.fields?.map((field) => [field.name, field.required])
-    ).toStrictEqual([
-      ["id", false],
-      ["name", true],
-      ["slug", false],
+    ).toStrictEqual([["name", true]]);
+  });
+
+  it("falls back to the editor when every property is readOnly", () => {
+    const model = operationModel({
+      method: "post",
+      parameters: [],
+      path: "/accounts",
+      requestBody: {
+        content: {
+          "application/json": {
+            schema: {
+              properties: { id: { readOnly: true, type: "string" } },
+              type: "object",
+            },
+          },
+        },
+      },
+      schemas: {},
+      security: { alternatives: [], optional: false },
+      servers: [],
+    });
+    expect(model.body?.fields).toBeUndefined();
+    expect(model.body?.example).toBe("{}");
+  });
+});
+
+describe("examples follow the schema's direction", () => {
+  // A TypeSpec model: the read-only `id` is in its model-level example.
+  const schemas = {
+    Owner: {
+      properties: {
+        id: { readOnly: true, type: "integer" },
+        name: { type: "string" },
+      },
+      type: "object",
+    },
+    Pet: {
+      example: { id: 7, name: "Rex", owner: { id: 1, name: "Ann" } },
+      properties: {
+        id: { readOnly: true, type: "integer" },
+        name: { type: "string" },
+        owner: { $ref: "#/components/schemas/Owner" },
+        password: { type: "string", writeOnly: true },
+      },
+      type: "object",
+    },
+  } satisfies Record<string, SchemaLike>;
+  const pet = { $ref: "#/components/schemas/Pet" };
+
+  it("leaves readOnly properties out of a request sample, at any depth", () => {
+    expect(exampleValue(pet, schemas)).toStrictEqual({
+      name: "Rex",
+      owner: { name: "Ann" },
+    });
+    expect(exampleValue({ items: pet, type: "array" }, schemas)).toStrictEqual([
+      { name: "Rex", owner: { name: "Ann" } },
     ]);
+  });
+
+  it("leaves them out of the Try it prefill and the code samples", () => {
+    const model = operationModel({
+      method: "post",
+      parameters: [],
+      path: "/pets",
+      requestBody: { content: { "application/json": { schema: pet } } },
+      schemas,
+      security: { alternatives: [], optional: false },
+      servers: ["https://api.test"].map((url) => ({ url })),
+    });
+    expect(JSON.parse(model.body?.example ?? "")).toStrictEqual({
+      name: "Rex",
+      owner: { name: "Ann" },
+    });
+    expect(buildRequest(model, defaultValues(model)).body).toBe(
+      model.body?.example
+    );
+  });
+
+  it("leaves writeOnly properties out of a declared response example", () => {
+    expect(
+      responseExample(
+        { example: { id: 7, password: "hunter2" }, schema: pet },
+        schemas
+      )
+    ).toStrictEqual({ id: 7 });
+  });
+
+  it("keeps what the schema doesn't describe as written", () => {
+    expect(
+      forDirection([{ id: 1 }], { type: "array" }, schemas, "request")
+    ).toStrictEqual([{ id: 1 }]);
+    expect(forDirection({ id: 1 }, undefined, schemas, "request")).toEqual({
+      id: 1,
+    });
+    expect(forDirection({ extra: 1 }, pet, schemas, "request")).toEqual({
+      extra: 1,
+    });
+  });
+});
+
+describe("keywords beside a $ref", () => {
+  const schemas = {
+    Status: {
+      description: "A pet's status.",
+      enum: ["available", "sold"],
+      type: "string",
+    },
+  } satisfies Record<string, SchemaLike>;
+
+  it("reads the property's own description over the referenced one", () => {
+    expect(
+      resolveSchema(schemas, {
+        $ref: "#/components/schemas/Status",
+        description: "Where this pet is in the sale.",
+      })
+    ).toStrictEqual({
+      description: "Where this pet is in the sale.",
+      enum: ["available", "sold"],
+      type: "string",
+    });
+    // With nothing beside it, a `$ref` is the referenced schema itself.
+    expect(
+      resolveSchema(schemas, { $ref: "#/components/schemas/Status" })
+    ).toBe(schemas.Status);
+  });
+
+  it("samples the example written beside a $ref", () => {
+    const body = {
+      properties: {
+        lifecycle: { $ref: "#/components/schemas/Status", default: "sold" },
+        status: { $ref: "#/components/schemas/Status", example: "sold" },
+        tagged: {
+          $ref: "#/components/schemas/Status",
+          allOf: [{ description: "Kept." }],
+          examples: ["sold"],
+        },
+      },
+      type: "object",
+    };
+    expect(exampleValue(body, schemas)).toStrictEqual({
+      lifecycle: "sold",
+      status: "sold",
+      tagged: "sold",
+    });
+    // A component schema's own properties get the same reading.
+    expect(
+      exampleValue(
+        { $ref: "#/components/schemas/Order" },
+        {
+          ...schemas,
+          Order: {
+            properties: {
+              status: { $ref: "#/components/schemas/Status", example: "sold" },
+            },
+            type: "object",
+          },
+        }
+      )
+    ).toStrictEqual({ status: "sold" });
   });
 });

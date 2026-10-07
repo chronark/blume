@@ -2,6 +2,7 @@ import { withServerDefaults } from "../../openapi/model.ts";
 import {
   declaredExample,
   exampleValue,
+  mediaExample,
   objectProperties,
   parameterDescription,
   resolveSchema,
@@ -172,7 +173,9 @@ const jsonContentType = (
 /**
  * Typed field inputs when the body schema is a flat object of primitives —
  * anything nested (object/array properties) falls back to the raw JSON editor,
- * where structure is easier to edit than in exploded form fields.
+ * where structure is easier to edit than in exploded form fields. A
+ * `readOnly` property gets no field: the server sets it, so a request
+ * doesn't send it, as the request body's schema table leaves it out.
  */
 const bodyFields = (
   schema: SchemaLike | undefined,
@@ -184,13 +187,13 @@ const bodyFields = (
     return undefined;
   }
   const { properties, required } = objectProperties(resolved, schemas);
-  if (properties.length === 0) {
-    return undefined;
-  }
   const defaults = isExampleObject(example) ? example : undefined;
   const fields: PlaygroundBodyField[] = [];
   for (const [name, property] of properties) {
     const propertySchema = resolveSchema(schemas, property);
+    if (property.readOnly === true || propertySchema.readOnly === true) {
+      continue;
+    }
     const type = scalarType(property, schemas);
     if (
       !(type in PRIMITIVE_TYPES) ||
@@ -203,17 +206,12 @@ const bodyFields = (
       description: propertySchema.description,
       enum: propertySchema.enum?.map(String),
       name,
-      // A `readOnly` property's `required` binds responses only: a request
-      // shouldn't send the server-generated field at all.
-      required:
-        required.has(name) &&
-        property.readOnly !== true &&
-        propertySchema.readOnly !== true,
+      required: required.has(name),
       type,
       value: inputValue(defaults?.[name]),
     });
   }
-  return fields;
+  return fields.length > 0 ? fields : undefined;
 };
 
 /**
@@ -232,9 +230,7 @@ const modelBody = (
     return undefined;
   }
   const [contentType, mediaType] = media;
-  const exampleData =
-    declaredExample(mediaType, components) ??
-    exampleValue(mediaType.schema, schemas);
+  const exampleData = mediaExample(mediaType, schemas, "request", components);
   const encoding = bodyEncoding(contentType);
   const raw = encoding === "raw";
   const body: PlaygroundBody = {
