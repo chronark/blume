@@ -132,6 +132,18 @@ See [the threads endpoint](/api-reference/inboxes/threads/get).
 </ParamField>
 
 <ParamField path={"user.email"} type="string" default="none" />
+
+<Tip title="Fast" icon="fa-solid fa-bolt">
+  Keeps its icon.
+</Tip>
+
+<Info icon="fa-brands fa-python">
+  Loses its icon.
+</Info>
+
+<iframe src="https://www.youtube.com/embed/dQw4w9WgXcQ" title="Demo" allowfullscreen></iframe>
+
+<iframe src="https://www.youtube.com/embed/videoseries?list=PL123" title="Series"></iframe>
 `;
 
 const FILES = {
@@ -374,6 +386,15 @@ describe("fern-codemod", () => {
     ).content;
     expect(body).toContain("{/* an editor's note */}");
     expect(body).toContain(":::note[Heads up]\nRead this first.\n:::");
+    // A directive can't set an icon, so a callout that keeps one stays a <Callout>.
+    expect(body).toContain(
+      '<Callout type="tip" title="Fast" icon="zap">\n  Keeps its icon.\n</Callout>'
+    );
+    expect(body).toContain(":::info\nLoses its icon.\n:::");
+    expect(body).toContain('<YouTube id="dQw4w9WgXcQ" title="Demo" />');
+    expect(body).toContain(
+      '<YouTube url="https://www.youtube.com/embed/videoseries?list=PL123" title="Series" />'
+    );
     expect(body).toContain("<CodeGroup>");
     expect(body).toContain('```python title="Python"');
     expect(body).toContain('```ts title="Snippet with title" wrap');

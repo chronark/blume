@@ -11,7 +11,9 @@
 // pages: 115 content pages, 149 operation pages, 8 webhook pages, and the
 // reference overview; 281 redirects), its one warning BLUME_NAV_MISSING_PAGE
 // for the tab at "/" (no page lives there; the tab works through the "/"
-// redirect); `blume validate --strict` passed after the agent fixed 22 links
+// redirect; since the run, a root tab links to the first page and no longer
+// warns, and operations follow the spec's order instead of sorting
+// alphabetically); `blume validate --strict` passed after the agent fixed 22 links
 // and 1 anchor that were already broken on the live site;
 // `blume audit --only redirects` passed; and `fern check` passed with the
 // SDK config left in fern/. Of the 270 old URLs (the sitemap's 268 plus 2
@@ -480,9 +482,9 @@ const corsProbe = [
     </li>
     <li>
       <strong>Callout icons.</strong> Callouts at the top level of a page become{" "}
-      <code>:::note</code>-style directives, which take no icon. Callouts
-      inside other components stay <code>&lt;Callout&gt;</code> and keep
-      theirs.
+      <code>:::note</code>-style directives, which take no icon. A callout
+      with an icon, or one inside another component, stays a{" "}
+      <code>&lt;Callout&gt;</code> and keeps its icon where Lucide has one.
     </li>
     <li>
       <strong>Icons.</strong> Font Awesome names map to Lucide where one
@@ -502,9 +504,9 @@ const corsProbe = [
     </li>
     <li>
       <strong>The API reference.</strong> Tags carry readable names, webhook
-      pages are back, and operations within a tag are sorted alphabetically
-      rather than in your definition's order. Nested sections like Orders ›
-      Refunds become sibling groups.
+      pages are back, and operations within a tag follow the order of the
+      exported spec. Nested sections like Orders › Refunds become sibling
+      groups.
     </li>
     <li>
       <strong>Embedded endpoint snippets.</strong> Blume can't embed an
@@ -534,11 +536,9 @@ const corsProbe = [
     </li>
   </ul>
   <p>
-    One build warning is expected: when your main tab's pages share no URL
-    prefix, it sits at <code>/</code>, and Blume warns{" "}
-    <code>BLUME_NAV_MISSING_PAGE</code> because no page lives at{" "}
-    <code>/</code> itself. The tab still works: Fern sent <code>/</code> to
-    your first page, and the migration keeps that redirect.
+    When your main tab's pages share no URL prefix, the tab sits at{" "}
+    <code>/</code>, where no page lives. The tab links to your first page, and{" "}
+    <code>/</code> redirects there, as Fern sent it.
   </p>
 
   <h2>Keep every old URL working</h2>

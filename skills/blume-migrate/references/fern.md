@@ -125,7 +125,7 @@ The codemod applies these; you need them for its sitemap diff and anything it do
 - **`meta.ts`** per folder: `pages` in `docs.yml` order, the section title and Lucide icon, and a collapsible section (`collapsed`, `collapsible`, `collapsed-by-default`) → `display: "group"`. Blume lists loose pages above subgroups, so a section that interleaves pages and subsections renders its pages first: report any such reorder.
 - **Labels.** Fern labels a page in the sidebar with its `page:` name (or `sidebar-title`) and titles it with frontmatter `title`. So: no `title` → `title: <page name>` (or an H1 that opens the body, which it removes); a different `title` → `sidebar.label: <page name>`. The api **summary** page keeps its `title` with no label (its page name usually repeats the tab label).
 - **`hidden: true`** → `hidden: true`, `seo: { noindex: true }`, and `search: { exclude: true }`: Fern keeps hidden pages reachable but out of search and indexing.
-- **The root URL.** Nothing serves `/` under a root tab, so it redirects `/` to the first page (307), as Fern did; set `logo.href` to that page. `blume build` then warns `BLUME_NAV_MISSING_PAGE` for the tab at `/`, since no page lives there; the tab still works through the redirect, so expect the warning. Only a root `index.mdx` silences it, which moves the landing page to `/`; do that only if the user wants `/` as the landing URL.
+- **The root URL.** Nothing serves `/` under a root tab, so it redirects `/` to the first page (307), as Fern did; set `logo.href` to that page. The tab at `/` links to the sidebar's first page on its own. A root `index.mdx` would move the landing page to `/`; do that only if the user wants `/` as the landing URL.
 
 By hand: `availability` (`beta`, `deprecated`, …) → `sidebar.badge` (`Beta`) or `deprecated: true`; `- link:` items → `navigation.featured` (`{ label, href, icon? }`) or an explicit `navigation.sidebar` link (report which); a hidden **tab** (its printed line ends `(hidden on Fern)`) → leave it out of `navigation.tabs`; the codemod already marked its pages hidden.
 
@@ -138,7 +138,7 @@ The codemod prints one `navigation.tabs` entry per tab (`{ label: display-name, 
 
 ### Changelog
 
-The codemod moves each entry to `changelog/<YYYY-MM-DD>[-suffix].mdx` (Blume keeps ISO names whole in routes; `MM-DD-YYYY` and `MM-DD-YY` names are renamed. Fern parsed those in the publishing machine's time zone, so one can sit a day off: the sitemap diff shows it) with `type: changelog`, `date`, and a `title`: the frontmatter one, the date as Fern showed it, or the file suffix sentence-cased (`agentid-sign-in-keys` → "Agentid sign in keys"). **Review every suffix title** (`AgentID sign-in keys`); the TODO list names them. `tags` → `changelog.category` (the first) and `search.tags` (all).
+The codemod moves each entry to `changelog/<YYYY-MM-DD>[-suffix].mdx` (`MM-DD-YYYY` and `MM-DD-YY` names are renamed, so entries sort by date and a two-digit year's month isn't read as an ordering prefix. Fern parsed those in the publishing machine's time zone, so one can sit a day off: the sitemap diff shows it) with `type: changelog`, `date`, and a `title`: the frontmatter one, the date as Fern showed it, or the file suffix sentence-cased (`agentid-sign-in-keys` → "Agentid sign in keys"). **Review every suffix title** (`AgentID sign-in keys`); the TODO list names them. `tags` → `changelog.category` (the first) and `search.tags` (all).
 
 - **Same-day entries.** The day's Fern URL redirects to the unsuffixed entry, or else the first by file name. Fern showed both on one page: consider linking the second from the first, and report it.
 - `overview.mdx` (or `index.mdx`, `summary.mdx`) → its text goes into `changelog: { title, description }` in `blume.config.ts`, since an `index.mdx` would replace Blume's generated `/changelog` index (a list, where Fern's index rendered whole entries). Its `layout` and `authors` drop.
@@ -156,14 +156,14 @@ The codemod moves each entry to `changelog/<YYYY-MM-DD>[-suffix].mdx` (Blume kee
 
 The codemod writes every page as `.mdx` and converts:
 
-- **Callouts.** `<Note>`, `<Tip>`, `<Info>`, `<Warning>`, `<Success>`/`<Check>`, `<Error>`, `<Launch>`, and `<Callout intent>` (no intent → `info`, as Fern rendered it). A top-level one becomes a `:::type[Title]` directive (dedented), which takes no icon, so a top-level callout's icon drops. One nested in a component becomes `<Callout type title icon>`, with the icon mapped to Lucide.
-- **Code groups.** `<CodeBlocks>` → `<CodeGroup>`; every **untitled fence inside a group gets a language title** (`title="Python"`), or Blume labels it "Tab 1". `<CodeBlock title>` wrappers are unwrapped onto the fence (Blume's `<CodeBlock>` takes a `code` prop and crashes the page when it wraps a fence).
-- **Fence metas.** Multi-word bare titles are quoted (Fern reads ` ```js Snippet with title`; Blume reads one bare word), `filename=` → `title=`, `wordWrap` → `wrap`, `env` → `dotenv` (Shiki has no `env`).
+- **Callouts.** `<Note>`, `<Tip>`, `<Info>`, `<Warning>`, `<Success>`/`<Check>`, `<Error>`, `<Launch>`, and `<Callout intent>` (no intent → `info`, as Fern rendered it). A top-level one becomes a `:::type[Title]` directive (dedented). One whose icon maps to Lucide (a directive can't set one), or one nested in a component, becomes `<Callout type title icon>`; an icon with no Lucide equivalent drops (reported).
+- **Code groups.** `<CodeBlocks>` → `<CodeGroup>`; every untitled fence inside a group gets Fern's language title (`title="Python"`, `title="cURL"`). Blume labels an untitled grouped fence by its language anyway, so the title only keeps Fern's spelling. `<CodeBlock title>` wrappers are unwrapped onto the fence: Blume's `<CodeBlock>` renders a wrapped fence, but not the wrapper's `title`.
+- **Fence metas.** Multi-word bare titles are quoted (Fern and Blume both read every word of ` ```js Snippet with title` as the title), `filename=` → `title=` and `wordWrap` → `wrap` (Blume warns `BLUME_CODE_FENCE_OPTION` on the Fern spellings), `env` → `dotenv` (Shiki has no `env`: `BLUME_UNKNOWN_CODE_LANGUAGE`).
 - **Cards and accordions.** `<Cards>` → `<CardGroup>`, card icons → Lucide, Fern-only card props drop. `<AccordionGroup>`/`<Accordion>` → `<Accordion>`/`<AccordionItem>`; a lone `<Accordion>` is wrapped in one.
 - **`<Icon>`**: icon → Lucide, `size` × 4 (Fern counts in 4px units). **`<Frame>`**: `background` drops. **`<Tab language>`**: `language` drops (Blume syncs same-titled tabs).
 - **`<ParamField path>`** → `<ParamField name>`: Fern's `path` is the field's name, and Blume's `path=` would mark it a path parameter. `toc` drops. Nested fields in an `<Indent>` (reported) → an `<Expandable title="properties">` in the parent field's body.
 - **Snippets.** `<Markdown src="/snippets/x.mdx" planName="x" />` → `<include planName="x">/_snippets/x.mdx</include>` on a line of its own, with the snippet moved to `<content-root>/_snippets/`. Its `{{planName}}` placeholders carry over as written; Blume reads an include prop only when its name starts with a lowercase letter, so rename any that don't.
-- **Embeds and comments.** A YouTube iframe → `<YouTube id>`; `allowfullscreen`/`frameborder` → `allowFullScreen`/`frameBorder` (MDX drops the lowercase forms silently); `<!-- -->` → `{/* */}`.
+- **Embeds and comments.** A YouTube iframe → `<YouTube id>` (a playlist embed → `<YouTube url>`); `allowfullscreen`/`frameborder` → `allowFullScreen`/`frameBorder` (MDX drops the lowercase forms silently); `<!-- -->` → `{/* */}`.
 - **Assets.** `/assets/x.png` and `../x.png` → moved into `public/` at their path from `fern/` and linked root-absolute. A YAML or JSON file is copied instead (SDK generation may read it; the copy goes stale when it changes). An asset no page or config references stays put: move or delete it.
 - **Links.** Absolute links to the docs' own domain → root-relative; links to moved pages, endpoints, and Fern's `api:METHOD/path` syntax → the new routes (the `endpoints` step).
 
@@ -279,7 +279,7 @@ actions:
 ### Layout, summary, snippets, Try it
 
 - **`summary`** (a page shown at the API's root) → the codemod places it at `<route>/introduction.mdx`, a normal page in the reference sidebar. The old base URL serves Blume's overview, which renders `info.description`.
-- **`layout`**, `alphabetized`, `flattened`, `paginated` → Blume orders tag groups by the top-level `tags` list (set it in the overlay) and **sorts operations within a tag alphabetically by summary**: Fern's endpoint order is lost (report it). An endpoint's `title` → its `summary` via overlay; `hidden: true` endpoints → remove them or let them show (ask).
+- **`layout`**, `alphabetized`, `flattened`, `paginated` → Blume orders tag groups by the top-level `tags` list (set it in the overlay) and operations within a tag in the spec's order (paths as listed, each path's methods as written). An endpoint order that `layout` or `alphabetized` set and the spec doesn't share → a `pages` list of operation slugs in `<route>/<tag-slug>/meta.ts`, or report it. An endpoint's `title` → its `summary` via overlay; `hidden: true` endpoints → remove them or let them show (ask).
 - **`snippets`** (SDK package names) → Fern rendered SDK calls; Blume generates HTTP-client samples. Add `x-codeSamples` through the overlay to keep SDK calls, or report the loss.
 - **Try it.** Fern's API Explorer proxies requests; Blume's playground sends them from the browser, so the API must answer CORS for the docs origin. Probe it:
 
@@ -297,7 +297,7 @@ The `endpoints` step computes these; check its output against them.
 - **OpenAPI**: with `x-fern-sdk-method-name`, `<base>/<x-fern-sdk-group-name>/<x-fern-sdk-method-name>`; otherwise `<base>/<first tag>/<the operation id minus the tag's leading words>`, or the summary when there's no operation id. Each part kebab-cased (`v1` → `v-1`). Read from Fern's parser, not from a migrated site: the `endpoints` step's coverage check catches any URL it gets wrong.
 - **Group paths** → the overview's anchor for that tag: `/api-reference/inboxes/threads` → `/api-reference#inbox-threads` (307, as Fern's was). Content linking to a group gets the same anchor; `blume validate` checks it.
 
-Blume routes rarely match Fern's (the `endpoints` step skips any that do), and a pattern redirect over the old prefix also covers the new pages (`BLUME_REDIRECT_MATCHES_PAGE`), hence one exact redirect per endpoint. Don't shorten operation ids with an overlay: they're unique across the whole spec, and duplicates become `list-get`, `list-get-get`.
+Blume routes rarely match Fern's (the `endpoints` step skips any that do), and a pattern redirect over the old prefix also covers the new pages (`BLUME_REDIRECT_MATCHES_PAGE`), hence one exact redirect per endpoint. Don't shorten operation ids with an overlay: OpenAPI needs them unique across the whole spec, and shortened ones repeat (`list` in every tag), which warns `BLUME_OPENAPI_DUPLICATE_OPERATION_ID`.
 
 ## URLs, redirects, and deploy
 
@@ -319,9 +319,9 @@ Repoint `package.json` scripts to `blume dev`/`build`/`preview`, add `blume`, an
 ## Dropped: report these
 
 - **Hosted features**: the API Explorer's proxy, login-injected credentials, and OAuth flow; Ask Fern search and chat; AI-generated examples; **Fern's docs MCP server (`/_mcp/server`)**, which has no static equivalent (Blume's MCP server is at `/mcp` and needs server output; `.md` page mirrors and `llms.txt` carry over), so update content that advertises it; the dashboard, analytics, preview links, RBAC and authenticated docs (host-level protection instead, per the deployment docs' **Private docs** section), feature flags.
-- **API reference**: SDK snippets (unless rebuilt as `x-codeSamples`), WebSocket channel pages, endpoint order within a tag, nested sections, hidden endpoints, gRPC/OpenRPC references.
+- **API reference**: SDK snippets (unless rebuilt as `x-codeSamples`), WebSocket channel pages, a `layout` or `alphabetized` endpoint order you didn't rebuild with `meta.ts`, nested sections, hidden endpoints, gRPC/OpenRPC references.
 - **Navigation and theme**: dropdown and link icons, approximated variants, sidebar reorders, moved `link` items, extra `colors`, `layout`, custom `header`/`footer`, `css` aimed at `.fern-*`, and `js` that isn't a tracking script.
-- **Content**: API embeds replaced by samples or links, icons on top-level callouts, code tooltips, `<ChangelogTags>`, role gating, and each dropped frontmatter key.
+- **Content**: API embeds replaced by samples or links, code tooltips, `<ChangelogTags>`, role gating, and each dropped frontmatter key.
 - **Icons** with no Lucide equivalent, by name and where they were used.
 - **Unpublished drafts** and what was done with them.
 - **Second instances** and what replaces them.

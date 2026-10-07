@@ -1304,13 +1304,19 @@ const maskFences = (input, ctx) => {
 };
 
 const iframe = (whole, attrs) => {
+  const src = attr(attrs, "src") ?? "";
+  const title = attr(attrs, "title");
+  const titled = title ? ` title="${title}"` : "";
+  // A playlist embed names no video (`videoseries`): <YouTube url> embeds the list.
+  if (/youtube(?:-nocookie)?\.com\/embed\/videoseries\?/u.test(src)) {
+    return `<YouTube url="${src}"${titled} />`;
+  }
   const id =
     /(?:youtube(?:-nocookie)?\.com\/embed\/|youtu\.be\/)(?<id>[\w-]{6,})/u.exec(
-      attr(attrs, "src") ?? ""
+      src
     )?.groups.id;
   if (id) {
-    const title = attr(attrs, "title");
-    return `<YouTube id="${id}"${title ? ` title="${title}"` : ""} />`;
+    return `<YouTube id="${id}"${titled} />`;
   }
   return whole
     .replace(
@@ -1431,6 +1437,8 @@ const TAG_HANDLERS = {
       ? []
       : [edit(open, tagText(open, "Card", attrs))];
   },
+  // Blume's <CodeBlock> renders a wrapped fence but not its `title`, so the
+  // title moves onto the fence (scanTags) and the wrapper goes.
   CodeBlock: (open) =>
     attr(open.attrs, "code") === undefined ? wrapEdits(open, "", "") : [],
   Frame: (open) => dropProps(open, ["background"]),
@@ -1477,7 +1485,10 @@ const TAG_HANDLERS = {
   Tab: (open) => dropProps(open, ["language"]),
 };
 
-/** A top-level callout becomes a `:::` directive; a nested one a <Callout>. */
+/**
+ * A top-level callout becomes a `:::` directive; a nested one, or one whose
+ * icon maps (a directive can't set an icon), a <Callout>.
+ */
 const calloutEdits = (open, src, ctx) => {
   const intent = String(
     attr(open.attrs, "intent") ?? attr(open.attrs, "type") ?? "info"
@@ -1485,21 +1496,20 @@ const calloutEdits = (open, src, ctx) => {
   const kind =
     CALLOUTS.get(open.name) ?? INTENTS.get(intent.toLowerCase()) ?? "info";
   const title = attr(open.attrs, "title");
-  const icon = attr(open.attrs, "icon");
+  const mapped = mapIcon(attr(open.attrs, "icon"));
+  const iconValue = mapped.lucide ?? (mapped.asset && ctx.asset(mapped.asset));
+  if (!iconValue) {
+    ctx.report.icon(`${ctx.where} <${open.name}>`, mapped);
+  }
   const alone = lineStart(src, open.start) === open.start;
   if (
+    !iconValue &&
     open.parents.length === 0 &&
     open.close &&
     alone &&
     ownLine(src, open.close.start) &&
     endsLine(src, open.close.end)
   ) {
-    if (icon) {
-      ctx.report.drop(
-        ctx.where,
-        `icon ${icon} on a top-level callout (directives take none)`
-      );
-    }
     const directive = `:::${kind}${title ? `[${title}]` : ""}`;
     return [
       {
@@ -1510,11 +1520,6 @@ const calloutEdits = (open, src, ctx) => {
         start: open.start,
       },
     ];
-  }
-  const mapped = mapIcon(icon);
-  const iconValue = mapped.lucide ?? (mapped.asset && ctx.asset(mapped.asset));
-  if (!iconValue) {
-    ctx.report.icon(`${ctx.where} <${open.name}>`, mapped);
   }
   const titleAttr = title ? ` title="${title.replaceAll('"', "&quot;")}"` : "";
   const iconAttr = iconValue ? ` icon="${iconValue}"` : "";
@@ -1561,9 +1566,12 @@ const fenceInfo = (fence) => {
     )
     .trim();
   if (/\s/u.test(bare)) {
-    // Fern reads every word after the language as the title; Blume one bare word.
+    // Fern and Blume both read every word after the language as the title;
+    // the quotes only make it explicit.
     meta = `title="${bare}" ${meta.replace(bare, "").trim()}`.trim();
   }
+  // Blume labels an untitled grouped block by its language too; the title
+  // keeps Fern's label where the two differ (`curl` → cURL).
   const groupTitle =
     fence.group && lang ? (LANGUAGES.get(lang) ?? lang) : undefined;
   const title = fence.title ?? groupTitle;
