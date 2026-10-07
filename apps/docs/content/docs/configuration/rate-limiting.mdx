@@ -78,16 +78,16 @@ import { defineConfig } from "blume";
 import { unkey } from "blume/ratelimit";
 
 export default defineConfig({
-  rateLimit: unkey({ namespace: "docs", requests: 30, window: 600 }),
+  rateLimit: unkey(),
 });
 ```
 
-`namespace` is required. `requests` defaults to 30 and `window` to 600 seconds. Blume converts the window to milliseconds for Unkey. Each host, route, and reader has a separate identifier within the namespace.
+`namespace` defaults to `"docs"`, `requests` to 30, and `window` to 600 seconds. Pass `namespace` to use a different namespace. Blume converts the window to milliseconds for Unkey. Each host, route, and reader has a separate identifier within the namespace.
 
 Use `rootKeyEnv` to name a different server environment variable:
 
 ```ts blume.config.ts lineNumbers
-rateLimit: unkey({ namespace: "docs", rootKeyEnv: "DOCS_UNKEY_ROOT_KEY" }),
+rateLimit: unkey({ rootKeyEnv: "DOCS_UNKEY_ROOT_KEY" }),
 ```
 
 Without the root key, Blume warns and counts in memory. API failures are logged and requests pass through, like the other shared adapters. Unkey uses sliding windows and regional counters that converge across regions, not one globally exact counter. The `Retry-After` header uses Unkey's window reset time; it does not guarantee that all capacity returns at once.

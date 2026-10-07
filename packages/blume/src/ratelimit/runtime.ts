@@ -204,7 +204,7 @@ export const createLimiter = (
               duration: window * 1000,
               identifier: key,
               limit: requests,
-              namespace: adapter.options.namespace,
+              namespace: adapter.options.namespace ?? "docs",
             }),
             headers: {
               authorization: `Bearer ${rootKey}`,

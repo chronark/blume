@@ -6,8 +6,8 @@ import { rateLimitOptionsSchema } from "./memory.ts";
 import type { RateLimitOptions } from "./memory.ts";
 
 export interface UnkeyOptions extends RateLimitOptions {
-  /** The Unkey rate limit namespace. */
-  namespace: string;
+  /** The Unkey rate limit namespace. Defaults to `docs`. */
+  namespace?: string;
   /** Name of the env var holding the root key. Defaults to `UNKEY_ROOT_KEY`. */
   rootKeyEnv?: string;
 }
@@ -15,7 +15,7 @@ export interface UnkeyOptions extends RateLimitOptions {
 export const unkeyAdapterSchema = adapterDescriptorSchema(
   "unkey",
   rateLimitOptionsSchema.extend({
-    namespace: z.string().min(1),
+    namespace: z.string().min(1).optional(),
     rootKeyEnv: z.string().min(1).optional(),
   })
 );
@@ -27,7 +27,7 @@ export const unkeySecrets = (options: UnkeyOptions): [string] => [
 ];
 
 /** Counts requests through Unkey's REST API without an SDK dependency. */
-export const unkey = (options: UnkeyOptions): UnkeyAdapter => ({
+export const unkey = (options: UnkeyOptions = {}): UnkeyAdapter => ({
   kind: "unkey",
   options,
   requiredSecrets: unkeySecrets(options),

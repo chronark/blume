@@ -9,7 +9,11 @@ import { createLimiter, rateLimited } from "../src/ratelimit/runtime.ts";
 describe("Unkey rate limiting", () => {
   it("uses default limits and accepts allowed replies with past reset times", async () => {
     const requests: Request[] = [];
-    const limiter = createLimiter(unkey({ namespace: "docs" }), {
+    const adapter = unkey();
+    expect(
+      blumeConfigSchema.parse({ rateLimit: adapter }).rateLimit
+    ).toStrictEqual(adapter);
+    const limiter = createLimiter(adapter, {
       fetch: Object.assign(
         (input: string | URL | Request, init?: RequestInit) => {
           requests.push(new Request(input, init));
@@ -147,7 +151,7 @@ describe("Unkey rate limiting", () => {
     );
     const limiter = createLimiter(
       unkey({
-        namespace: "docs",
+        namespace: "custom-docs",
         requests: 7,
         rootKeyEnv: "DOCS_KEY",
         window: 43,
@@ -177,7 +181,7 @@ describe("Unkey rate limiting", () => {
       duration: 43_000,
       identifier: "blume:docs.example.com:ask:192.0.2.1",
       limit: 7,
-      namespace: "docs",
+      namespace: "custom-docs",
     });
   });
 });
