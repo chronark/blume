@@ -10,7 +10,8 @@
 //                   order, section titles and icons, collapse), maps
 //                   frontmatter to Blume's strict schema, converts the Fern
 //                   components a migration always meets (callouts, code
-//                   groups, cards, accordions, icons, snippets, embeds),
+//                   groups, cards, accordions, icons, param fields,
+//                   snippets, embeds),
 //                   moves the assets pages use into public/, and saves
 //                   fern-migration.json for the next step.
 //   endpoints       After `blume build` and operation-routes.mjs: joins
@@ -1175,7 +1176,7 @@ const RENAMES = table(
   "AccordionGroup:Accordion Cards:CardGroup CodeBlocks:CodeGroup"
 );
 const REPORTED = new Set(
-  "Aside Availability Badge Button ChangelogTags Code Copy Download EndpointRequestSnippet EndpointResponseSnippet EndpointSchemaSnippet Feature Files If Indent PaginatedSearchableTable PaginatedTable ParamField Prompt RunnableEndpoint Schema SchemaSnippet ScrollWalkthrough SearchableTable StickySearchableTable StickyTable Template Versions WebhookPayloadSnippet".split(
+  "Aside Availability Badge Button ChangelogTags Code Copy Download EndpointRequestSnippet EndpointResponseSnippet EndpointSchemaSnippet Feature Files If Indent PaginatedSearchableTable PaginatedTable Prompt RunnableEndpoint Schema SchemaSnippet ScrollWalkthrough SearchableTable StickySearchableTable StickyTable Template Versions WebhookPayloadSnippet".split(
     " "
   )
 );
@@ -1461,6 +1462,17 @@ const TAG_HANDLERS = {
     // Blume reads an <include> only on a line of its own.
     const alone = ownLine(src, open.start) && endsLine(src, open.end);
     return [edit(open, alone ? include : `\n${include}\n`)];
+  },
+  // Fern's `path` is the field's name; Blume's (Mintlify's) is a path
+  // parameter's location, which would badge every field "path".
+  ParamField: (open) => {
+    const attrs = dropAttr(open.attrs, "toc").replace(
+      attrPattern("path"),
+      (match) => match.replace("path", "name")
+    );
+    return attrs === open.attrs
+      ? []
+      : [edit(open, tagText(open, "ParamField", attrs.trimEnd()))];
   },
   Tab: (open) => dropProps(open, ["language"]),
 };

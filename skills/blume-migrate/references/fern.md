@@ -161,6 +161,7 @@ The codemod writes every page as `.mdx` and converts:
 - **Fence metas.** Multi-word bare titles are quoted (Fern reads ` ```js Snippet with title`; Blume reads one bare word), `filename=` → `title=`, `wordWrap` → `wrap`, `env` → `dotenv` (Shiki has no `env`).
 - **Cards and accordions.** `<Cards>` → `<CardGroup>`, card icons → Lucide, Fern-only card props drop. `<AccordionGroup>`/`<Accordion>` → `<Accordion>`/`<AccordionItem>`; a lone `<Accordion>` is wrapped in one.
 - **`<Icon>`**: icon → Lucide, `size` × 4 (Fern counts in 4px units). **`<Frame>`**: `background` drops. **`<Tab language>`**: `language` drops (Blume syncs same-titled tabs).
+- **`<ParamField path>`** → `<ParamField name>`: Fern's `path` is the field's name, and Blume's `path=` would mark it a path parameter. `toc` drops. Nested fields in an `<Indent>` (reported) → an `<Expandable title="properties">` in the parent field's body.
 - **Snippets.** `<Markdown src="/snippets/x.mdx" planName="x" />` → `<include planName="x">/_snippets/x.mdx</include>` on a line of its own, with the snippet moved to `<content-root>/_snippets/`. Its `{{planName}}` placeholders carry over as written; Blume reads an include prop only when its name starts with a lowercase letter, so rename any that don't.
 - **Embeds and comments.** A YouTube iframe → `<YouTube id>`; `allowfullscreen`/`frameborder` → `allowFullScreen`/`frameBorder` (MDX drops the lowercase forms silently); `<!-- -->` → `{/* */}`.
 - **Assets.** `/assets/x.png` and `../x.png` → moved into `public/` at their path from `fern/` and linked root-absolute. A YAML or JSON file is copied instead (SDK generation may read it; the copy goes stale when it changes). An asset no page or config references stays put: move or delete it.
@@ -170,7 +171,6 @@ The codemod writes every page as `.mdx` and converts:
 
 | Fern | Blume |
 | --- | --- |
-| `<ParamField path="name" type required>` | `<ParamField name="name" …>`: **Fern's `path` is the field's name**; Blume's `path=` means a path parameter. `<Indent>` children → `<Expandable title="properties">` in the parent's body |
 | `<EndpointRequestSnippet endpoint="POST /x">`, `<EndpointResponseSnippet>` | a hand-written fenced sample plus a link to the operation page: Blume can't embed an operation's sample in prose |
 | `<EndpointSchemaSnippet>`, `<Schema>`, `<SchemaSnippet>`, `<WebhookPayloadSnippet>`, `<RunnableEndpoint>` | a link to the operation page; a small schema can become a `TypeTable` |
 | `<Badge intent outlined>`, `<Availability type>` | `<Badge variant stroke>` (`success`, `warning`, `error` → `danger`, `tip` → `accent`); an availability that labels the page → `sidebar.badge` |

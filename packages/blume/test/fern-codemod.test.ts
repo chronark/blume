@@ -126,6 +126,12 @@ console.log("hi")
 See [the threads endpoint](/api-reference/inboxes/threads/get).
 
 <EndpointRequestSnippet endpoint="GET /v0/inboxes" />
+
+<ParamField path="username" type="string" required={true} toc={true}>
+  The user's display name.
+</ParamField>
+
+<ParamField path={"user.email"} type="string" default="none" />
 `;
 
 const FILES = {
@@ -287,6 +293,7 @@ describe("fern-codemod", () => {
     expect(report).toContain("Fern Definition in definition");
     expect(report).toContain("pages/draft.mdx: unpublished draft");
     expect(report).toContain("<EndpointRequestSnippet> (line 47)");
+    expect(report).not.toContain("<ParamField>");
     expect(report).toContain(
       'changelog title "Launch" came from the file name'
     );
@@ -385,6 +392,13 @@ describe("fern-codemod", () => {
       '<include planName="Pro">/_snippets/plan.mdx</include>'
     );
     expect(body).toContain("![Diagram](/assets/diagram.png)");
+    // Fern's `path` names the field; in Blume it would mark a path parameter.
+    expect(body).toContain(
+      '<ParamField name="username" type="string" required={true}>'
+    );
+    expect(body).toContain(
+      '<ParamField name={"user.email"} type="string" default="none" />'
+    );
     expect(await read("docs/_snippets/plan.mdx")).toBe(
       "Upgrade to {{planName}}.\n"
     );
