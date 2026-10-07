@@ -53,6 +53,8 @@ reference: [
 ],
 ```
 
+An id Blume doesn't generate a sample for is left out, with a `BLUME_GRAPHQL_UNKNOWN_CODE_SAMPLE` warning that lists the ones it does.
+
 ## Type pages
 
 Named types get their own deep-linkable pages, grouped by kind in the sidebar: fields and input fields with their types linked, enum values, union members, interface implementations, and a **Used by** section listing the operations that return or accept the type and the other types that reference it. Spec-defined scalars (`String`, `Int`, …) don't get pages; custom scalars do, including their `specifiedBy` URL.

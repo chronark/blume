@@ -1,3 +1,7 @@
+import {
+  SAMPLE_LANGUAGE_IDS,
+  unknownSampleLanguages,
+} from "../components/openapi/snippets.ts";
 import { withBasePath } from "../core/base-path.ts";
 import matter from "../core/frontmatter.ts";
 import { stripOrderingPrefix } from "../core/ordering-prefix.ts";
@@ -137,6 +141,41 @@ const failureSuggestion = (
     return INVALID_SUGGESTIONS[kind];
   }
   return "Check the spec URL/path is reachable from the build environment; behind a proxy, set HTTP(S)_PROXY.";
+};
+
+/** The adapter that configures each kind, as a warning names it. */
+const ADAPTER_NAMES = {
+  asyncapi: "asyncapi()",
+  graphql: "graphql()",
+  openapi: "openapi()",
+} satisfies Record<BlumeReferenceSource["kind"], string>;
+
+/**
+ * A warning for the `codeSamples` ids Blume generates no sample for, which
+ * the operation pages would otherwise leave out without a sign. AsyncAPI's
+ * ids name tools, matched against each operation's protocol binding, so only
+ * the HTTP kinds are checked here.
+ */
+const unknownLanguageDiagnostics = (
+  reference: BlumeReferenceSource
+): Diagnostic[] => {
+  if (reference.kind === "asyncapi") {
+    return [];
+  }
+  const unknown = unknownSampleLanguages(reference.display.codeSamples);
+  if (unknown.length === 0) {
+    return [];
+  }
+  const names = unknown.map((id) => `"${id}"`).join(", ");
+  const one = unknown.length === 1;
+  return [
+    {
+      code: `${CODE_PREFIXES[reference.kind]}_UNKNOWN_CODE_SAMPLE`,
+      message: `\`codeSamples\` in ${ADAPTER_NAMES[reference.kind]} lists ${names}, which ${one ? "isn't a language" : "aren't languages"} Blume generates samples in, so ${one ? "it's" : "they're"} left out of every operation page.`,
+      severity: "warning",
+      suggestion: `Use the ids Blume generates (${SAMPLE_LANGUAGE_IDS.join(", ")}) or an alias the reference docs list, or show your own samples with \`x-codeSamples\` in the spec.`,
+    },
+  ];
 };
 
 const toEntry = (rendered: RenderedPage, ref: string): SourceEntry => {
@@ -440,6 +479,14 @@ export const openApiSource = (
         severity: "warning" as const,
       }))
     );
+    // Display options belong to the adapter, which every one of its sources
+    // repeats: one warning per distinct message.
+    const languageWarnings = new Map(
+      references
+        .flatMap(unknownLanguageDiagnostics)
+        .map((diagnostic) => [diagnostic.message, diagnostic])
+    );
+    diagnostics.push(...languageWarnings.values());
     const data: OpenApiData = {};
     const folderMeta: Record<string, FolderMeta> = {};
     const redirects: SourceRedirect[] = [];

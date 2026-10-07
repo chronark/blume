@@ -10,6 +10,7 @@ import {
   sampleLanguageId,
   sampleLanguageInfo,
   sampleLanguages,
+  unknownSampleLanguages,
 } from "../src/components/openapi/snippets.ts";
 import type { RequestSample } from "../src/components/openapi/snippets.ts";
 
@@ -67,6 +68,14 @@ const build = (id: string, sample: RequestSample): string => {
 };
 
 describe("sample languages", () => {
+  it("reads ReadMe's ids, and names the ids it generates nothing for", () => {
+    expect(sampleLanguageId("cplusplus")).toBe("cpp");
+    expect(
+      unknownSampleLanguages(["curl", "cplusplus", "objectivec", "Clojure"])
+    ).toStrictEqual(["objectivec", "Clojure"]);
+    expect(unknownSampleLanguages(false)).toStrictEqual([]);
+  });
+
   it("offers every language Mintlify generates, under its aliases", () => {
     expect(SAMPLE_LANGUAGE_IDS).toEqual([
       "curl",

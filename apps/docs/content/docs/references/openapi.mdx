@@ -105,12 +105,14 @@ Every sample is plain, copy-pasteable code for the request, written with the lan
 | `csharp`     | C#         | `HttpClient`        | `c#`, `cs`            |
 | `dotnet`     | .NET       | RestSharp           | `.net`, `dot-net`     |
 | `c`          | C          | libcurl             |                       |
-| `cpp`        | C++        | cpr                 | `c++`                 |
+| `cpp`        | C++        | cpr                 | `c++`, `cplusplus`    |
 | `kotlin`     | Kotlin     | OkHttp              | `kt`                  |
 | `rust`       | Rust       | reqwest             | `rs`                  |
 | `dart`       | Dart       | `package:http`      | `flutter`             |
 
 Each value is quoted by its own language's rules, so a header like `If-Match: "33a64df5"` or a body with a `$` in it reaches the API as written.
+
+An id Blume doesn't generate a sample for, such as ReadMe's `objectivec`, is left out of every page, with a `BLUME_OPENAPI_UNKNOWN_CODE_SAMPLE` warning that lists the ids above. To show a sample in another language, write it into the spec as [your own sample](#your-own-samples).
 
 Schema tables follow the way the data travels, as the examples do: a request body leaves out `readOnly` properties, which the server sets, and a response leaves out `writeOnly` ones, which it never returns. A [webhook or callback](#webhooks-and-callbacks) body is a request your API sends, so it reads like a response.
 

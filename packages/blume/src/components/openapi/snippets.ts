@@ -1008,12 +1008,16 @@ const LANGUAGES: SampleLanguage[] = [
 /** Every id `codeSamples` accepts for a generated sample. */
 export const SAMPLE_LANGUAGE_IDS = LANGUAGES.map((language) => language.id);
 
-/** Other spellings of the ids, including every alias Mintlify accepts. */
+/**
+ * Other spellings of the ids, including every alias Mintlify accepts and
+ * ReadMe's ids for the languages Blume generates (`cplusplus`).
+ */
 const ALIASES = new Map([
   [".net", "dotnet"],
   ["bash", "curl"],
   ["c#", "csharp"],
   ["c++", "cpp"],
+  ["cplusplus", "cpp"],
   ["cs", "csharp"],
   ["dot-net", "dotnet"],
   ["flutter", "dart"],
@@ -1057,8 +1061,16 @@ export const sampleLanguageInfo = (raw: string): SampleLanguageInfo | null => {
 export const DEFAULT_SAMPLE_LANGUAGES = ["curl", "js", "python"];
 
 /**
+ * The configured ids Blume generates no sample for, as written: the ones
+ * {@link sampleLanguages} drops, which the reference source warns about.
+ */
+export const unknownSampleLanguages = (ids: string[] | false): string[] =>
+  ids === false ? [] : ids.filter((raw) => sampleLanguageInfo(raw) === null);
+
+/**
  * The sample languages to render, resolved from config ids (unknown ids
- * dropped), in order. `false` and an empty list both render none.
+ * dropped, with a warning from the reference source), in order. `false` and
+ * an empty list both render none.
  */
 export const sampleLanguages = (ids: string[] | false): SampleLanguage[] => {
   if (ids === false) {
