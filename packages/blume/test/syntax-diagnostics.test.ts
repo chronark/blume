@@ -232,6 +232,17 @@ describe("Nuxt Content (MDC) syntax", () => {
     expect(found("  ::card-group\n  :::card\n  :::\n  ::\n")).toStrictEqual([
       { code: "BLUME_MDC_SYNTAX", column: 3, line: 1 },
     ]);
+    expect(found('::callout{icon="x"}\nA.\n::\n', "mdx")).toStrictEqual([
+      { code: "BLUME_MDC_SYNTAX", column: 1, line: 1 },
+    ]);
+  });
+
+  it("finds a block opener that shares its line with text", () => {
+    // No parser reads this as a block, and in `.mdx` its props become a
+    // JavaScript expression.
+    expect(found('::callout{icon="x"} Text. ::\n', "mdx")).toStrictEqual([
+      { code: "BLUME_MDC_SYNTAX", column: 1, line: 1 },
+    ]);
   });
 
   it("leaves callouts, ratios, times, schemes, and code alone", () => {

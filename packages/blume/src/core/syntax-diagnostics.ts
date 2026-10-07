@@ -86,8 +86,10 @@ const MDC_BLOCK =
   /^[\t ]*(?<written>::(?<name>[a-z][\w-]*)(?:\[[^\]\n]*\])?(?:\{[^}\n]*\})?)[\t ]*$/gimu;
 // An inline MDC component: a colon and a name, then a `[slot]`, `{props}`,
 // or both. A word character before the colon (`og:image`, `16:9`) is prose.
+// Two colons is a block opener that shares its line with text, which no
+// parser reads as a block.
 const MDC_INLINE =
-  /(?<![\w:\\])(?<written>:(?<name>[a-z][\w-]*)(?:\[[^\]\n]*\](?:\{[^}\n]*\})?|\{[^}\n]*\}))/giu;
+  /(?<![\w:\\])(?<written>:{1,2}(?<name>[a-z][\w-]*)(?:\[[^\]\n]*\](?:\{[^}\n]*\})?|\{[^}\n]*\}))/giu;
 
 // One attribute in a list: `#id`, `.class`, or `key=value` (quoted or not).
 const ATTRIBUTE = String.raw`(?:#[\w-]+|\.[A-Za-z_-][\w-]*|[\w-]+=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'{}]+))`;
@@ -281,22 +283,31 @@ const wikilinkFindings = ({ pageRoute, starts, text }: Scan): Finding[] =>
     ];
   });
 
-const mdcFindings = ({ starts, text }: Scan): Finding[] => [
-  ...[...text.matchAll(MDC_BLOCK)].map((match) => ({
-    ...siteOf(starts, match.index + match[0].indexOf("::")),
-    code: "BLUME_MDC_SYNTAX",
-    message: `\`${match.groups?.written}\` opens a Nuxt Content (MDC) block component, which Blume doesn't render, so the page shows its \`::\` lines as text.`,
-    suggestion:
-      "Rewrite the block as the matching Blume component (`<Callout>`, `<Card>`, `<Tabs>`, …) or a `:::` callout.",
-  })),
-  ...[...text.matchAll(MDC_INLINE)].map((match) => ({
-    ...siteOf(starts, match.index),
-    code: "BLUME_MDC_SYNTAX",
-    message: `\`${match.groups?.written}\` is an inline component in Nuxt Content (MDC) syntax, which Blume doesn't render, so the page shows it as written.`,
-    suggestion:
-      "Rewrite it as the matching Blume component (`<Badge>`, `<Icon>`, …) or as plain text.",
-  })),
-];
+const mdcFindings = ({ starts, text }: Scan): Finding[] => {
+  const blocks = [...text.matchAll(MDC_BLOCK)].map((match) => ({
+    at: match.index + match[0].indexOf("::"),
+    written: match.groups?.written,
+  }));
+  const opened = new Set(blocks.map(({ at }) => at));
+  return [
+    ...blocks.map(({ at, written }) => ({
+      ...siteOf(starts, at),
+      code: "BLUME_MDC_SYNTAX",
+      message: `\`${written}\` opens a Nuxt Content (MDC) block component, which Blume doesn't render, so the page shows its \`::\` lines as text.`,
+      suggestion:
+        "Rewrite the block as the matching Blume component (`<Callout>`, `<Card>`, `<Tabs>`, …) or a `:::` callout.",
+    })),
+    ...[...text.matchAll(MDC_INLINE)]
+      .filter((match) => !opened.has(match.index))
+      .map((match) => ({
+        ...siteOf(starts, match.index),
+        code: "BLUME_MDC_SYNTAX",
+        message: `\`${match.groups?.written}\` is an inline component in Nuxt Content (MDC) syntax, which Blume doesn't render, so the page shows it as written.`,
+        suggestion:
+          "Rewrite it as the matching Blume component (`<Badge>`, `<Icon>`, …) or as plain text.",
+      })),
+  ];
+};
 
 /**
  * Whether the list at `column` of `line` is a heading's trailing `{#id}`
