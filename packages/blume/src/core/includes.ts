@@ -5,12 +5,7 @@ import { dirname, extname, join, relative, resolve } from "pathe";
 import { nextFenceState } from "./code-fences.ts";
 import type { FenceState } from "./code-fences.ts";
 import matter from "./frontmatter.ts";
-import {
-  INLINE_CODE,
-  MD_IMAGE,
-  rewriteCardImages,
-  targetOffsetIn,
-} from "./sources/normalize.ts";
+import { rewriteCardImages, rewriteImageTargets } from "./sources/normalize.ts";
 import type { Diagnostic } from "./types.ts";
 import { substituteVariables } from "./variables.ts";
 
@@ -388,38 +383,12 @@ const rebaseImageTarget = (
 };
 
 /**
- * Rewrite one line's relative image targets from the included file's
- * directory to the including file's, so a partial's colocated
- * `![](./diagram.png)` still resolves once its markdown lives in the
- * includer. Mirrors `rewriteLine` in `content-assets.ts`: matches run on an
- * inline-code-masked copy while replacements splice into the real line.
+ * Rebase every relative image target in expanded lines, skipping fences, from
+ * the included file's directory to the including file's, so a partial's
+ * colocated `![](./diagram.png)` still resolves once its markdown lives in
+ * the includer. Every destination form is read and written back in its own
+ * form (`![](<./a b.png> "Title")`; see `rewriteImageTargets`).
  */
-const rebaseImageLine = (
-  line: string,
-  fromDir: string,
-  toDir: string
-): string => {
-  const masked = line.replaceAll(INLINE_CODE, (span) =>
-    " ".repeat(span.length)
-  );
-  let out = "";
-  let cursor = 0;
-  for (const match of masked.matchAll(MD_IMAGE)) {
-    const target = match.groups?.target ?? "";
-    const url = rebaseImageTarget(target, fromDir, toDir);
-    if (url === null) {
-      continue;
-    }
-    const offset =
-      (match.index ?? 0) +
-      targetOffsetIn(match[0], target, match.groups?.title);
-    out += line.slice(cursor, offset) + url;
-    cursor = offset + target.length;
-  }
-  return out + line.slice(cursor);
-};
-
-/** Rebase every relative image target in expanded lines, skipping fences. */
 const rebaseImages = (
   lines: string[],
   fromDir: string,
@@ -433,7 +402,11 @@ const rebaseImages = (
     const next = nextFenceState(line, fence);
     const inFence = fence !== null || next !== null;
     fence = next;
-    return inFence ? line : rebaseImageLine(line, fromDir, toDir);
+    return inFence
+      ? line
+      : rewriteImageTargets(line, (target) =>
+          rebaseImageTarget(target, fromDir, toDir)
+        );
   });
   // A `<Card img>` is an image embed too, and its tag may wrap onto later
   // lines, so it's rebased over the whole text.

@@ -1076,38 +1076,119 @@ const DESTINATION_CHAR = String.raw`\\[!-/:-@[-\x60{-~]|\\(?![!-/:-@[-\x60{-~])|
 // balanced parens, so a Wikipedia-style URL (`/wiki/Foo_(bar)`) isn't
 // truncated at its first `)`. {@link destinationLink} reads it.
 const DESTINATION = String.raw`<(?:\\[!-/:-@[-\x60{-~]|\\(?![!-/:-@[-\x60{-~])|[^<>\n\\])*>|(?!<)(?:${DESTINATION_CHAR}|\((?:${DESTINATION_CHAR})*\))+`;
+// A bare destination on its own, for telling whether a target can be written
+// back without angle brackets (see `writeDestination`).
+const BARE_DESTINATION = new RegExp(
+  String.raw`^(?!<)(?:${DESTINATION_CHAR}|\((?:${DESTINATION_CHAR})*\))+$`,
+  "u"
+);
+// A link title (CommonMark): `"…"`, `'…'`, or `(…)`, each holding backslash
+// escapes. Every alternative starts with its own delimiter, so they never
+// overlap.
+const TITLE = String.raw`"(?:[^"\\]|\\[\s\S])*"|'(?:[^'\\]|\\[\s\S])*'|\((?:[^()\\]|\\[\s\S])*\)`;
+// What follows a link's `[label]`: the destination, an optional title, and
+// the spaces CommonMark allows around both, in parentheses. The destination
+// holds no whitespace and the title starts with a delimiter, so each space
+// run has one home.
+const DESTINATION_TAIL = String.raw`\([ \t]*(?<target>${DESTINATION})(?:[ \t]+(?<title>${TITLE}))?[ \t]*\)`;
 
 // The label admits one level of nested brackets so an image-wrapped link
 // (`[![alt](/img.png)](/target)`) matches as the *outer* link — with a flat
 // `[^\]]*` label the match stopped at the image's `]` and the outer target was
 // never seen. The target is the destination as written (see `DESTINATION`).
+// Matches carry indices (`d`), which locate the target past any spaces.
 const MD_LINK = new RegExp(
-  String.raw`\[(?<label>(?:[^[\]]|\[[^\]]*\])*)\]\((?<target>${DESTINATION})(?<title>\s+"[^"]*")?\)`,
-  "gu"
+  String.raw`\[(?<label>(?:[^[\]]|\[[^\]]*\])*)\]${DESTINATION_TAIL}`,
+  "dgu"
 );
 // An image inside a link label; its target was matched (and so validated) as a
 // link of its own before labels admitted nesting, and still should be.
 const LABEL_IMAGE = new RegExp(
-  String.raw`!\[[^\]]*\]\((?<target>${DESTINATION})(?<title>\s+"[^"]*")?\)`,
-  "gu"
+  String.raw`!\[[^\]]*\]${DESTINATION_TAIL}`,
+  "dgu"
 );
-// The image embeds the include and content-asset rewriters move: a bare
-// destination with balanced parens, spliced back as written.
-export const MD_IMAGE =
-  /!\[[^\]]*\]\((?<target>(?:[^()\s]|\([^()\s]*\))+)(?<title>\s+"[^"]*")?\)/gu;
+// An image embed, the way the include and content-asset rewriters move one:
+// every destination form (`<…>`, escapes, a title in any of its quotes),
+// read and written back by `rewriteImageTargets`.
+const MD_IMAGE = new RegExp(
+  String.raw`!\[(?:[^[\]]|\[[^\]]*\])*\]${DESTINATION_TAIL}`,
+  "dgu"
+);
 
-/** Column (0-based, within `matched`) where a link/image match's target starts. */
-export const targetOffsetIn = (
-  matched: string,
-  target: string,
-  title: string | undefined
-): number => matched.length - 1 - (title?.length ?? 0) - target.length;
+/** Where a match's `target` group starts, as an offset into the matched text. */
+const targetStart = (match: RegExpExecArray | RegExpMatchArray): number =>
+  (match.indices?.groups?.target?.[0] ?? match.index ?? 0) - (match.index ?? 0);
+
+/** A destination as written, and the target the renderer reads from it. */
+interface ReadDestination {
+  /** Whether it was written in `<…>`. */
+  angled: boolean;
+  /** The text the target is read from: inside any brackets. */
+  source: string;
+  target: string;
+}
+
+/**
+ * A destination as written, read the way the renderer reads it: angle
+ * brackets dropped and backslash escapes resolved, so `<https://x.dev/a(b>`
+ * is `https://x.dev/a(b` and `image%20\(1\).png` is `image%20(1).png`.
+ */
+const readDestination = (written: string): ReadDestination => {
+  const angled = written.startsWith("<");
+  const source = angled ? written.slice(1, -1) : written;
+  return { angled, source, target: source.replaceAll(ESCAPED, "$<char>") };
+};
+
+/**
+ * Write `target` back as a destination: as it stands where the bare form
+ * reads it unchanged, else with its parentheses and backslashes escaped, and
+ * in angle brackets where it was written in them or holds whitespace, which
+ * no bare destination can.
+ */
+const writeDestination = (target: string, angled: boolean): string => {
+  if (!angled && BARE_DESTINATION.test(target) && !target.includes("\\")) {
+    return target;
+  }
+  if (!(angled || /[\s<>]/u.test(target))) {
+    return target.replaceAll(/[\\()]/gu, String.raw`\$&`);
+  }
+  return `<${target.replaceAll(/[\\<>]/gu, String.raw`\$&`)}>`;
+};
+
+/**
+ * Rewrite the target of every image embed on one line with `rewrite`, which
+ * gets the target as the renderer reads it (see `readDestination`) and
+ * returns the new one, or `null` to leave it as written. Inline code is
+ * skipped: matches run on a copy with code spans blanked, and replacements
+ * splice into the real line by index, which the same-length mask keeps in
+ * step. A rewritten target is written back in the form its destination took.
+ */
+export const rewriteImageTargets = (
+  line: string,
+  rewrite: (target: string) => string | null
+): string => {
+  const masked = line.replaceAll(INLINE_CODE, (span) =>
+    " ".repeat(span.length)
+  );
+  let out = "";
+  let cursor = 0;
+  for (const match of masked.matchAll(MD_IMAGE)) {
+    const written = match.groups?.target ?? "";
+    const { angled, target } = readDestination(written);
+    const next = rewrite(target);
+    if (next === null) {
+      continue;
+    }
+    const at = match.index + targetStart(match);
+    out += line.slice(cursor, at) + writeDestination(next, angled);
+    cursor = at + written.length;
+  }
+  return out + line.slice(cursor);
+};
 
 /**
  * The link a destination written at `at` (the 1-based position of its first
- * character) leads to, as the renderer reads it: angle brackets dropped and
- * backslash escapes resolved, so `<https://x.dev/a(b>` is
- * `https://x.dev/a(b` and `image%20\(1\).png` is `image%20(1).png`. It's
+ * character) leads to, as the renderer reads it (see `readDestination`). It's
  * located where the target's text starts, inside any brackets. An empty `<>`
  * leads nowhere.
  */
@@ -1115,9 +1196,7 @@ const destinationLink = (
   written: string,
   at: Pick<PageLink, "column" | "line">
 ): PageLink | undefined => {
-  const angled = written.startsWith("<");
-  const source = angled ? written.slice(1, -1) : written;
-  const target = source.replaceAll(ESCAPED, "$<char>");
+  const { angled, source, target } = readDestination(written);
   if (target === "") {
     return undefined;
   }
@@ -1203,12 +1282,11 @@ const scanLinkLine = (
     if (written === undefined || match.index === undefined) {
       continue;
     }
-    // Locate the target by arithmetic from the match end rather than searching
-    // for its text — a label that contains the same text (e.g. `[/a/b](/a/b)`)
-    // would otherwise report the column inside the label.
-    const targetOffset = targetOffsetIn(match[0], written, match.groups?.title);
+    // Locate the target by its group's index rather than searching for its
+    // text — a label that contains the same text (e.g. `[/a/b](/a/b)`) would
+    // otherwise report the column inside the label.
     const entry = destinationLink(written, {
-      column: match.index + targetOffset + 1,
+      column: match.index + targetStart(match) + 1,
       line: lineNumber,
     });
     if (entry) {
@@ -1222,18 +1300,14 @@ const scanLinkLine = (
     }
     // An image nested in the label (`[![alt](/img.png)](/target)`) carries its
     // own target; surface it too so a missing image is still caught.
-    const label = match[0].slice(0, targetOffset - "](".length);
+    const label = `[${match.groups?.label ?? ""}`;
     for (const image of label.matchAll(LABEL_IMAGE)) {
       const imageWritten = image.groups?.target;
       if (imageWritten === undefined || image.index === undefined) {
         continue;
       }
       const imageLink = destinationLink(imageWritten, {
-        column:
-          match.index +
-          image.index +
-          targetOffsetIn(image[0], imageWritten, image.groups?.title) +
-          1,
+        column: match.index + image.index + targetStart(image) + 1,
         line: lineNumber,
       });
       if (imageLink) {
@@ -1288,8 +1362,8 @@ const CARD_IMG =
  * paragraph) and no brackets, so a match never repeats a one-line link.
  */
 const WRAPPED_LINK = new RegExp(
-  String.raw`\[[^[\]\n]*(?:\n(?![ \t]*(?:\n|$))[^[\]\n]*)+\]\((?<target>${DESTINATION})(?<title>\s+"[^"]*")?\)`,
-  "gu"
+  String.raw`\[[^[\]\n]*(?:\n(?![ \t]*(?:\n|$))[^[\]\n]*)+\]${DESTINATION_TAIL}`,
+  "dgu"
 );
 
 // An MDX comment (`{/* … */}`): JavaScript, so nothing in it renders.
@@ -1459,8 +1533,7 @@ const multilineLinks = (
   );
   for (const match of text.matchAll(WRAPPED_LINK)) {
     const written = match.groups?.target ?? "";
-    const at =
-      match.index + targetOffsetIn(match[0], written, match.groups?.title);
+    const at = match.index + targetStart(match);
     const link = destinationLink(
       written,
       positionIn(lineStarts, at, lineOffset)

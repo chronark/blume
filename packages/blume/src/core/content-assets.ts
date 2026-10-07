@@ -14,12 +14,7 @@ import { normalizeBasePath } from "./base-path.ts";
 import { nextFenceState } from "./code-fences.ts";
 import type { FenceState } from "./code-fences.ts";
 import { hashText } from "./sources/cache.ts";
-import {
-  INLINE_CODE,
-  MD_IMAGE,
-  rewriteCardImages,
-  targetOffsetIn,
-} from "./sources/normalize.ts";
+import { rewriteCardImages, rewriteImageTargets } from "./sources/normalize.ts";
 import { readExpandedEntryText } from "./sources/read.ts";
 import type { ContentSource } from "./sources/types.ts";
 import type { PageRecord } from "./types.ts";
@@ -158,36 +153,6 @@ export const contentAssetUrl = (param: string, deployBase?: string): string =>
     .join("/")}`;
 
 /**
- * Rewrite one line's relative image targets. Matches run on a copy with inline
- * code blanked out (a `` `![x](./y.png)` `` span is syntax being *shown*, not
- * an image), while replacements splice into the real line by index — the mask
- * preserves length, so the indices line up.
- */
-const rewriteLine = (
-  line: string,
-  toUrl: (target: string) => string | null
-): string => {
-  const masked = line.replaceAll(INLINE_CODE, (span) =>
-    " ".repeat(span.length)
-  );
-  let out = "";
-  let cursor = 0;
-  for (const match of masked.matchAll(MD_IMAGE)) {
-    const target = match.groups?.target ?? "";
-    const url = toUrl(target);
-    if (url === null) {
-      continue;
-    }
-    const offset =
-      (match.index ?? 0) +
-      targetOffsetIn(match[0], target, match.groups?.title);
-    out += line.slice(cursor, offset) + url;
-    cursor = offset + target.length;
-  }
-  return out + line.slice(cursor);
-};
-
-/**
  * Rewrite a page's relative image references to their served
  * `/blume-assets/content/…` URLs (under `deployment.base` when set). Fenced
  * code blocks and inline code are skipped; only references whose file actually
@@ -218,7 +183,9 @@ export const rewriteRelativeImages = (options: {
     const next = nextFenceState(line, fence);
     const inFence = fence !== null || next !== null;
     fence = next;
-    return inFence ? line : rewriteLine(line, toUrl);
+    // Inline code is skipped too: a `` `![x](./y.png)` `` span is syntax
+    // being shown, not an image.
+    return inFence ? line : rewriteImageTargets(line, toUrl);
   });
   // A `<Card img>` is an image embed too: its file is served and its value
   // pointed there, which the HTML render reads back (see

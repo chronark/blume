@@ -488,6 +488,38 @@ describe("expandIncludes", () => {
     expect(result.text).toContain("![fenced](./skip.png)");
   });
 
+  it("rebases every destination form, writing each back in its own", async () => {
+    const root = await fixture({
+      "_snippets/tip.md": [
+        "![angled](<img/a b.png>)",
+        `![double](img/x.png "A \\"title\\"") ![single]( img/x.png 'T' )`,
+        "![paren](img/x.png (T)) ![balanced](img/a(1).png)",
+        String.raw`![escaped](img/a\(1.png) ![nested [alt]](<img/c.png>)`,
+        "",
+      ].join("\n"),
+      "guides/page.mdx": "unused",
+    });
+    const result = await expandIncludes(
+      "<include>../_snippets/tip.md</include>",
+      { contentRoot: root, sourcePath: join(root, "guides/page.mdx") }
+    );
+    expect(result.text.split("\n")).toStrictEqual([
+      "![angled](<../_snippets/img/a b.png>)",
+      `![double](../_snippets/img/x.png "A \\"title\\"") ![single]( ../_snippets/img/x.png 'T' )`,
+      "![paren](../_snippets/img/x.png (T)) ![balanced](../_snippets/img/a(1).png)",
+      String.raw`![escaped](../_snippets/img/a\(1.png) ![nested [alt]](<../_snippets/img/c.png>)`,
+    ]);
+
+    // A path with a space can't be written bare, so it gains brackets.
+    await mkdir(join(root, "my parts"));
+    await writeFile(join(root, "my parts/p.md"), "![x](img/x.png)\n");
+    const spaced = await expandIncludes("<include>../my parts/p.md</include>", {
+      contentRoot: root,
+      sourcePath: join(root, "guides/page.mdx"),
+    });
+    expect(spaced.text).toBe("![x](<../my parts/img/x.png>)");
+  });
+
   it("trims blank edge lines off a splice", async () => {
     const root = await fixture({
       "gappy.md": "\n\nBody line.\n\n\n",

@@ -36,6 +36,22 @@ describe("link destinations", () => {
     ]);
   });
 
+  it("reads a destination with spaces around it and a title in any quotes", () => {
+    const body = [
+      `[a](  ./a  ) [b](./b 'T') [c](./c (T)) [d](<./d d> "T \\" q")`,
+      "![e]( ./e.png 'T' ) [![f](./f.png (T))](./g \"T\")",
+    ].join("\n");
+    expect(extractLinks(body)).toStrictEqual([
+      { column: 7, line: 1, target: "./a" },
+      { column: 18, line: 1, target: "./b" },
+      { column: 31, line: 1, target: "./c" },
+      { column: 45, line: 1, target: "./d d" },
+      { column: 7, image: true, line: 2, target: "./e.png" },
+      { column: 41, line: 2, target: "./g" },
+      { column: 27, image: true, line: 2, target: "./f.png" },
+    ]);
+  });
+
   it("reads an angle-bracketed URL once, not again as an autolink", () => {
     const body = [
       "[x](<https://a.dev/x>) and <https://a.dev/auto>",

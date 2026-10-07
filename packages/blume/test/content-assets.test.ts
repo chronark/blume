@@ -70,6 +70,22 @@ describe("rewriteRelativeImages", () => {
     );
   });
 
+  it("reads every destination form, writing the URL back in its own", () => {
+    expect(
+      rewrite(
+        [
+          "![a](<./my photo.png>) ![b]( ./photo.png 'T' ) ![c](./photo.png (T))",
+          String.raw`![d](my%20photo.png) ![e](./images/nested.png "q \" q")`,
+        ].join("\n")
+      )
+    ).toBe(
+      [
+        `![a](<${CONTENT_ASSETS_PREFIX}/docs/my%20photo.png>) ![b]( ${CONTENT_ASSETS_PREFIX}/docs/photo.png 'T' ) ![c](${CONTENT_ASSETS_PREFIX}/docs/photo.png (T))`,
+        String.raw`![d](${CONTENT_ASSETS_PREFIX}/docs/my%20photo.png) ![e](${CONTENT_ASSETS_PREFIX}/docs/images/nested.png "q \" q")`,
+      ].join("\n")
+    );
+  });
+
   it("rewrites an image nested inside a link label", () => {
     expect(rewrite("[![Alt](./photo.png)](https://example.com)")).toBe(
       `[![Alt](${CONTENT_ASSETS_PREFIX}/docs/photo.png)](https://example.com)`
