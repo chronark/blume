@@ -93,6 +93,7 @@ const DOCS_PATHS = new Map(
     BLUME_SOURCE_UNAVAILABLE: DOCS_CONTENT_SOURCES,
     BLUME_SOURCE_UNRESOLVED_LINK: "/docs/content/sources/contentful",
     BLUME_SOURCE_UNSUPPORTED_NODE: "/docs/content/sources/payload",
+    BLUME_SVG_UNOPTIMIZED: "/docs/content/syntax#links-and-images",
     BLUME_TEMPLATE_TAG: DOCS_OTHER_TOOLS_SYNTAX,
     BLUME_THEME_COLOR_INVALID: "/docs/configuration/theming",
     BLUME_TRANSLATE_MISSING: "/docs/cli/translate",

@@ -30,6 +30,7 @@ import { mermaidPlugin } from "./mermaid.ts";
 import { packageInstallPlugin } from "./package-install.ts";
 import { promptTextPlugin } from "./prompt-text.ts";
 import { relativeLinksPlugin } from "./relative-links.ts";
+import { svgFallbackPlugin } from "./svg-fallback.ts";
 import { tableWrapPlugin } from "./table-wrap.ts";
 import { DEFAULT_CODE_THEMES } from "./themes.ts";
 import type { CodeThemes } from "./themes.ts";
@@ -324,14 +325,16 @@ export interface BlumeMarkdownOptions {
 }
 
 /**
- * MDAST plugins that apply to both `.md` and `.mdx`: relative page links
- * rewritten to the served URL of the route they mean, then the base-path link
- * rewrite for root-relative links (added only when a `basePath` or
- * `deployBase` is configured).
+ * MDAST plugins that apply to both `.md` and `.mdx`: an SVG Astro can't
+ * measure pointed at its served original, relative page links rewritten to
+ * the served URL of the route they mean, then the base-path link rewrite for
+ * root-relative links (added only when a `basePath` or `deployBase` is
+ * configured).
  */
 const blumeSharedMdastPlugins = (
   options: BlumeMarkdownOptions
 ): MdastPlugin[] => [
+  asMdastPlugin(svgFallbackPlugin()),
   asMdastPlugin(
     relativeLinksPlugin({
       contentRoot: options.contentRoot,

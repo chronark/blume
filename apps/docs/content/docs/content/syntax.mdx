@@ -174,6 +174,8 @@ External links open in the same tab by default. Set `markdown: { externalLinks: 
 ![Build output](./images/build-output.png)
 ```
 
+An SVG whose size Astro can't read is served as it is instead of failing the build. Astro reads an SVG's size from its `<svg>` tag, which needs a width and height or a viewBox and has to end within the file's first 1,000 bytes; a draw.io export puts its whole diagram in a `content` attribute on that tag, which pushes it past them. Blume warns about each one as `BLUME_SVG_UNOPTIMIZED` at the line that embeds it. The image still shows, without the intrinsic size an optimized image carries; export the diagram without the copy of its source, or remove the `content` attribute, to have it optimized.
+
 Absolute paths under `public/` (`![Alt text](/screenshot.png)`) are served verbatim with no optimization — use them for files that must keep their exact bytes and URL, like a logo referenced from outside your docs. Remote images are also passed through untouched unless their host is authorized in the [`image` config](/docs/configuration#images).
 
 Content images are click-to-zoom by default — readers can click any image to open it in a lightbox. Turn this off with `markdown: { imageZoom: false }` in `blume.config.ts`, or opt a single image out with `data-no-zoom`.

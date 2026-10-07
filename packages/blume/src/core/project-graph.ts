@@ -38,6 +38,7 @@ import type {
   SourceEntry,
   SourceLoadResult,
 } from "./sources/types.ts";
+import { unmeasurableSvgDiagnostics } from "./svg-images.ts";
 import { indexPageNames, syntaxDiagnostics } from "./syntax-diagnostics.ts";
 import type {
   BlumeManifest,
@@ -711,6 +712,7 @@ export const scanProject = async (
   const i18nWarnings = config.i18n
     ? i18nDiagnostics(pages, config.i18n, config.versions)
     : [];
+  const svgWarnings = await unmeasurableSvgDiagnostics(pages);
   const versionWarnings = config.versions
     ? versionsDiagnostics(pages, config.versions)
     : [];
@@ -752,6 +754,7 @@ export const scanProject = async (
       ...i18nWarnings,
       ...versionWarnings,
       ...lastModifiedWarnings,
+      ...svgWarnings,
       ...publicOpenApiDiagnostics(config, context.root),
       ...redirectPageDiagnostics(
         config,
