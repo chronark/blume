@@ -379,6 +379,7 @@ export default defineConfig({
     Compare that with merging both specs into one file first. Operation IDs
     are unique within a spec, so Blume gives the second <code>listEvents</code>{" "}
     a method suffix, <code>/api/events/list-events-get</code>, and warns{" "}
+    <code>BLUME_OPENAPI_DUPLICATE_OPERATION_ID</code> about the shared ID and{" "}
     <code>BLUME_NAV_DUPLICATE_LABEL</code> about the two List events entries.
     Separate specs keep both URLs predictable.
   </p>

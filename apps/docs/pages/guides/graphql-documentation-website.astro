@@ -435,7 +435,7 @@ export default defineConfig({
       </tr>
       <tr>
         <td><code>Message</code> type</td>
-        <td><code>/graphql/objects/message-object</code></td>
+        <td><code>/graphql/objects/message</code></td>
       </tr>
       <tr>
         <td><code>Template</code> type</td>
@@ -464,11 +464,11 @@ export default defineConfig({
   </table>
   <p>
     Names are split at their capitals, so <code>sendMessage</code> becomes{" "}
-    <code>send-message</code>. Page keys are unique across the schema and root
-    fields claim theirs first, so the <code>message</code> query took{" "}
-    <code>message</code> and the <code>Message</code> type got its kind
-    appended. Built-in scalars like <code>String</code> and the root types
-    themselves get no page.
+    <code>send-message</code>. A page's URL only has to be unique within its
+    group, so the <code>message</code> query and the <code>Message</code> type
+    both end in <code>message</code>, one under <code>queries</code> and one
+    under <code>objects</code>. Built-in scalars like <code>String</code> and
+    the root types themselves get no page.
   </p>
   <p>
     An operation page lists its arguments, marking required ones and showing
@@ -708,7 +708,7 @@ npx blume validate`}
     lang="bash"
   />
   <p>
-    In the preview, check that <code>/graphql/objects/message-object</code>{" "}
+    In the preview, check that <code>/graphql/objects/message</code>{" "}
     loads on its own, that site search finds <code>sendMessage</code>, and that{" "}
     <code>/graphql/mutations/send-email.md</code> returns the page as Markdown,
     with <code>mutation sendEmail</code> and its deprecation marker.{" "}

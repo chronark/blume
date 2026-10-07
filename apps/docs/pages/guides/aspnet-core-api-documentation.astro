@@ -939,9 +939,10 @@ dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer --version 10.0.
     Without <code>WithName</code>, it falls back to the method and path, so
     the pages land at <code>/api/messages/post-messages</code> and{" "}
     <code>/api/messages/get-messages-id</code>. Keep the names unique: the
-    build doesn't check, a repeated name goes into the spec twice, and Blume
-    gives the second page a URL with its HTTP method added, like{" "}
-    <code>get-message-get</code>. Without{" "}
+    .NET build doesn't check, a repeated name goes into the spec twice, and
+    Blume warns <code>BLUME_OPENAPI_DUPLICATE_OPERATION_ID</code> and gives
+    the second page a URL with its HTTP method added when the two share a
+    tag, like <code>get-message-get</code>. Without{" "}
     <code>WithTags</code>, every operation is tagged with the
     assembly name, <code>AcmeApi</code>, and lands in one sidebar group.
   </p>
@@ -967,12 +968,11 @@ dotnet add package Microsoft.AspNetCore.Authentication.JwtBearer --version 10.0.
       handler has both, the XML comment wins.
     </li>
     <li>
-      <strong>Leave the summary off enums.</strong> The spec puts an enum in{" "}
-      <code>components.schemas</code> and points each property at it with a{" "}
-      <code>$ref</code>, with the property's own description beside it. Blume
-      shows the enum's description when it has one, so every{" "}
-      <code>channel</code> row would read the same. Without a summary on the
-      enum, each row shows its property's own.
+      <strong>Enum properties keep their own description.</strong> The spec
+      puts an enum in <code>components.schemas</code> and points each property
+      at it with a <code>$ref</code>, with the property's own description
+      beside it. Blume shows the property's description on its row, and the
+      enum's only where the property has none.
     </li>
   </ul>
 
@@ -1431,15 +1431,9 @@ npx blume preview`}
       <code>npm run spec</code>.
     </li>
     <li>
-      <strong>A description beside a <code>$ref</code> loses to the target's.</strong>{" "}
-      Blume shows a referenced schema's own description in place of the
-      property's, which is why the enums above have no summary.
-    </li>
-    <li>
-      <strong>Operation order needs a <code>meta.ts</code>.</strong> The
-      sidebar sorts a tag's operations by URL, whatever order you map them
-      in. A <code>meta.ts</code> only reorders the sidebar: the overview keeps
-      listing them in the spec's path order.
+      <strong>Operations follow the spec's order.</strong> The sidebar and the
+      overview list a tag's operations in the order the spec lists them. A{" "}
+      <code>meta.ts</code> only reorders the sidebar.
     </li>
   </ul>
 

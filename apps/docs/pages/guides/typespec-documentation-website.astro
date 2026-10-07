@@ -486,19 +486,19 @@ options:
         <td><code>Widgets.list</code></td>
         <td><code>/api/widgets/widgets-list</code></td>
         <td>GET /widgets</td>
-        <td>/widgets</td>
+        <td>GET /widgets</td>
       </tr>
       <tr>
         <td><code>Widgets.create</code></td>
         <td><code>/api/widgets/widgets-create</code></td>
         <td>POST /widgets</td>
-        <td>/widgets</td>
+        <td>POST /widgets</td>
       </tr>
       <tr>
         <td><code>Widgets.read</code></td>
         <td><code>/api/widgets/widgets-read</code></td>
         <td>GET /widgets/&#123;id&#125;</td>
-        <td>/widgets/&#123;id&#125;</td>
+        <td>GET /widgets/&#123;id&#125;</td>
       </tr>
     </tbody>
   </table>
@@ -507,12 +507,9 @@ options:
     <li>
       <strong>No summaries.</strong> TypeSpec writes a doc comment to the
       operation's <code>description</code>, never its <code>summary</code>.
-      Blume titles a page with the summary and falls back to the method and
-      path, and its sidebar label falls back to the path alone. Operations that
-      share a path then share a label, which Blume reports as{" "}
-      <code>BLUME_NAV_DUPLICATE_LABEL</code>, so{" "}
-      <code>blume validate --strict</code> fails. Add <code>@summary</code> to
-      every operation.
+      Blume titles a page and labels it in the sidebar with the summary, and
+      falls back to the method and path, so the sidebar reads like a list of
+      endpoints. Add <code>@summary</code> to every operation.
     </li>
     <li>
       <strong>Generated operation IDs.</strong> By default the emitter names an
@@ -696,17 +693,16 @@ jq '.paths["/widgets/{id}"].get' openapi.json`}
   <h3>Examples</h3>
   <p>
     Put <code>@example</code> on each property rather than on the whole
-    model. A model-level example becomes one example object for the schema,
-    read-only <code>id</code> included, and Blume uses it as written, so the
-    Create a widget sample sends an <code>id</code> the server sets. With
-    examples on the properties, Blume builds the request from them and leaves{" "}
-    <code>id</code> out, while response examples keep it.
+    model, so every model and operation that uses a property shares its
+    example. Blume builds the request from them and leaves the read-only{" "}
+    <code>id</code> out, while response examples keep it. It does the same
+    with a model-level example, which becomes one example object for the
+    schema, <code>id</code> included.
   </p>
   <p>
     <code>@opExample</code> is type-checked against the whole operation. That's
     why Create a widget has none: its body is a <code>Widget</code>, so the
-    example would need an <code>id</code> too, and the request sample would
-    send it. Update a widget's example needs a <code>body</code> beside the{" "}
+    example would need an <code>id</code> too. Update a widget's example needs a <code>body</code> beside the{" "}
     <code>id</code> for the same reason, but the emitter writes no request
     example for a merge-patch body, so that page builds its body sample from
     the property examples. The <code>id</code> is what matters there: with it,
@@ -1130,23 +1126,13 @@ export default defineMeta({
       only way to shape that sample.
     </li>
     <li>
-      <strong>Try it still lists read-only fields.</strong> The request body
-      table and the request sample leave <code>id</code> out, but the Try it
-      form shows it as an optional, empty field.
-    </li>
-    <li>
-      <strong>Operation order doesn't follow the interface.</strong> The
-      sidebar sorts a tag's operations alphabetically by summary and the
-      overview lists them by path, whatever order the interface declares them
-      in. A <code>meta.ts</code> that lists the pages sets the sidebar order,
-      but not the overview's.
-    </li>
-    <li>
-      <strong>Agents get the prose, not the tables.</strong> The Markdown copy
-      of each operation page, which <code>llms-full.txt</code> and the{" "}
-      <code>.md</code> URLs serve, carries its summary, doc comment, and
-      endpoint, without parameters, schemas, or responses. Write the doc
-      comments so they stand on their own.
+      <strong>Agents get the body and responses, not every table.</strong>{" "}
+      The Markdown copy of each operation page, which{" "}
+      <code>llms-full.txt</code> and the <code>.md</code> URLs serve, carries
+      its summary, doc comment, and endpoint, the request body's top-level
+      properties and example, and each response with its example, but not
+      the parameters or nested schemas. Write the doc comments so they stand
+      on their own.
     </li>
   </ul>
 

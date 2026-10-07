@@ -871,8 +871,9 @@ php artisan vendor:publish --provider="Dedoc\\Scramble\\ScrambleServiceProvider"
     redirects a guest to a <code>login</code> route unless the request asks
     for JSON with <code>Accept: application/json</code>. This app has no such
     route, so a request without a token and without that header gets a 500{" "}
-    <code>Route [login] not defined.</code> instead of a 401. Browsers don't
-    send that header, so this is what Try it would show:
+    <code>Route [login] not defined.</code> instead of a 401. Try it and the
+    code samples send it, but a browser or a client that doesn't would get the
+    500:
   </p>
   <CodeBlock code={bootstrapPhp} lang="php" title="bootstrap/app.php" />
 
@@ -1339,18 +1340,12 @@ curl http://127.0.0.1:8000/api/tokens \\
       database's columns.
     </li>
     <li>
-      <strong>Operation order doesn't follow your code.</strong> The sidebar
-      lists a tag's operations alphabetically, Get, List, Send. The overview
-      follows the spec's paths but puts each path's methods in a fixed order,
-      GET before POST. The tag order does follow <code>#[Group]</code>'s{" "}
-      <code>weight</code>.
-    </li>
-    <li>
-      <strong>Agents get the prose, not the tables.</strong> The Markdown copy
-      of each operation page, which <code>llms-full.txt</code> and the{" "}
-      <code>.md</code> URLs serve, carries the summary, description, and
-      endpoint, without parameters, schemas, or responses. Write PHPDoc
-      descriptions that stand on their own.
+      <strong>Agents get the body and responses, not every table.</strong> The
+      Markdown copy of each operation page, which <code>llms-full.txt</code>{" "}
+      and the <code>.md</code> URLs serve, carries the summary, description,
+      and endpoint, the request body's top-level fields and example, and each
+      response with its example, but not the parameters or nested schemas.
+      Write PHPDoc descriptions that stand on their own.
     </li>
   </ul>
 
@@ -1383,16 +1378,18 @@ curl http://127.0.0.1:8000/api/tokens \\
     <code>php artisan scramble:analyze --fail-on-empty</code> prints the
     selection rule and exits 1 when no route matches.
   </p>
-  <h3>Try it gets a 500 with "Route [login] not defined."</h3>
+  <h3>A request gets a 500 with "Route [login] not defined."</h3>
   <p>
-    The request had no valid token, and the auth middleware tried to redirect
-    to a login page. Add the <code>redirectGuestsTo</code> line to{" "}
-    <code>bootstrap/app.php</code> as shown above, so API guests get a 401.
+    The request had no valid token and didn't ask for JSON, so the auth
+    middleware tried to redirect to a login page. Add the{" "}
+    <code>redirectGuestsTo</code> line to <code>bootstrap/app.php</code> as
+    shown above, so API guests get a 401.
   </p>
   <h3>Try it sends requests to localhost</h3>
   <p>
     <code>servers</code> is <code>null</code>, so the export used{" "}
-    <code>APP_URL</code>. Set an absolute production URL in{" "}
+    <code>APP_URL</code>, and the build warns{" "}
+    <code>BLUME_OPENAPI_LOCAL_SERVER</code>. Set an absolute production URL in{" "}
     <code>config/scramble.php</code> and export again.
   </p>
   <h3>The build fails with BLUME_OPENAPI_UNAVAILABLE</h3>

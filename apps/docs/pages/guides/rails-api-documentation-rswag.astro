@@ -863,9 +863,9 @@ bin/rails generate rswag:specs:install`}
       draft 4 plus OpenAPI 3.0's <code>nullable</code>, so the schemas are 3.0
       schemas. Blume upgrades a 3.0 document to 3.1 as it reads it, which
       turns <code>nullable: true</code> into a string-or-null type. Declare{" "}
-      <code>3.1.0</code> instead and Blume takes the file as written, where{" "}
-      <code>nullable</code> means nothing, so <code>description</code> is
-      labeled <code>string</code> rather than <code>string | null</code>.
+      <code>3.1.0</code> instead and Blume takes the file as written and warns{" "}
+      <code>BLUME_OPENAPI_NULLABLE</code>: 3.1 has no <code>nullable</code>,
+      so other 3.1 tools read <code>description</code> as never null.
     </li>
     <li>
       <strong>The <code>/v1</code> prefix.</strong> The server URL ends in{" "}
@@ -1319,9 +1319,7 @@ bin/rails db:migrate`}
       <strong>One example per response.</strong> Each status code of each
       operation gets the body of the one spec that tested it, and each request
       body gets the body a successful spec sent. The helper's hook replaces
-      any examples you add with rswag's <code>request_body_example</code>, and
-      Blume shows only the first example of each media type, without its name,
-      so more named examples wouldn't show anyway.
+      any examples you add with rswag's <code>request_body_example</code>.
     </li>
     <li>
       <strong>URL values aren't recorded.</strong> Path and query parameter
@@ -1346,18 +1344,12 @@ bin/rails db:migrate`}
       its gemspec before you upgrade Rails.
     </li>
     <li>
-      <strong>Agents get the prose, not the examples.</strong> The Markdown
+      <strong>Agents get the examples, not every table.</strong> The Markdown
       copy of each operation page, which <code>llms-full.txt</code> and the{" "}
       <code>.md</code> URLs serve, has the summary, description, and
-      endpoint, without schemas or the recorded examples. Write the
+      endpoint, the request body's top-level fields, and the recorded
+      examples, but not the parameters or nested schemas. Write the
       descriptions so they stand on their own.
-    </li>
-    <li>
-      <strong>Sidebar order isn't spec order.</strong> Within a tag, the
-      sidebar sorts operations alphabetically by summary, and the overview
-      lists them by path. A <code>meta.ts</code> in the tag's folder can set
-      the sidebar order, as in{" "}
-      <a href="/guides/typespec-documentation-website#write-guides-beside-the-reference">the TypeSpec guide</a>.
     </li>
   </ul>
 
