@@ -1,3 +1,5 @@
+import { fileURLToPath } from "node:url";
+
 import { satteri } from "@astrojs/markdown-satteri";
 import {
   transformerMetaHighlight,
@@ -8,9 +10,11 @@ import {
   transformerNotationWordHighlight,
 } from "@shikijs/transformers";
 import { escape as escapeHtml } from "html-escaper";
+import { resolve } from "pathe";
 import { codeToHtml } from "shiki";
 
-import { hasVariables } from "../core/variables.ts";
+import { withIncludedDefinitions } from "../core/includes.ts";
+import { hasVariables, substituteVariables } from "../core/variables.ts";
 import type { ContentVariables } from "../core/variables.ts";
 import { apiRailPlugin } from "./api-rail.ts";
 import { baseLinksPlugin } from "./base-links.ts";
@@ -373,20 +377,77 @@ const blumeIncludePlugin = (options: BlumeMarkdownOptions): MdastPlugin =>
     })
   );
 
+/** A Sätteri processor, as `satteri()` builds one. */
+type SatteriProcessor = ReturnType<typeof satteri>;
+
+/**
+ * `processor`, rendering each page with the link-reference definitions its
+ * includes write appended to its source (see `withIncludedDefinitions`):
+ * the include splice runs after the page is parsed, too late for the parse
+ * to resolve a reference in the page against a partial's definition. Pages
+ * without an include render their source as given.
+ */
+const withPartialDefinitions = (
+  processor: SatteriProcessor,
+  options: BlumeMarkdownOptions
+): SatteriProcessor => {
+  const contentRoot = options.contentRoot
+    ? resolve(options.contentRoot)
+    : undefined;
+  const source = async (content: string, sourcePath: string) =>
+    substituteVariables(
+      await withIncludedDefinitions(content, { contentRoot, sourcePath }),
+      options.variables
+    );
+  const { createMdxRenderer, createRenderer } = processor;
+  const wrapped: SatteriProcessor = {
+    ...processor,
+    createRenderer: async (shared) => {
+      const renderer = await createRenderer(shared);
+      return {
+        render: async (content, renderOptions) =>
+          renderer.render(
+            renderOptions?.fileURL
+              ? await source(content, fileURLToPath(renderOptions.fileURL))
+              : content,
+            renderOptions
+          ),
+      };
+    },
+  };
+  if (createMdxRenderer) {
+    wrapped.createMdxRenderer = async (shared, mdx) => {
+      const renderer = await createMdxRenderer(shared, mdx);
+      return {
+        process: async (content, filePath, frontmatter) =>
+          renderer.process(
+            await source(content, filePath),
+            filePath,
+            frontmatter
+          ),
+      };
+    };
+  }
+  return wrapped;
+};
+
 /** Sätteri processor for plain `.md`, with Blume's curated feature set. */
 export const blumeMarkdownProcessor = (options: BlumeMarkdownOptions = {}) =>
-  satteri({
-    features: { ...MARKDOWN_BODY_FEATURES },
-    hastPlugins: blumeHastPlugins(options),
-    mdastPlugins: [
-      blumeIncludePlugin(options),
-      asMdastPlugin(fenceLanguagePlugin()),
-      ...(hasVariables(options.variables)
-        ? [asMdastPlugin(variablesPlugin(options.variables))]
-        : []),
-      ...blumeSharedMdastPlugins(options),
-    ],
-  });
+  withPartialDefinitions(
+    satteri({
+      features: { ...MARKDOWN_BODY_FEATURES },
+      hastPlugins: blumeHastPlugins(options),
+      mdastPlugins: [
+        blumeIncludePlugin(options),
+        asMdastPlugin(fenceLanguagePlugin()),
+        ...(hasVariables(options.variables)
+          ? [asMdastPlugin(variablesPlugin(options.variables))]
+          : []),
+        ...blumeSharedMdastPlugins(options),
+      ],
+    }),
+    options
+  );
 
 export type BlumeMdxOptions = BlumeMarkdownOptions;
 
@@ -412,21 +473,24 @@ export type BlumeMdxOptions = BlumeMarkdownOptions;
  * Satteri's full `MdastPlugin` type at this single boundary.
  */
 export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
-  satteri({
-    features: { ...MDX_BODY_FEATURES },
-    hastPlugins: blumeHastPlugins(options),
-    mdastPlugins: [
-      blumeIncludePlugin(options),
-      asMdastPlugin(fenceLanguagePlugin()),
-      asMdastPlugin(packageInstallPlugin()),
-      asMdastPlugin(ts2jsPlugin()),
-      asMdastPlugin(directiveToCalloutPlugin()),
-      asMdastPlugin(githubAlertsPlugin()),
-      asMdastPlugin(mermaidPlugin()),
-      asMdastPlugin(mathPlugin()),
-      ...blumeSharedMdastPlugins(options),
-      asMdastPlugin(apiRailPlugin()),
-      asMdastPlugin(viewsPlugin()),
-      asMdastPlugin(promptTextPlugin()),
-    ],
-  });
+  withPartialDefinitions(
+    satteri({
+      features: { ...MDX_BODY_FEATURES },
+      hastPlugins: blumeHastPlugins(options),
+      mdastPlugins: [
+        blumeIncludePlugin(options),
+        asMdastPlugin(fenceLanguagePlugin()),
+        asMdastPlugin(packageInstallPlugin()),
+        asMdastPlugin(ts2jsPlugin()),
+        asMdastPlugin(directiveToCalloutPlugin()),
+        asMdastPlugin(githubAlertsPlugin()),
+        asMdastPlugin(mermaidPlugin()),
+        asMdastPlugin(mathPlugin()),
+        ...blumeSharedMdastPlugins(options),
+        asMdastPlugin(apiRailPlugin()),
+        asMdastPlugin(viewsPlugin()),
+        asMdastPlugin(promptTextPlugin()),
+      ],
+    }),
+    options
+  );

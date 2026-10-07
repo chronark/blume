@@ -9,11 +9,13 @@ import { resolveRelativeFile } from "./relative-files.ts";
 import {
   INLINE_CODE,
   isLinkElementUrl,
+  linkDefinitions,
   rewriteCardImages,
   rewriteElementUrls,
   rewriteImageTargets,
   rewriteLinkTargets,
 } from "./sources/normalize.ts";
+import type { LinkDefinition } from "./sources/normalize.ts";
 import type { Diagnostic } from "./types.ts";
 import { substituteVariables } from "./variables.ts";
 
@@ -797,6 +799,51 @@ export const expandIncludes = async (
     origins,
     text: lines.join("\n"),
   };
+};
+
+/**
+ * `text` with each of `definitions` it doesn't define itself appended, so a
+ * reference in it resolves through a definition written elsewhere in the
+ * page (CommonMark definitions are document-wide). Definitions render
+ * nothing; they're left off a text that ends in an open code fence, where
+ * they'd show as code.
+ */
+export const withDefinitions = (
+  text: string,
+  definitions: readonly LinkDefinition[]
+): string => {
+  const own = new Set(
+    linkDefinitions(text).map((definition) => definition.key)
+  );
+  const missing = definitions.filter((definition) => !own.has(definition.key));
+  let fence: FenceState = null;
+  for (const line of text.split("\n")) {
+    fence = nextFenceState(line, fence);
+  }
+  return missing.length === 0 || fence !== null
+    ? text
+    : `${text}\n\n${missing.map((definition) => definition.text).join("\n")}\n`;
+};
+
+/**
+ * A page's source with the link-reference definitions its included partials
+ * write appended, for the render to parse. Each partial is spliced after the
+ * page is parsed (see `markdown/include.ts`), so a reference in the page
+ * (`[PEP 508]`) to a definition in a partial would otherwise stay text,
+ * though an include reads as if written inline. The definitions come from
+ * the expansion every surface shares, so a partial's definition of a file
+ * beside it is already rebased onto the page. The page's own definition of
+ * a label wins.
+ */
+export const withIncludedDefinitions = async (
+  body: string,
+  options: { sourcePath: string; contentRoot?: string }
+): Promise<string> => {
+  if (!hasIncludeStatements(body)) {
+    return body;
+  }
+  const expanded = await expandIncludes(body, options);
+  return withDefinitions(body, linkDefinitions(expanded.text));
 };
 
 /**

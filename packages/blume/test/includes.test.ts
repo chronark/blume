@@ -17,11 +17,13 @@ import {
   matchIncludeStatement,
   parseIncludeLine,
   parseIncludeStatement,
+  withDefinitions,
 } from "../src/core/includes.ts";
 import { validateLinks } from "../src/core/links.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import {
   extractHeadings,
+  linkDefinitions,
   normalizeEntry,
 } from "../src/core/sources/normalize.ts";
 import { readExpandedEntryText } from "../src/core/sources/read.ts";
@@ -605,6 +607,85 @@ describe("expandIncludes", () => {
     );
     expect(String(code)).toContain("Shown ");
     expect(String(code)).not.toContain("hidden");
+  });
+
+  it("resolves references across a page and its partials, as if inline", async () => {
+    const root = await fixture({
+      "_parts/defs.md": [
+        "[pep 508]: https://peps.dev/508 'PEP'",
+        "[spec]: ./spec.pdf",
+        "[page def]: https://partial.dev",
+        "",
+      ].join("\n"),
+      "_parts/spec.pdf": "pdf",
+      "_parts/uses.md":
+        "Partial uses [page def], [Other], and [mine].\n\n[mine]: https://mine.dev\n",
+      "guides/page.md": "u",
+      "guides/page.mdx": "u",
+    });
+    const page = [
+      "Page uses [PEP 508], [the spec][spec], and [page def].",
+      "",
+      "<include>../_parts/uses.md</include>",
+      "",
+      "[page def]: https://page.dev",
+      "[other]: https://other.dev",
+      "",
+      "<include>../_parts/defs.md</include>",
+      "",
+    ].join("\n");
+    const contentRoot = root;
+    const md = await blumeMarkdownProcessor({ contentRoot }).createRenderer({});
+    const rendered = await md.render(page, {
+      fileURL: pathToFileURL(join(root, "guides/page.md")),
+    });
+    const html = rendered.code;
+    expect(html).toContain(
+      '<a href="https://peps.dev/508" title="PEP">PEP 508</a>'
+    );
+    expect(html).toContain('<a href="../_parts/spec.pdf">the spec</a>');
+    // The page's own definition wins, in the page and in its partials.
+    expect(html).toContain("Page uses");
+    expect(html).not.toContain("partial.dev");
+    expect(html).toContain(
+      '<a href="https://page.dev">page def</a>, <a href="https://other.dev">Other</a>, and <a href="https://mine.dev">mine</a>'
+    );
+
+    const processor = blumeMdxProcessor({ contentRoot });
+    if (!processor.createMdxRenderer) {
+      throw new Error("The satteri processor has no MDX renderer.");
+    }
+    const mdx = await processor.createMdxRenderer({}, { optimize: false });
+    const { code } = await mdx.process(page, join(root, "guides/page.mdx"), {});
+    expect(code).toContain('href: "https://peps.dev/508"');
+    expect(code).toContain('href: "https://other.dev"');
+  });
+
+  it("appends only definitions a text lacks, and none into an open fence", () => {
+    const definitions = linkDefinitions(
+      [
+        "> [Quoted]: /quoted 'Q'",
+        "[^1]: A footnote.",
+        "[dup]: /first",
+        "[DUP]: /second",
+        "`[code]: /code`",
+        "```",
+        "[fenced]: /fenced",
+        "```",
+        "[bare]:",
+      ].join("\n")
+    );
+    expect(definitions).toStrictEqual([
+      { key: "quoted", text: "[Quoted]: /quoted 'Q'" },
+      { key: "dup", text: "[dup]: /first" },
+    ]);
+    expect(withDefinitions("Uses [quoted].\n\n[dup]: /mine", definitions)).toBe(
+      "Uses [quoted].\n\n[dup]: /mine\n\n[Quoted]: /quoted 'Q'\n"
+    );
+    expect(withDefinitions("[quoted]: /x\n[dup]: /y", definitions)).toBe(
+      "[quoted]: /x\n[dup]: /y"
+    );
+    expect(withDefinitions("```\nopen", definitions)).toBe("```\nopen");
   });
 
   it("trims blank edge lines off a splice", async () => {

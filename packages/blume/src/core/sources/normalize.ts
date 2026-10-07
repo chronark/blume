@@ -1626,6 +1626,43 @@ export const rewriteLinkTargets = (
   return applySplices(text, splices);
 };
 
+/** A link-reference definition, as {@link linkDefinitions} reads one. */
+export interface LinkDefinition {
+  /** The label as CommonMark matches it: case-folded, spaces collapsed. */
+  key: string;
+  /** The definition on a line of its own, out of any container. */
+  text: string;
+}
+
+/**
+ * Every link-reference definition in `text` (`[label]: /url "Title"`,
+ * outside code; footnotes aren't links), in order, the first of each label
+ * only, since that's the one that renders. A definition is read from its own
+ * line: its destination and any title there.
+ */
+export const linkDefinitions = (text: string): LinkDefinition[] => {
+  const definitions = new Map<string, LinkDefinition>();
+  const lines = text.split("\n");
+  for (const [index, line] of maskCode(lines).split("\n").entries()) {
+    const groups = line.match(REF_DEFINITION)?.groups;
+    const label = groups?.label ?? "^";
+    const key = labelKey(label);
+    const rest = groups?.rest ?? "";
+    if (
+      label.startsWith("^") ||
+      key === "" ||
+      definitions.has(key) ||
+      !DEFINITION_DESTINATION.test(rest)
+    ) {
+      continue;
+    }
+    // The real line's text, at the same offset the masked one's starts.
+    const written = (lines[index] ?? "").slice(line.length - rest.length);
+    definitions.set(key, { key, text: `[${label}]: ${written}` });
+  }
+  return [...definitions.values()];
+};
+
 /**
  * Every link in the masked `text` (see `maskCode`) of `lines` that can span
  * lines, with its 1-based position: an element's `href` (see `ELEMENT_HREF`),
