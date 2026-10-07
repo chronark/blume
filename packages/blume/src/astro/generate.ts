@@ -47,7 +47,7 @@ import {
 import type { ComponentOverrideAnalysis } from "../core/component-overrides.ts";
 import {
   collectContentAssets,
-  rewriteRelativeImages,
+  rewriteRelativeAssets,
 } from "../core/content-assets.ts";
 import type {
   BlumeBanner,
@@ -704,7 +704,7 @@ export const collectStaged = (project: BlumeProject): Map<string, string> => {
       // Point it at the served original instead — the same rewrite the
       // agent-facing Markdown gets.
       const text = page.sourcePath
-        ? rewriteRelativeImages({
+        ? rewriteRelativeAssets({
             deployBase: project.config.deployment.options.base,
             projectRoot: project.context.root,
             source: page.body.text,

@@ -1,20 +1,19 @@
-import { readdirSync, statSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 
-import {
-  basename,
-  dirname,
-  extname,
-  normalize,
-  relative,
-  resolve,
-} from "pathe";
+import { dirname, extname, relative } from "pathe";
 
 import { normalizeBasePath } from "./base-path.ts";
 import { nextFenceState } from "./code-fences.ts";
 import type { FenceState } from "./code-fences.ts";
+import { resolveRelativeFile, resolveRelativeImage } from "./relative-files.ts";
 import { hashText } from "./sources/cache.ts";
-import { rewriteCardImages, rewriteImageTargets } from "./sources/normalize.ts";
+import {
+  isLinkElementUrl,
+  rewriteCardImages,
+  rewriteElementUrls,
+  rewriteImageTargets,
+  rewriteLinkTargets,
+} from "./sources/normalize.ts";
 import { readExpandedEntryText } from "./sources/read.ts";
 import type { ContentSource } from "./sources/types.ts";
 import type { PageRecord } from "./types.ts";
@@ -29,30 +28,17 @@ import type { PageRecord } from "./types.ts";
  * `/blume-assets/content/<project-relative path>` by a generated endpoint (see
  * `contentAssetsEndpointTemplate`), and these helpers rewrite the relative
  * references in agent-facing output to that URL.
+ *
+ * Other files beside a page are published the same way: a link to one
+ * (`[spec](./spec.pdf)`, a reference definition), a raw HTML or `.mdx`
+ * element's `src` (`<img src="./diagram.png">`, `<video>`, `<source>`,
+ * `<audio>`), and an `<a>`'s or a component's `href`. Nothing else serves
+ * them, so the HTML render points those at the same URLs (see
+ * `markdown/content-assets.ts`).
  */
 
-/** The endpoint route prefix colocated content images are served under. */
+/** The endpoint route prefix colocated content files are served under. */
 export const CONTENT_ASSETS_PREFIX = "/blume-assets/content";
-
-// The formats Astro's image pipeline accepts, plus the web-safe pass-throughs;
-// anything else referenced relatively (a `.pdf`, a source file) is left alone.
-const IMAGE_EXTENSIONS = new Set([
-  ".apng",
-  ".avif",
-  ".bmp",
-  ".gif",
-  ".ico",
-  ".jpeg",
-  ".jpg",
-  ".png",
-  ".svg",
-  ".tiff",
-  ".webp",
-]);
-
-/** Whether a link target is a relative filesystem path (not URL/absolute/hash). */
-const isRelativeTarget = (target: string): boolean =>
-  !(target.startsWith("/") || target.startsWith("#")) && !URL.canParse(target);
 
 /**
  * The endpoint param a colocated image is served under: its project-relative
@@ -71,76 +57,6 @@ export const contentAssetParam = (
   return rel;
 };
 
-/** Percent-decode an image target; malformed escapes stay verbatim. */
-const decodeTarget = (target: string): string => {
-  try {
-    return decodeURI(target);
-  } catch {
-    return target;
-  }
-};
-
-/**
- * Whether a target is *shaped* like a colocated image reference: a relative
- * filesystem path with an image extension. Exported so link validation can
- * tell "not a colocated candidate" apart from "a candidate that resolves
- * nowhere" — the former falls through to the public-dir probe, the latter is
- * a broken reference beside the page source.
- */
-export const isRelativeImageTarget = (target: string): boolean =>
-  isRelativeTarget(target) &&
-  IMAGE_EXTENSIONS.has(extname(decodeTarget(target)).toLowerCase());
-
-/**
- * Whether `abs` is a file whose trailing `segments` names match the on-disk
- * entries exactly. A bare `existsSync` accepts `./Diagram.PNG` for
- * `diagram.png` (or a directory named like an image) on a case-insensitive
- * filesystem — the reference then validates and serves locally but breaks on
- * the case-sensitive Linux build.
- */
-const existsAsWritten = (abs: string, segments: number): boolean => {
-  let current = abs;
-  for (let i = 0; i < segments; i += 1) {
-    const parent = dirname(current);
-    let entries: string[];
-    try {
-      entries = readdirSync(parent);
-    } catch {
-      return false;
-    }
-    if (!entries.includes(basename(current))) {
-      return false;
-    }
-    current = parent;
-  }
-  const stat = statSync(abs, { throwIfNoEntry: false });
-  return stat !== undefined && stat.isFile();
-};
-
-/**
- * Resolve one image target against its page's directory. Returns the absolute
- * file path when the target is relative, is an image, and exists on disk —
- * anything else (remote URLs, `public/` absolutes, broken refs, code-block
- * examples that happen to look like paths) is null and left untouched. Shared
- * with link validation, so what counts as a colocated image is decided once.
- */
-export const resolveRelativeImage = (
-  sourceDir: string,
-  target: string
-): string | null => {
-  if (!isRelativeImageTarget(target)) {
-    return null;
-  }
-  const decoded = decodeTarget(target);
-  // Only the segments the author wrote are checked against on-disk names;
-  // `sourceDir`'s own casing is the filesystem's business, not the target's.
-  const segments = normalize(decoded)
-    .split("/")
-    .filter((part) => part !== "" && part !== "..").length;
-  const abs = resolve(sourceDir, decoded);
-  return existsAsWritten(abs, segments) ? abs : null;
-};
-
 /**
  * The URL a colocated image's endpoint param is served at, under
  * `deployment.base` when set, encoded for a Markdown or HTML URL with its `/`
@@ -153,13 +69,14 @@ export const contentAssetUrl = (param: string, deployBase?: string): string =>
     .join("/")}`;
 
 /**
- * Rewrite a page's relative image references to their served
+ * Rewrite a page's relative image references, and its links and element
+ * URLs naming other files beside it, to their served
  * `/blume-assets/content/…` URLs (under `deployment.base` when set). Fenced
  * code blocks and inline code are skipped; only references whose file actually
  * exists next to the source are touched. `register` observes each rewritten
  * asset so a caller can accumulate the files the endpoint must serve.
  */
-export const rewriteRelativeImages = (options: {
+export const rewriteRelativeAssets = (options: {
   source: string;
   sourcePath: string;
   projectRoot: string;
@@ -168,14 +85,18 @@ export const rewriteRelativeImages = (options: {
 }): string => {
   const { source, sourcePath, projectRoot, deployBase, register } = options;
   const sourceDir = dirname(sourcePath);
-  const toUrl = (target: string): string | null => {
-    const abs = resolveRelativeImage(sourceDir, target);
-    if (abs === null) {
-      return null;
-    }
+  const served = (abs: string): string => {
     const param = contentAssetParam(projectRoot, abs);
     register?.(param, abs);
     return contentAssetUrl(param, deployBase);
+  };
+  const toUrl = (target: string): string | null => {
+    const abs = resolveRelativeImage(sourceDir, target);
+    return abs === null ? null : served(abs);
+  };
+  const toFileUrl = (target: string): string | null => {
+    const file = resolveRelativeFile(sourceDir, target);
+    return file === null ? null : `${served(file.path)}${file.suffix}`;
   };
 
   let fence: FenceState = null;
@@ -189,12 +110,16 @@ export const rewriteRelativeImages = (options: {
   });
   // A `<Card img>` is an image embed too: its file is served and its value
   // pointed there, which the HTML render reads back (see
-  // `markdown/card-images.ts`).
-  return rewriteCardImages(lines.join("\n"), toUrl);
+  // `markdown/content-assets.ts`), as are links and element URLs naming any
+  // other file beside the page.
+  return rewriteElementUrls(
+    rewriteLinkTargets(rewriteCardImages(lines.join("\n"), toUrl), toFileUrl),
+    (url) => (isLinkElementUrl(url) ? toFileUrl(url.value) : null)
+  );
 };
 
 /**
- * Every colocated image the project's pages reference, keyed by endpoint param.
+ * Every colocated file the project's pages reference, keyed by endpoint param.
  * Serialized to `generated/content-assets.json`, which the
  * `/blume-assets/[...asset]` endpoint reads to serve the original files. Runs
  * the same rewrite the agent-Markdown builders apply — over the same
@@ -224,7 +149,7 @@ export const collectContentAssets = async (project: {
       } catch {
         return;
       }
-      rewriteRelativeImages({
+      rewriteRelativeAssets({
         projectRoot: project.context.root,
         register: (param, abs) => {
           files[param] = abs;

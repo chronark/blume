@@ -14,8 +14,8 @@ import { hasVariables } from "../core/variables.ts";
 import type { ContentVariables } from "../core/variables.ts";
 import { apiRailPlugin } from "./api-rail.ts";
 import { baseLinksPlugin } from "./base-links.ts";
-import { cardImagesPlugin } from "./card-images.ts";
 import { codeTitleTransformer } from "./code-title.ts";
+import { contentAssetsPlugin } from "./content-assets.ts";
 import { directiveToCalloutPlugin } from "./directives.ts";
 import { externalLinksPlugin } from "./external-links.ts";
 import { MARKDOWN_BODY_FEATURES, MDX_BODY_FEATURES } from "./features.ts";
@@ -327,7 +327,8 @@ export interface BlumeMarkdownOptions {
 /**
  * MDAST plugins that apply to both `.md` and `.mdx`: an SVG Astro can't
  * measure pointed at its served original, relative page links rewritten to
- * the served URL of the route they mean, then the base-path link rewrite for
+ * the served URL of the route they mean, references to other files beside the
+ * page to their served copies, then the base-path link rewrite for
  * root-relative links (added only when a `basePath` or `deployBase` is
  * configured).
  */
@@ -343,7 +344,7 @@ const blumeSharedMdastPlugins = (
     })
   ),
   asMdastPlugin(
-    cardImagesPlugin({
+    contentAssetsPlugin({
       dataFile: options.dataFile,
       deployBase: options.deployBase,
     })

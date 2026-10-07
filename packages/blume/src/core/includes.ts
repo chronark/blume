@@ -5,7 +5,14 @@ import { dirname, extname, join, relative, resolve } from "pathe";
 import { nextFenceState } from "./code-fences.ts";
 import type { FenceState } from "./code-fences.ts";
 import matter from "./frontmatter.ts";
-import { rewriteCardImages, rewriteImageTargets } from "./sources/normalize.ts";
+import { resolveRelativeFile } from "./relative-files.ts";
+import {
+  isLinkElementUrl,
+  rewriteCardImages,
+  rewriteElementUrls,
+  rewriteImageTargets,
+  rewriteLinkTargets,
+} from "./sources/normalize.ts";
 import type { Diagnostic } from "./types.ts";
 import { substituteVariables } from "./variables.ts";
 
@@ -360,6 +367,12 @@ const resolveIncludePath = (
   return { path };
 };
 
+/** A relative path written in `fromDir`, as written from `toDir`. */
+const movePath = (path: string, fromDir: string, toDir: string): string => {
+  const moved = relative(toDir, resolve(fromDir, path));
+  return moved.startsWith(".") ? moved : `./${moved}`;
+};
+
 /**
  * An image target written in the included file's directory, rebased onto the
  * including file's, or `null` when it means the same thing from either: only
@@ -370,16 +383,29 @@ const rebaseImageTarget = (
   target: string,
   fromDir: string,
   toDir: string
+): string | null =>
+  target.startsWith("/") || target.startsWith("#") || URL.canParse(target)
+    ? null
+    : movePath(target, fromDir, toDir);
+
+/**
+ * A link to a file beside the included file (`./spec.pdf`, see
+ * `resolveRelativeFile`), rebased onto the including file's directory with
+ * its `?query#fragment` kept, or `null` for any other target. A page link
+ * stays as written: it resolves against the including page, wherever the
+ * partial lives.
+ */
+const rebaseFileTarget = (
+  target: string,
+  fromDir: string,
+  toDir: string
 ): string | null => {
-  if (
-    target.startsWith("/") ||
-    target.startsWith("#") ||
-    URL.canParse(target)
-  ) {
+  const file = resolveRelativeFile(fromDir, target);
+  if (file === null) {
     return null;
   }
-  const rebased = relative(toDir, resolve(fromDir, target));
-  return rebased.startsWith(".") ? rebased : `./${rebased}`;
+  const path = target.slice(0, target.length - file.suffix.length);
+  return `${movePath(path, fromDir, toDir)}${file.suffix}`;
 };
 
 /**
@@ -387,7 +413,10 @@ const rebaseImageTarget = (
  * the included file's directory to the including file's, so a partial's
  * colocated `![](./diagram.png)` still resolves once its markdown lives in
  * the includer. Every destination form is read and written back in its own
- * form (`![](<./a b.png> "Title")`; see `rewriteImageTargets`).
+ * form (`![](<./a b.png> "Title")`; see `rewriteImageTargets`). A link,
+ * a reference definition, or an element URL naming a file beside the partial
+ * moves with it too, the way the build publishes such a file (see
+ * `core/content-assets.ts`).
  */
 const rebaseImages = (
   lines: string[],
@@ -409,9 +438,17 @@ const rebaseImages = (
         );
   });
   // A `<Card img>` is an image embed too, and its tag may wrap onto later
-  // lines, so it's rebased over the whole text.
-  return rewriteCardImages(rebased.join("\n"), (target) =>
-    rebaseImageTarget(target, fromDir, toDir)
+  // lines, so it's rebased over the whole text, as are links and elements.
+  const toFile = (target: string): string | null =>
+    rebaseFileTarget(target, fromDir, toDir);
+  return rewriteElementUrls(
+    rewriteLinkTargets(
+      rewriteCardImages(rebased.join("\n"), (target) =>
+        rebaseImageTarget(target, fromDir, toDir)
+      ),
+      toFile
+    ),
+    (url) => (isLinkElementUrl(url) ? toFile(url.value) : null)
   ).split("\n");
 };
 

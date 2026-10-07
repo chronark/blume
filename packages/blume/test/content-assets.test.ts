@@ -8,7 +8,7 @@ import {
   collectContentAssets,
   CONTENT_ASSETS_PREFIX,
   contentAssetParam,
-  rewriteRelativeImages,
+  rewriteRelativeAssets,
 } from "../src/core/content-assets.ts";
 
 let root: string;
@@ -35,16 +35,16 @@ afterAll(async () => {
 
 const rewrite = (
   source: string,
-  over: Partial<Parameters<typeof rewriteRelativeImages>[0]> = {}
+  over: Partial<Parameters<typeof rewriteRelativeAssets>[0]> = {}
 ): string =>
-  rewriteRelativeImages({
+  rewriteRelativeAssets({
     projectRoot: root,
     source,
     sourcePath: pagePath,
     ...over,
   });
 
-describe("rewriteRelativeImages", () => {
+describe("rewriteRelativeAssets", () => {
   it("rewrites a colocated relative image to its served URL", () => {
     expect(rewrite("![Alt](./photo.png)")).toBe(
       `![Alt](${CONTENT_ASSETS_PREFIX}/docs/photo.png)`
@@ -156,6 +156,71 @@ describe("rewriteRelativeImages", () => {
       "docs/photo.png": join(root, "docs", "photo.png"),
       "shared.png": join(root, "shared.png"),
     });
+  });
+});
+
+describe("rewriteRelativeAssets — other files beside the page", () => {
+  const served = `${CONTENT_ASSETS_PREFIX}/docs/spec.pdf`;
+
+  it("rewrites a link, a definition, and a wrapped link to a file", () => {
+    expect(
+      rewrite(
+        [
+          "[Spec](./spec.pdf) and [page 2](<spec.pdf#page=2> 'T').",
+          "[a long",
+          "label](./spec.pdf)",
+          "",
+          "[spec]: ./spec.pdf",
+          "[shot]: ./photo.png?v=2",
+        ].join("\n")
+      )
+    ).toBe(
+      [
+        `[Spec](${served}) and [page 2](<${served}#page=2> 'T').`,
+        "[a long",
+        `label](${served})`,
+        "",
+        `[spec]: ${served}`,
+        `[shot]: ${CONTENT_ASSETS_PREFIX}/docs/photo.png?v=2`,
+      ].join("\n")
+    );
+  });
+
+  it("rewrites a media src and an href, in raw HTML or a component", () => {
+    expect(
+      rewrite(
+        [
+          '<img src="./photo.png" alt="x"> <video src=\'./spec.pdf\'></video>',
+          '<a href="./spec.pdf">Spec</a> <Card title="S" href="./spec.pdf" />',
+          "<Card",
+          '  href="./spec.pdf"',
+          "/>",
+        ].join("\n")
+      )
+    ).toBe(
+      [
+        `<img src="${CONTENT_ASSETS_PREFIX}/docs/photo.png" alt="x"> <video src='${served}'></video>`,
+        `<a href="${served}">Spec</a> <Card title="S" href="${served}" />`,
+        "<Card",
+        `  href="${served}"`,
+        "/>",
+      ].join("\n")
+    );
+  });
+
+  it("leaves page links, missing files, non-links, and code alone", () => {
+    const source = [
+      "[page](./page.mdx) [doc](./page.md#x) [up](../) [none](./missing.pdf)",
+      "![embed](./spec.pdf) [dir](./dir.png) [web](https://x.dev/a.pdf)",
+      "[^1]: spec.pdf is a footnote.",
+      '<iframe src="./spec.pdf"></iframe> <a href="./page">Page</a>',
+      '<Frame src="./spec.pdf" /> <a title="./spec.pdf">x</a>',
+      "`[code](./spec.pdf)` and",
+      "```html",
+      '<a href="./spec.pdf">fenced</a>',
+      "```",
+    ].join("\n");
+    expect(rewrite(source)).toBe(source);
   });
 });
 

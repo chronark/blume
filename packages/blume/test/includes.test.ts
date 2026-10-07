@@ -520,6 +520,31 @@ describe("expandIncludes", () => {
     expect(spaced.text).toBe("![x](<../my parts/img/x.png>)");
   });
 
+  it("rebases a partial's links and element URLs to files beside it", async () => {
+    const root = await fixture({
+      "_snippets/files.md": [
+        "[Spec](./spec.pdf#page=2) and [a page](./other.md).",
+        "[Missing](./nope.pdf) <img src='./pic.png'> <a href=\"spec.pdf\">x</a>",
+        "",
+        "[spec]: ./spec.pdf",
+        "",
+      ].join("\n"),
+      "_snippets/pic.png": "png",
+      "_snippets/spec.pdf": "pdf",
+      "guides/page.md": "unused",
+    });
+    const result = await expandIncludes(
+      "<include>../_snippets/files.md</include>",
+      { contentRoot: root, sourcePath: join(root, "guides/page.md") }
+    );
+    expect(result.text.split("\n")).toStrictEqual([
+      "[Spec](../_snippets/spec.pdf#page=2) and [a page](./other.md).",
+      "[Missing](./nope.pdf) <img src='../_snippets/pic.png'> <a href=\"../_snippets/spec.pdf\">x</a>",
+      "",
+      "[spec]: ../_snippets/spec.pdf",
+    ]);
+  });
+
   it("trims blank edge lines off a splice", async () => {
     const root = await fixture({
       "gappy.md": "\n\nBody line.\n\n\n",

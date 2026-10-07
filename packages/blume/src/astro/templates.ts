@@ -1867,7 +1867,10 @@ export function GET({ props }: { props: { route: string } }) {
  *   - `content/<project-relative path>` — colocated content images
  *     (`![alt](./diagram.png)`), served as originals for the agent-facing
  *     Markdown endpoints (the HTML render uses the `astro:assets`-optimized
- *     copies instead). The mapping comes from `generated/content-assets.json`.
+ *     copies instead), and the other files beside a page that its links and
+ *     element URLs name (`[spec](./spec.pdf)`, `<img src="./a.png">`), which
+ *     the HTML render points here too. The mapping comes from
+ *     `generated/content-assets.json`.
  *   - `<source>/<hash>.<ext>` — remote-source images the scan pipeline
  *     materializes under `.blume/public/blume-assets` (see
  *     `core/sources/assets.ts`). That directory is NOT Astro's `publicDir`
@@ -1910,11 +1913,25 @@ const TYPES: Record<string, string> = {
   ".webp": "image/webp",
 };
 
+// The other files a page's links name beside it, typed so the dev server
+// opens them the way a static host would. Anything else downloads.
+const FILE_TYPES: Record<string, string> = {
+  ".csv": "text/csv; charset=utf-8",
+  ".json": "application/json",
+  ".mp3": "audio/mpeg",
+  ".pdf": "application/pdf",
+  ".txt": "text/plain; charset=utf-8",
+  ".wav": "audio/wav",
+  ".zip": "application/zip",
+};
+
 const extensionOf = (path: string): string =>
   path.slice(path.lastIndexOf(".")).toLowerCase();
 
 const contentType = (path: string): string =>
-  TYPES[extensionOf(path)] ?? "application/octet-stream";
+  TYPES[extensionOf(path)] ??
+  FILE_TYPES[extensionOf(path)] ??
+  "application/octet-stream";
 
 // A source downloads only images and videos; anything else in the staged
 // directory (a page an older build saved under its URL's extension) is never

@@ -1356,6 +1356,35 @@ const CARD_IMG =
   /(?<=(?:^|[^\\])(?:\\\\)*)<Card(?=[\s/>])[^<>]*?\simg=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
 
 /**
+ * Any element's string `href` or `src` (the first a tag carries), read the
+ * way `ELEMENT_HREF` and `ELEMENT_SRC` read theirs: wrapped onto later lines
+ * or not, an expression value unmatched, an escaped `\<tag>` text.
+ */
+const ELEMENT_URL =
+  /(?<=(?:^|[^\\])(?:\\\\)*)<(?<tag>[A-Za-z][\w.:-]*)(?=[\s/>])[^<>]*?\s(?<attribute>href|src)=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
+
+/** A string `href` or `src` on an element, as {@link rewriteElementUrls} reads it. */
+export interface ElementUrl {
+  attribute: string;
+  /** The element's name as written: `img`, `a`, `Card`. */
+  tag: string;
+  value: string;
+}
+
+const MEDIA_TAGS = new Set(["audio", "img", "source", "video"]);
+
+/**
+ * Whether an element URL is one `blume validate` reads as a link (see
+ * `ELEMENT_HREF` and `ELEMENT_SRC`): a media element's `src`, or an `<a>`'s or
+ * a component's `href`. Only these name a file the build publishes from
+ * beside the page.
+ */
+export const isLinkElementUrl = (url: ElementUrl): boolean =>
+  url.attribute === "src"
+    ? MEDIA_TAGS.has(url.tag)
+    : url.attribute === "href" && (url.tag === "a" || /^[A-Z]/u.test(url.tag));
+
+/**
  * An inline link whose label wraps onto later lines of its paragraph
  * (`[a long⏎label](/x)`), as a formatter leaves one: the line scan can't see
  * it. The label holds a line break but no blank line (which would end the
@@ -1434,8 +1463,9 @@ const positionIn = (
 
 /**
  * Every media element's string `src` in the masked `text` (see
- * `ELEMENT_SRC`), with its 1-based position. It ships as written, like a raw
- * `<a href>`: nothing rewrites it or copies a file beside the page for it.
+ * `ELEMENT_SRC`), with its 1-based position. Like a raw `<a href>`, the
+ * browser resolves it as written, unless it names a file beside the page,
+ * which the build publishes and points it at (see `core/content-assets.ts`).
  */
 const mediaSourceLinks = (
   text: string,
@@ -1492,6 +1522,108 @@ export const rewriteCardImages = (
     }
   }
   return out + text.slice(cursor);
+};
+
+/** A same-text edit: replace `length` characters at `at` with `text`. */
+interface Splice {
+  at: number;
+  length: number;
+  text: string;
+}
+
+/** Apply non-overlapping splices to `text`, in any order. */
+const applySplices = (text: string, splices: readonly Splice[]): string => {
+  let out = "";
+  let cursor = 0;
+  for (const splice of splices.toSorted((a, b) => a.at - b.at)) {
+    out += text.slice(cursor, splice.at) + splice.text;
+    cursor = splice.at + splice.length;
+  }
+  return out + text.slice(cursor);
+};
+
+/**
+ * Rewrite every element's string `href` or `src` in `text` (outside code)
+ * with `rewrite`, which returns the new value or `null` to leave one as
+ * written. The include expander rebases a partial's files with it, the
+ * content-asset rewriter points them at their served URL, and the render
+ * plugins rewrite raw HTML with it.
+ */
+export const rewriteElementUrls = (
+  text: string,
+  rewrite: (url: ElementUrl) => string | null
+): string => {
+  if (!(text.includes("href=") || text.includes("src="))) {
+    return text;
+  }
+  const splices: Splice[] = [];
+  for (const match of maskCode(text.split("\n")).matchAll(ELEMENT_URL)) {
+    const value = match.groups?.double ?? match.groups?.single ?? "";
+    const next = rewrite({
+      attribute: match.groups?.attribute ?? "",
+      tag: match.groups?.tag ?? "",
+      value,
+    });
+    if (next !== null) {
+      // The value ends one character (its closing quote) before the match.
+      const at = match.index + match[0].length - value.length - 1;
+      splices.push({ at, length: value.length, text: next });
+    }
+  }
+  return applySplices(text, splices);
+};
+
+/**
+ * Rewrite the target of every Markdown link in `text` (outside code) with
+ * `rewrite`, which gets the target as the renderer reads it and returns the
+ * new one, or `null` to leave it as written: inline links (an image embed is
+ * no link; see {@link rewriteImageTargets}), links whose label wraps onto
+ * later lines, and link-reference definitions (`[spec]: ./spec.pdf`). Each
+ * rewritten target is written back in the form its destination took.
+ */
+export const rewriteLinkTargets = (
+  text: string,
+  rewrite: (target: string) => string | null
+): string => {
+  const splices: Splice[] = [];
+  const add = (at: number, written: string): void => {
+    const { angled, target } = readDestination(written);
+    const next = rewrite(target);
+    if (next !== null) {
+      splices.push({
+        at,
+        length: written.length,
+        text: writeDestination(next, angled),
+      });
+    }
+  };
+  const lines = text.split("\n");
+  const masked = maskCode(lines);
+  const lineStarts = lineStartsOf(lines);
+  for (const [index, line] of masked.split("\n").entries()) {
+    const start = lineStarts[index] ?? 0;
+    for (const match of line.matchAll(MD_LINK)) {
+      if (line[match.index - 1] !== "!") {
+        add(
+          start + match.index + targetStart(match),
+          match.groups?.target ?? ""
+        );
+      }
+    }
+    // A footnote definition (`[^1]: …`) is no link.
+    const groups = line.match(REF_DEFINITION)?.groups;
+    const rest = groups?.label?.startsWith("^") ? "" : (groups?.rest ?? "");
+    const written = rest.match(DEFINITION_DESTINATION)?.[0];
+    if (written !== undefined) {
+      add(start + line.length - rest.length, written);
+    }
+  }
+  for (const match of masked.matchAll(WRAPPED_LINK)) {
+    if (masked[match.index - 1] !== "!") {
+      add(match.index + targetStart(match), match.groups?.target ?? "");
+    }
+  }
+  return applySplices(text, splices);
 };
 
 /**

@@ -742,6 +742,7 @@ describe("validateLinks — assets against a public dir", () => {
     await mkdir(join(publicDir, "empty"), { recursive: true });
     await writeFile(join(contentDir, "guides", "screenshot.png"), "binary");
     await writeFile(join(contentDir, "guides", "my photo.png"), "binary");
+    await writeFile(join(contentDir, "guides", "spec.pdf"), "pdf");
     await writeFile(join(contentDir, "images", "diagram.png"), "binary");
     // Partials: published as no page, so a link to one is broken.
     await writeFile(join(contentDir, "guides", "_draft.md"), "# Draft\n");
@@ -890,19 +891,38 @@ describe("validateLinks — assets against a public dir", () => {
     expect(diagnostics).toHaveLength(0);
   });
 
-  it("still flags a plain link to a colocated image", async () => {
-    // Only `![]()` embeds go through the image pipeline; a plain
-    // `[text](./x.png)` href resolves as a site route and 404s on the built
-    // site, so the public-dir diagnostic (and its suggestion) stays correct.
+  it("accepts a link to a file beside the page, which is published with it", async () => {
+    // A plain `[text](./x.pdf)` (or a raw `<a href>`) is pointed at the
+    // file's served copy, so it resolves beside the page; one naming no file
+    // there is still looked for in public/.
     const diagnostics = await validateWithPublic([
-      guidePage([link("./screenshot.png")]),
+      guidePage([
+        link("./screenshot.png"),
+        { ...link("./spec.pdf#page=2"), line: 2 },
+        raw("../images/diagram.png", 3),
+        { ...link("./missing.pdf"), line: 4 },
+      ]),
+    ]);
+    expect(
+      diagnostics.map((d) => [d.line, d.code, d.suggestion])
+    ).toStrictEqual([
+      [
+        4,
+        "BLUME_BROKEN_ASSET",
+        "Add the file at public/guides/missing.pdf or fix the link.",
+      ],
+    ]);
+  });
+
+  it("flags an image embed of a file that isn't an image", async () => {
+    // Only images go through the image pipeline; nothing publishes a `.pdf`
+    // embedded as one.
+    const diagnostics = await validateWithPublic([
+      guidePage([image("./spec.pdf")]),
     ]);
     expect(diagnostics.map((d) => d.code)).toStrictEqual([
       "BLUME_BROKEN_ASSET",
     ]);
-    expect(diagnostics[0]?.suggestion).toContain(
-      "public/guides/screenshot.png"
-    );
   });
 
   it("flags an image embed whose target carries a query or fragment suffix", async () => {
@@ -921,7 +941,7 @@ describe("validateLinks — assets against a public dir", () => {
   });
 
   it("resolves an encoded colocated reference exactly like the rewriter", async () => {
-    // One decode, same as `rewriteRelativeImages`: `%20` finds `my photo.png`,
+    // One decode, same as `rewriteRelativeAssets`: `%20` finds `my photo.png`,
     // a double-encoded `%2520` does not — validation must not vouch for a
     // reference the rewriter leaves verbatim.
     const diagnostics = await validateWithPublic([
@@ -991,17 +1011,19 @@ describe("validateLinks — assets against a public dir", () => {
     ]);
   });
 
-  it("checks a media src where the browser requests it, as written", async () => {
+  it("checks a media src in public/, or beside the page, which publishes it", async () => {
     const partial = join(contentDir, "_snippets", "media.mdx");
     const diagnostics = await validateWithPublic([
       guidePage([
         // `/guides/a` requests `../logo.png` at `/logo.png`, in public/.
         src("../logo.png", 1),
         src("/logo.png?v=2", 2),
+        // Beside the page: the build publishes it and points the src there.
         src("./screenshot.png", 3),
         src("./screenshot.png#t=1", 4, "video"),
         src("./nothing.png", 5),
         src("/missing.png", 6),
+        // A partial's, rebased onto the page by the include expander.
         { ...src("../images/diagram.png", 7), file: partial },
       ]),
       makePage({
@@ -1015,16 +1037,6 @@ describe("validateLinks — assets against a public dir", () => {
       diagnostics.map((d) => [d.line, d.message, d.suggestion])
     ).toStrictEqual([
       [
-        3,
-        '<img src="./screenshot.png"> names a file next to a.mdx, but a src in HTML ships as written and the file isn\'t published, so the browser requests /guides/screenshot.png and gets a 404.',
-        "Embed the image with Markdown syntax (![alt](./screenshot.png)), which publishes it, or move it into public/ and use its root path.",
-      ],
-      [
-        4,
-        '<video src="./screenshot.png#t=1"> names a file next to a.mdx, but a src in HTML ships as written and the file isn\'t published, so the browser requests /guides/screenshot.png and gets a 404.',
-        "Move the file into public/ and use its root path.",
-      ],
-      [
         5,
         "<img src=\"./nothing.png\"> points at /guides/nothing.png, which isn't in the public directory, and there's no ./nothing.png next to a.mdx either.",
         "Fix the path, or add the file.",
@@ -1033,12 +1045,6 @@ describe("validateLinks — assets against a public dir", () => {
         6,
         '<img src="/missing.png"> points at /missing.png, which isn\'t in the public directory.',
         "Add the file at public/missing.png or fix the src.",
-      ],
-      [
-        7,
-        // Beside the partial it's written in, not the including page.
-        '<img src="../images/diagram.png"> (included by a.mdx) names a file next to media.mdx, but a src in HTML ships as written and the file isn\'t published, so the browser requests /images/diagram.png and gets a 404.',
-        "Embed the image with Markdown syntax (![alt](../images/diagram.png)), which publishes it, or move it into public/ and use its root path.",
       ],
       [
         1,

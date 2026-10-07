@@ -72,8 +72,9 @@ export interface PageLink {
    * mounts the base path on it, so it's checked the way a browser reads it. */
   raw?: boolean;
   /** The element, when the target is a media element's `src` (`img`,
-   * `source`, `video`, `audio`). It's `raw` too: it ships as written, and
-   * nothing copies a file beside the page for it, unlike an image embed. */
+   * `source`, `video`, `audio`). It's `raw` too: the browser resolves it as
+   * written, unless it names a file beside the page, which the build
+   * publishes and points it at. */
   src?: string;
   /** 1-based line number in the source file. */
   line: number;

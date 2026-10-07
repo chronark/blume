@@ -1,5 +1,5 @@
 import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
-import { rewriteRelativeImages } from "../core/content-assets.ts";
+import { rewriteRelativeAssets } from "../core/content-assets.ts";
 import matter from "../core/frontmatter.ts";
 import { isHiddenPage } from "../core/hidden-pages.ts";
 import { metaDescription } from "../core/manifest.ts";
@@ -347,7 +347,7 @@ const buildFull = async (project: BlumeProject): Promise<string> => {
       // Colocated `./image.png` references resolve to nothing for a reader of
       // llms-full.txt; point them at the served originals instead.
       if (page.sourcePath) {
-        raw = rewriteRelativeImages({
+        raw = rewriteRelativeAssets({
           deployBase: config.deployment.options.base,
           projectRoot: project.context.root,
           source: raw,

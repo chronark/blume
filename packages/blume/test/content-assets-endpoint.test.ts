@@ -11,12 +11,15 @@ interface EndpointModule {
   getStaticPaths: () => Promise<{ params: { asset: string } }[]>;
 }
 
-/** Write the generated endpoint, with an empty content map, and import it. */
-const loadEndpoint = async (stagedDir: string): Promise<EndpointModule> => {
+/** Write the generated endpoint with a content map, and import it. */
+const loadEndpoint = async (
+  stagedDir: string | null,
+  assets: Record<string, string> = {}
+): Promise<EndpointModule> => {
   const root = await mkdtemp(join(tmpdir(), "blume-assets-endpoint-"));
   const source = contentAssetsEndpointTemplate(stagedDir).replace(
     'import assets from "blume:content-assets";',
-    "const assets = {};"
+    `const assets = ${JSON.stringify(assets)};`
   );
   const file = join(root, "endpoint.ts");
   await writeFile(file, source);
@@ -45,5 +48,27 @@ describe("contentAssetsEndpointTemplate with a staged directory", () => {
 
     const page = await endpoint.GET({ params: { asset: "notion/pwn.html" } });
     expect(page.status).toBe(404);
+  });
+});
+
+describe("contentAssetsEndpointTemplate with content files", () => {
+  it("types a file a page links beside it, and downloads an unknown one", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "blume-assets-files-"));
+    await writeFile(join(dir, "spec.pdf"), "pdf-bytes");
+    await writeFile(join(dir, "notes.xyz"), "xyz-bytes");
+    const endpoint = await loadEndpoint(null, {
+      "docs/notes.xyz": join(dir, "notes.xyz"),
+      "docs/spec.pdf": join(dir, "spec.pdf"),
+    });
+
+    const pdf = await endpoint.GET({
+      params: { asset: "content/docs/spec.pdf" },
+    });
+    expect(pdf.headers.get("Content-Type")).toBe("application/pdf");
+    expect(await pdf.text()).toBe("pdf-bytes");
+    const other = await endpoint.GET({
+      params: { asset: "content/docs/notes.xyz" },
+    });
+    expect(other.headers.get("Content-Type")).toBe("application/octet-stream");
   });
 });

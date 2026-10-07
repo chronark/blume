@@ -3,11 +3,8 @@ import { readFile } from "node:fs/promises";
 import { imageMetadata } from "astro/assets/utils";
 import { dirname, extname } from "pathe";
 
-import {
-  contentAssetParam,
-  contentAssetUrl,
-  resolveRelativeImage,
-} from "./content-assets.ts";
+import { contentAssetParam, contentAssetUrl } from "./content-assets.ts";
+import { resolveRelativeImage } from "./relative-files.ts";
 import type { Diagnostic, PageRecord } from "./types.ts";
 
 /**

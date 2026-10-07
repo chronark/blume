@@ -12,7 +12,7 @@ import {
 import type { RuntimeModuleId } from "../src/astro/runtime-modules.ts";
 import {
   collectContentAssets,
-  rewriteRelativeImages,
+  rewriteRelativeAssets,
 } from "../src/core/content-assets.ts";
 import { expandIncludes } from "../src/core/includes.ts";
 import { validateLinks } from "../src/core/links.ts";
@@ -156,7 +156,7 @@ describe("<Card img> through the content pipeline", () => {
       "docs/guides/here.png": join(root, "docs/guides/here.png"),
     });
     expect(
-      rewriteRelativeImages({
+      rewriteRelativeAssets({
         deployBase: "/base",
         projectRoot: root,
         source: '<Card img="./here.png" />',

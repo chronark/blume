@@ -37,7 +37,7 @@ docs/
 
 A partial is a normal Markdown or MDX file. Its front matter is stripped when spliced (the including page's front matter wins), and everything else — callouts, code fences, components, math — renders exactly as it would inline. Partials can include other partials; a circular include is reported as an error.
 
-Relative image references inside a partial keep working: they're rebased onto the including page, so a colocated `![diagram](./diagram.png)` or `<Card img="./cover.png">` next to the partial resolves wherever the partial is spliced. An image's path is rebased in whatever form it's written: in angle brackets (`![diagram](<./my diagram.png>)`), with escaped parentheses, or followed by a title in any of its quotes.
+Relative image references inside a partial keep working: they're rebased onto the including page, so a colocated `![diagram](./diagram.png)` or `<Card img="./cover.png">` next to the partial resolves wherever the partial is spliced. An image's path is rebased in whatever form it's written: in angle brackets (`![diagram](<./my diagram.png>)`), with escaped parentheses, or followed by a title in any of its quotes. A link to another file next to the partial (`[spec](./spec.pdf)`, or an `<img src>` or `<a href>` naming one) moves with it too. A link to a page resolves from the including page, as if it were written there.
 
 Editing a partial while `blume dev` is running reloads every page that includes it.
 

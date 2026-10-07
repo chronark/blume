@@ -3,10 +3,6 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { basename, dirname, join, normalize, relative, resolve } from "pathe";
 
 import { isInternalPath, stripBasePath, withBasePath } from "./base-path.ts";
-import {
-  isRelativeImageTarget,
-  resolveRelativeImage,
-} from "./content-assets.ts";
 import { locatePath } from "./diagnostics.ts";
 import type { LocaleRouting } from "./i18n.ts";
 import { localizeLinkPath } from "./locale-links.ts";
@@ -16,6 +12,11 @@ import {
   isPatternPath,
   pathsUnderPattern,
 } from "./redirect-patterns.ts";
+import {
+  isRelativeImageTarget,
+  resolveRelativeFile,
+  resolveRelativeImage,
+} from "./relative-files.ts";
 import { staticFileResolver } from "./static-files.ts";
 import type {
   ContentGraph,
@@ -377,6 +378,74 @@ const htmlPageRoute = (
     : undefined;
 };
 
+/**
+ * Validate a link to a file (`./spec.pdf`, `/logo.png`, `![](./a.png)`) that
+ * no route, redirect, or public file answers: an image embed or a link
+ * beside the page, or else a missing file.
+ */
+const checkFileLink = (
+  resolved: string,
+  assetPath: string,
+  page: PageRecord,
+  link: PageLink,
+  site: LinkSite,
+  ctx: LinkContext,
+  via: string
+): LinkResult => {
+  // A colocated image embed (`![](./diagram.png)`) is resolved from beside
+  // the page source and emitted to `_astro/` by the image pipeline, so it
+  // never lands in `public/`. The *raw* target goes through the same
+  // resolver that decides what the `/blume-assets/content` endpoint serves,
+  // so a reference the rewriter skips (a `?v=2` suffix, a double-encoded
+  // name) is reported here, not accepted.
+  if (link.image && page.sourcePath && isRelativeImageTarget(link.target)) {
+    if (resolveRelativeImage(dirname(page.sourcePath), link.target)) {
+      return null;
+    }
+    // A partial-origin image was rebased into the page's directory for
+    // resolution but reports against the partial — cite the path as
+    // authored there, so file, path, and "next to" agree.
+    const authored = link.file
+      ? authoredImageTarget(link.target, page.sourcePath, link.file)
+      : link.target;
+    return {
+      ...site,
+      code: "BLUME_BROKEN_ASSET",
+      message: `Image ${authored} was not found next to ${basename(link.file ?? page.sourcePath)}.`,
+      severity: "warning",
+      suggestion: "Add the file next to the page source or fix the reference.",
+    };
+  }
+  // A relative link to any other file beside the page (`./spec.pdf`) is
+  // published with it and pointed at its served copy, by the same resolver
+  // (see `core/content-assets.ts`); an image embed of one isn't.
+  if (
+    !link.image &&
+    page.sourcePath &&
+    resolveRelativeFile(dirname(page.sourcePath), link.target)
+  ) {
+    return null;
+  }
+  const pageRoute = htmlPageRoute(resolved, page, link, ctx);
+  if (pageRoute !== undefined) {
+    return {
+      ...site,
+      code: "BLUME_BROKEN_ASSET",
+      message: `Link ${link.target}${via} points at ${assetPath}, which public/ doesn't have, and pages aren't served at .html URLs.`,
+      severity: "warning",
+      suggestion: `Link the page at ${pageRoute} instead.`,
+    };
+  }
+  // With no `public/` folder at all, the site ships no such file either.
+  return {
+    ...site,
+    code: "BLUME_BROKEN_ASSET",
+    message: `Asset ${assetPath} was not found in the public directory.`,
+    severity: "warning",
+    suggestion: `Add the file at public${assetPath} or fix the link.`,
+  };
+};
+
 /** Validate a resolved internal path: asset, route, then optional anchor. */
 const checkPathLink = (
   resolved: string,
@@ -427,51 +496,7 @@ const checkPathLink = (
     return null;
   }
   if (FILE_EXT.test(assetPath) && !DOC_EXT.test(assetPath)) {
-    // A colocated image embed (`![](./diagram.png)`) is resolved from beside
-    // the page source and emitted to `_astro/` by the image pipeline, so it
-    // never lands in `public/`. The *raw* target goes through the same
-    // resolver that decides what the `/blume-assets/content` endpoint serves,
-    // so a reference the rewriter skips (a `?v=2` suffix, a double-encoded
-    // name) is reported here, not accepted. Plain links to the same path stay
-    // on the public-dir probe — an href resolves as a site route, and only
-    // image nodes are rewritten.
-    if (link.image && page.sourcePath && isRelativeImageTarget(link.target)) {
-      if (resolveRelativeImage(dirname(page.sourcePath), link.target)) {
-        return null;
-      }
-      // A partial-origin image was rebased into the page's directory for
-      // resolution but reports against the partial — cite the path as
-      // authored there, so file, path, and "next to" agree.
-      const authored = link.file
-        ? authoredImageTarget(link.target, page.sourcePath, link.file)
-        : link.target;
-      return {
-        ...site,
-        code: "BLUME_BROKEN_ASSET",
-        message: `Image ${authored} was not found next to ${basename(link.file ?? page.sourcePath)}.`,
-        severity: "warning",
-        suggestion:
-          "Add the file next to the page source or fix the reference.",
-      };
-    }
-    const pageRoute = htmlPageRoute(resolved, page, link, ctx);
-    if (pageRoute !== undefined) {
-      return {
-        ...site,
-        code: "BLUME_BROKEN_ASSET",
-        message: `Link ${link.target}${via} points at ${assetPath}, which public/ doesn't have, and pages aren't served at .html URLs.`,
-        severity: "warning",
-        suggestion: `Link the page at ${pageRoute} instead.`,
-      };
-    }
-    // With no `public/` folder at all, the site ships no such file either.
-    return {
-      ...site,
-      code: "BLUME_BROKEN_ASSET",
-      message: `Asset ${assetPath} was not found in the public directory.`,
-      severity: "warning",
-      suggestion: `Add the file at public${assetPath} or fix the link.`,
-    };
+    return checkFileLink(resolved, assetPath, page, link, site, ctx, via);
   }
 
   return {
@@ -487,11 +512,11 @@ const checkPathLink = (
 
 /**
  * Validate a media element's `src` (`<img src>`, `<video src>`), which
- * `resolved` reads the way the browser does. Nothing rewrites or copies it,
- * so it must be a file the site serves at that URL: in `public/`, or one
- * Blume generates. A file beside the page source isn't enough, since only a
- * Markdown image embed (`![](./diagram.png)`) publishes one; that case gets
- * its own message, as the file exists but the built page still 404s on it.
+ * `resolved` reads the way the browser does: a file the site serves at that
+ * URL (in `public/`, or one Blume generates), or a relative path naming a
+ * file beside the page, which the build publishes and points the `src` at
+ * (see `core/content-assets.ts`). A partial's was rebased onto the page when
+ * its file sits beside the partial.
  */
 const checkSourceLink = (
   rawPath: string,
@@ -515,28 +540,18 @@ const checkSourceLink = (
       suggestion: `Add the file at public${resolved} or fix the src.`,
     };
   }
-  const name = basename(sourceFile);
-  const beside = statSync(resolve(dirname(sourceFile), rawPath), {
-    throwIfNoEntry: false,
-  })?.isFile();
-  if (!beside) {
-    return {
-      ...site,
-      code: "BLUME_BROKEN_ASSET",
-      message: `<${link.src} src="${link.target}">${via} points at ${resolved}, which isn't in the public directory, and there's no ${rawPath} next to ${name} either.`,
-      severity: "warning",
-      suggestion: "Fix the path, or add the file.",
-    };
+  if (
+    page.sourcePath &&
+    resolveRelativeFile(dirname(page.sourcePath), link.target)
+  ) {
+    return null;
   }
   return {
     ...site,
     code: "BLUME_BROKEN_ASSET",
-    message: `<${link.src} src="${link.target}">${via} names a file next to ${name}, but a src in HTML ships as written and the file isn't published, so the browser requests ${resolved} and gets a 404.`,
+    message: `<${link.src} src="${link.target}">${via} points at ${resolved}, which isn't in the public directory, and there's no ${rawPath} next to ${basename(sourceFile)} either.`,
     severity: "warning",
-    suggestion:
-      link.src === "img"
-        ? `Embed the image with Markdown syntax (![alt](${link.target})), which publishes it, or move it into public/ and use its root path.`
-        : "Move the file into public/ and use its root path.",
+    suggestion: "Fix the path, or add the file.",
   };
 };
 

@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import { hasGeneratedChangelog } from "../astro/pages.ts";
 import { CHANGELOG_INDEX_ROUTE } from "../core/changelog-index.ts";
-import { rewriteRelativeImages } from "../core/content-assets.ts";
+import { rewriteRelativeAssets } from "../core/content-assets.ts";
 import { discoverPages, discoverPagesSync } from "../core/custom-pages.ts";
 import matter from "../core/frontmatter.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
@@ -76,7 +76,7 @@ export const buildRawMarkdown = async (
     project.manifest.routes.map(async (route) => {
       let text = await readRoute(route);
       if (route.sourcePath) {
-        text = rewriteRelativeImages({
+        text = rewriteRelativeAssets({
           deployBase: project.config.deployment.options.base,
           projectRoot: project.context.root,
           source: text,
