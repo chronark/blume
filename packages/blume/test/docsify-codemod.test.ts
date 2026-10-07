@@ -508,6 +508,8 @@ describe("docsify-codemod", () => {
         "",
         "Read [usage](usage.md?id=usage) and [the PDF](_media/guide.pdf ':ignore').",
         "",
+        "Raw [usage source](usage.md ':ignore') and [intro source](/intro.md ':ignore Intro')",
+        "",
       ].join("\n"),
       "usage.md": "# Usage\n\n## Flags\n",
     });
@@ -542,6 +544,37 @@ describe("docsify-codemod", () => {
       "Read [usage](../apple/usage.md) and [the PDF](/_media/guide.pdf)."
     );
     expect(report).toContain("/_media/guide.pdf");
+    // One to a page's file opened the raw file: a raw `<a>` keeps the path of
+    // its Markdown copy, where a Markdown link would land on the page.
+    expect(await read(root, "zebra/setup.md")).toContain(
+      'Raw <a href="/apple/usage.md">usage source</a> and <a href="/index.md" title="Intro">intro source</a>'
+    );
+    expect(report).toContain(
+      "2 × ':ignore' link to a page's file → <a href> to its Markdown copy"
+    );
+    expect(report).not.toContain("/intro.md");
+  });
+
+  it("reads an ':ignore' link from the page's folder in history mode", async () => {
+    const root = await site({
+      "guide/data.json": "{}\n",
+      "guide/other.md": "# Other\n",
+      "guide/setup.md": [
+        "# Setup",
+        "",
+        "See [the source](other.md ':ignore') and [data](data.json ':ignore').",
+        "",
+      ].join("\n"),
+      "index.html": INDEX_V4.replace(
+        "{ loadSidebar: true }",
+        "{ loadSidebar: true, routerMode: 'history' }"
+      ),
+    });
+    runCodemod(root, "--write", "docs");
+    // The browser read both from /guide/; only a page's file has a copy.
+    expect(await read(root, "guide/setup.md")).toContain(
+      'See <a href="/guide/other.md">the source</a> and [data](data.json).'
+    );
   });
 
   it("converts emoji with a map and reports what MDX will still reject", async () => {

@@ -41,7 +41,7 @@ It's zero-dependency and idempotent, and reads `version`, `relativePath`, `route
 - links resolved the way Docsify resolved them (hash links, `?id=`, and `--site` absolute links included) → relative file links, without an anchor that named the target's title H1 (that heading becomes `title`);
 - images → rebased for moved pages. Docsify read a leading-slash image from the page's folder too, where Blume would read it from `public/`;
 - link and image attribute strings → dropped;
-- relative raw HTML URLs and `':ignore'` links → root paths;
+- relative raw HTML URLs and `':ignore'` links → root paths. An `':ignore'` link to a page's own file opened the raw Markdown, so it becomes a raw `<a href>` to the page's Markdown copy (`/<new route>.md`): a Markdown link naming a page's file, even root-relative, lands on the page itself;
 - emoji shortcodes → Unicode;
 - the H1 or sidebar label → `title`, plus `sidebar.label`, `seo.title`, and `hidden: true`, with later H1s demoted;
 - `README.md` → `index.md`, and pages that need MDX → `.mdx` with MDX-safe comments, `<br>`, void tags, and autolinks.
@@ -127,12 +127,12 @@ It's zero-dependency and idempotent, and reads `version`, `relativePath`, `route
 - **Other remote aliases and includes:** vendor a copy (with a source comment), or use `mdxRemote()`.
 - **iframe, video, and audio embeds** become raw HTML, with the file in `public/`.
 
-**Files the pages link** (listed under "must be served from public/"): Docsify served every file in its folder, and Blume publishes only pages and the images they use.
+**Files the pages link** (listed under "must be served from public/"): Docsify served every file in its folder at its path. Blume publishes a file a page links relatively with that page, but at a new URL, and the codemod writes Docsify's root-resolved links as root paths, which keep the old URLs and are served from `public/`.
 
 - Copy each file into `public/` at the same path.
 - If a generator writes the files (test fixtures, examples), symlink the folder instead: `public/_media/examples → ../docs/examples`. Astro copies the target, and `validate` checks the links.
 - An HTML document saved as `.md` (generated API docs) goes to `public/` as HTML.
-- `blume validate --strict` reports a broken one as `BLUME_BROKEN_ASSET`, but only once `public/` exists.
+- `blume validate --strict` reports a missing one as `BLUME_BROKEN_ASSET`.
 
 **Everything else:**
 
@@ -232,7 +232,7 @@ Then open a few old hash URLs, with and without `?id=`, in a browser on the depl
 
 - Switch the Pages source from the branch folder to GitHub Actions, using the workflow in https://useblume.dev/guides/markdown-docs-github-pages (with `fetch-depth: 0` for `lastModified: "git"`).
 - Pages has no redirect rules of its own. A static build writes each exact `redirects` entry as a page that forwards to the new URL, which is all the table holds; a pattern redirect wouldn't work there.
-- A project URL (`user.github.io/repo/`) becomes `deployment: { site: "https://user.github.io", base: "/repo" }`, and that base goes in the script too. Blume adds the base to Markdown links and images but not to raw HTML, so prefix each root path in an `<a href>` or `<img src>` (the codemod's included) with it.
+- A project URL (`user.github.io/repo/`) becomes `deployment: { site: "https://user.github.io", base: "/repo" }`, and that base goes in the script too. Blume adds the base to root paths in Markdown and raw HTML alike, so the codemod's root paths need nothing more.
 - The custom domain stays in the Pages settings. Neither `CNAME` nor `.nojekyll` is needed.
 - The workflow's `npm ci` needs a lockfile, so commit one.
 

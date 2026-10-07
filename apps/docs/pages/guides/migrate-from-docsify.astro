@@ -63,6 +63,10 @@
 // the agent was pointed at the skill), a deploy to GitHub Pages, or a
 // lockfile regeneration. The reference was revised after the run (codemod,
 // split route table); those revisions weren't rerun on Zenroom end to end.
+// Blume changed after the run too: it adds `deployment.base` to root paths
+// in raw HTML, and a root-relative link to a page's `.md` file lands on the
+// page, so the codemod now writes an `':ignore'` link to a page's file as a
+// raw `<a href>` to its Markdown copy. The page below says so.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -556,9 +560,10 @@ const pinAnchors = [
     </li>
     <li>
       <strong>Files your pages link.</strong> Docsify served every file in its
-      folder, and Blume publishes pages and the images they use. Downloads,
-      PDFs, example files, and generated HTML move to <code>public/</code> at
-      the same path. A raw HTML link like{" "}
+      folder at its own path. Blume publishes a file a page links relatively
+      with that page, but at a new URL, so downloads, PDFs, example files, and
+      generated HTML move to <code>public/</code> at the same path, where
+      their old URLs keep working. A raw HTML link like{" "}
       <code>&lt;a href="../_media/data.json"&gt;</code> resolved from your
       docs root in Docsify, whatever page it was on, so the codemod rewrites it
       to <code>/_media/data.json</code>, and the file has to be there. If a script
@@ -650,10 +655,9 @@ const pinAnchors = [
     title="blume.config.ts"
   />
   <p>
-    Blume adds the base to Markdown links and images, but not to raw HTML. With
-    a base, start each root path the codemod wrote into an{" "}
-    <code>&lt;a href&gt;</code> or <code>&lt;img src&gt;</code> with it, like{" "}
-    <code>/acme-docs/_media/data.json</code>, and set the same base in the
+    Blume adds the base to root paths in Markdown links and raw HTML alike, so
+    the ones the codemod wrote into an <code>&lt;a href&gt;</code> or{" "}
+    <code>&lt;img src&gt;</code> need nothing more. Set the same base in the
     redirect script.
   </p>
   <p>
@@ -698,15 +702,19 @@ const pinAnchors = [
   <h3>A page shows <code>!&gt;</code> or <code>:::warning</code> as text</h3>
   <p>
     The callout wasn't converted, or the page is still <code>.md</code>.
-    Directives work only in <code>.mdx</code> pages. Rename the page, and write
-    the callout as <code>:::warning</code> on its own line.
+    Directives work only in <code>.mdx</code> pages, and a{" "}
+    <code>BLUME_MD_DIRECTIVE</code> warning names each one left in a{" "}
+    <code>.md</code> page. Rename the page, and write the callout as{" "}
+    <code>:::warning</code> on its own line.
   </p>
   <h3>The build fails with "Expected a closing tag"</h3>
   <p>
     An HTML block in an <code>.mdx</code> page doesn't nest the way MDX needs.
     A <code>&lt;td&gt;</code> that shares a line with text, or a heading inside
-    a <code>&lt;p&gt;</code>, is the usual cause. Put each table tag on its own
-    line, and make the <code>&lt;p&gt;</code> a <code>&lt;div&gt;</code>.
+    a <code>&lt;p&gt;</code>, is the usual cause. <code>blume check</code>{" "}
+    reports it as <code>BLUME_MDX_SYNTAX</code> at its line before you build.
+    Put each table tag on its own line, and make the <code>&lt;p&gt;</code> a{" "}
+    <code>&lt;div&gt;</code>.
   </p>
   <h3>An old link shows the 404 page</h3>
   <p>

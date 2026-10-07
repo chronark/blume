@@ -24,7 +24,9 @@
 //     title H1; rebases images (Docsify read a leading-slash one from the
 //     page's folder too); strips `':target=…'`-style attribute strings from
 //     links and images; makes relative raw-HTML `href`/`src` and `':ignore'`
-//     links root paths (hash routing resolved them from `/`);
+//     links root paths (hash routing resolved them from `/`), except that an
+//     `':ignore'` link to a page's own file, which opened the raw Markdown,
+//     becomes a raw `<a href>` to the page's Markdown copy;
 //   - converts emoji shortcodes to Unicode when given an emoji map (`--emoji`,
 //     e.g. GitHub's `https://api.github.com/emojis` saved to a file);
 //   - writes frontmatter: `title` from a leading H1 (deleted from the body,
@@ -307,6 +309,12 @@ const relativeFile = (fromFile, toFile) => {
   const relative = posix.relative(posix.dirname(fromFile), toFile);
   return relative.startsWith(".") ? relative : `./${relative}`;
 };
+
+/** The new route a page file publishes at. */
+const routeOfPage = (file) =>
+  `/${file.replace(PAGE_EXT, "").split("/").map(stripOrder).join("/")}`
+    .replace(INDEX_ROUTE, "$<lead>")
+    .replace(TRAILING_SLASHES, "$<first>") || "/";
 
 const humanize = (stem) =>
   stem
@@ -1235,13 +1243,16 @@ const rootedUrl = (url, ctx) => {
   return rooted;
 };
 
-/** A root path to a file in the content root: list it for public/. */
+/**
+ * A root path to a file in the content root: list it for public/. A page's
+ * own file needs nothing: Blume serves its Markdown copy at that path.
+ */
 const noteRootFile = (url, ctx) => {
   const file = splitAnchor(url).path;
   const stat = url.startsWith("//")
     ? undefined
     : statSync(path.join(ctx.root, file), { throwIfNoEntry: false });
-  if (stat?.isFile()) {
+  if (stat?.isFile() && !ctx.pageFiles.has(file.slice(1))) {
     ctx.publicFiles.add(file);
   }
 };
@@ -1285,21 +1296,50 @@ const assetFor = (href, page, index, ctx) => {
   return next;
 };
 
-/** A `':ignore'` link: Docsify left the href alone for the browser. */
+/**
+ * A `':ignore'` link: Docsify left the href alone for the browser, which read
+ * a relative one from the docs root (from the page's folder in history mode).
+ * One naming a page's `.md` file opened that raw file, which Blume serves as
+ * the page's Markdown copy, at its new route plus `.md`. A Markdown link to a
+ * page's file lands on the page itself, so that one becomes a raw `<a href>`,
+ * which keeps its path: `{ href, raw: true }`.
+ */
 const ignoredLinkFor = (href, page, ctx) => {
   const local = !(EXTERNAL.test(href) || href.startsWith("#") || href === "");
-  if (local && href.startsWith("/")) {
+  if (!local) {
+    return { href };
+  }
+  const { anchor, path: target } = splitAnchor(href);
+  const rooted = target.startsWith("/");
+  const dir = ctx.settings.history && !rooted ? posix.dirname(page.rel) : ".";
+  const file = docsPath(dir, target);
+  if (ctx.pageFiles.has(file)) {
+    count(
+      page,
+      "':ignore' link to a page's file → <a href> to its Markdown copy"
+    );
+    const route = routeOfPage(ctx.moves.get(file) ?? file);
+    const copy = route === "/" ? "/index.md" : `${route}.md`;
+    return { href: copy + (anchor ? `#${anchor}` : ""), raw: true };
+  }
+  if (rooted) {
     noteRootFile(href, ctx);
   }
-  if (!local || href.startsWith("/") || ctx.settings.history) {
-    return href;
+  if (rooted || ctx.settings.history) {
+    return { href };
   }
   count(page, "':ignore' link → root path");
-  // A page's own `.md` stays reachable as Blume's Markdown twin of it.
-  const file = docsPath(".", splitAnchor(href).path);
-  return ctx.pageFiles.has(file)
-    ? `/${docsPath(".", href)}`
-    : rootedUrl(href, ctx);
+  return { href: rootedUrl(href, ctx) };
+};
+
+const escapeAttribute = (value) =>
+  value.replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+
+/** A raw `<a href>`, its title from a link's ` "title"` (as stripped). */
+const rawLink = (label, href, title) => {
+  const text = title.trim().slice(1, -1);
+  const titled = text ? ` title="${escapeAttribute(text)}"` : "";
+  return `<a href="${escapeAttribute(href)}"${titled}>${label}</a>`;
 };
 
 const rewriteMatch = (page, index, ctx, { kind, line, match }) => {
@@ -1310,16 +1350,20 @@ const rewriteMatch = (page, index, ctx, { kind, line, match }) => {
   }
   const stripped = stripAttributes(page, title, kind);
   const local = !(EXTERNAL.test(href) || href.startsWith("#") || href === "");
+  const textAt = match.index + (kind === "image" ? 2 : 1);
+  const label = line.slice(textAt, textAt + text.length);
   let target = href;
   if (kind === "link" && stripped.config.has("ignore")) {
-    target = ignoredLinkFor(href, page, ctx);
+    const ignored = ignoredLinkFor(href, page, ctx);
+    if (ignored.raw) {
+      return rawLink(label, ignored.href, stripped.title);
+    }
+    target = ignored.href;
   } else if (kind === "link") {
     target = linkFor(href, page, index, ctx);
   } else if (local) {
     target = assetFor(href, page, index, ctx);
   }
-  const textAt = match.index + (kind === "image" ? 2 : 1);
-  const label = line.slice(textAt, textAt + text.length);
   const bang = kind === "image" ? "!" : "";
   return `${bang}[${label}](${target}${stripped.title})`;
 };
@@ -1987,12 +2031,6 @@ const finishPage = (page, ctx) => {
     );
   }
 };
-
-/** The new route a page file publishes at. */
-const routeOfPage = (file) =>
-  `/${file.replace(PAGE_EXT, "").split("/").map(stripOrder).join("/")}`
-    .replace(INDEX_ROUTE, "$<lead>")
-    .replace(TRAILING_SLASHES, "$<first>") || "/";
 
 /** Old route → new route, for every page whose route changed. */
 const routeTable = (pages, ctx) => {
