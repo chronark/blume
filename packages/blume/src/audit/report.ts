@@ -7,6 +7,7 @@ import type { Diagnostic, DiagnosticSeverity } from "../core/types.ts";
 import { CHECKS, checkMeta } from "./catalog.ts";
 import type { CheckId } from "./catalog.ts";
 import type { AuditResult } from "./run.ts";
+import { checkSelected } from "./terms.ts";
 import type { AuditCategory, AuditTier } from "./types.ts";
 
 const SEVERITY_COLOR = {
@@ -128,15 +129,27 @@ export const rollup = (diagnostics: Diagnostic[]): CheckRollup[] => {
 };
 
 /** Categories that had no findings but were never run, and the flag that runs them. */
-const skippedTiers = (tiers: Record<AuditTier, boolean>): string[] =>
-  TIER_FLAGS.filter(({ tier }) => !tiers[tier]).map(({ flag, tier }) => {
-    const label = CHECKS.filter((check) => check.tier === tier).length;
-    return `  ${colors.dim(`⊘ ${tier.padEnd(12)} skipped — pass ${flag} (${label} checks)`)}`;
+const skippedTiers = (result: AuditResult): string[] =>
+  TIER_FLAGS.flatMap(({ flag, tier }) => {
+    // Only the checks `--only`/`--skip` left in would have run.
+    const count = CHECKS.filter(
+      (check) => check.tier === tier && checkSelected(check.id, result)
+    ).length;
+    return result.tiers[tier] || count === 0
+      ? []
+      : [
+          `  ${colors.dim(`⊘ ${tier.padEnd(12)} skipped — pass ${flag} (${count} checks)`)}`,
+        ];
   });
 
-/** How many checks actually ran, i.e. those whose tier was enabled. */
-const activeChecks = (tiers: Record<AuditTier, boolean>): number =>
-  CHECKS.filter((check) => tiers[check.tier]).length;
+/**
+ * How many checks the report covers: those whose tier was enabled, and that
+ * `--only`/`--skip` left in.
+ */
+const activeChecks = (result: AuditResult): number =>
+  CHECKS.filter(
+    (check) => result.tiers[check.tier] && checkSelected(check.id, result)
+  ).length;
 
 /**
  * Individual checks performed: every rule that ran, against every page crawled.
@@ -144,7 +157,7 @@ const activeChecks = (tiers: Record<AuditTier, boolean>): number =>
  * rather than a bare count.
  */
 export const auditCount = (result: AuditResult): number =>
-  activeChecks(result.tiers) * result.pages;
+  activeChecks(result) * result.pages;
 
 const summaryLine = (
   counts: Record<DiagnosticSeverity, number>,
@@ -244,7 +257,7 @@ export const formatReport = (
     lines.push("");
   }
 
-  const skipped = skippedTiers(result.tiers);
+  const skipped = skippedTiers(result);
   if (skipped.length > 0) {
     lines.push(...skipped, "");
   }

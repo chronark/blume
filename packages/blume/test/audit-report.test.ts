@@ -147,6 +147,37 @@ describe("formatReport", () => {
     expect(online).toBeGreaterThan(offline);
   });
 
+  it("counts only the checks --only and --skip leave in", () => {
+    // `--only redirects` reports the redirect checks alone, so the headline
+    // counts those that ran, not the whole audit.
+    const redirects = CHECKS.filter(
+      (check) => check.category === "redirects" && check.tier === "static"
+    ).length;
+    const only = { ...result([]), only: ["redirects"] };
+    expect(auditCount(only)).toBe(redirects * 10);
+    const text = strip(formatReport(only, "/root"));
+    expect(text).toContain(`${redirects * 10} audits`);
+    // The skipped tiers count only the checks the filter left in, and a tier
+    // it left none in isn't listed.
+    const network = CHECKS.filter(
+      (check) => check.category === "redirects" && check.tier === "network"
+    ).length;
+    expect(text).toContain(
+      `network      skipped — pass --url <origin> (${network} checks)`
+    );
+    expect(text).not.toContain("external     skipped");
+    // A short id and a full id count one check each.
+    expect(
+      auditCount({
+        ...result([]),
+        only: ["redirect_loop", "BLUME_AUDIT_REDIRECT_BROKEN"],
+      })
+    ).toBe(20);
+    expect(
+      auditCount({ ...result([]), skip: ["redirects"] }) + redirects * 10
+    ).toBe(auditCount(result([])));
+  });
+
   it("rolls affected pages up under the check, not the other way round", () => {
     const diagnostics = Array.from({ length: 6 }, (_, index) =>
       finding("BLUME_AUDIT_TITLE_MISSING", { url: `/p${index}` }, "x")

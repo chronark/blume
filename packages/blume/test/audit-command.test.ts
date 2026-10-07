@@ -250,6 +250,8 @@ describe("blume audit", () => {
       JSON.parse(only.stdout).diagnostics.map((d: { code: string }) => d.code)
     );
     expect([...onlyCodes]).toEqual(["BLUME_AUDIT_LINK_TO_BROKEN"]);
+    // The headline counts the one check, against each page, not every check.
+    expect(JSON.parse(only.stdout).audit.audits).toBe(2);
 
     const skipped = await audit(root, "--json", "--skip", "link_to_broken");
     const skippedCodes = new Set(

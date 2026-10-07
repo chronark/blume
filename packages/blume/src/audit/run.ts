@@ -8,7 +8,6 @@ import type { BlumeProject } from "../core/project-graph.ts";
 import type { Diagnostic } from "../core/types.ts";
 import { deployStaticDir } from "../deploy/adapter-output.ts";
 import { applyBaseToAstroRedirects } from "../deploy/redirects.ts";
-import { CHECKS } from "./catalog.ts";
 import type { CheckId } from "./catalog.ts";
 import { assetChecks } from "./checks/assets.ts";
 import { contentChecks } from "./checks/content.ts";
@@ -32,7 +31,7 @@ import {
 import { crawlStaticDir } from "./crawl.ts";
 import { buildGraph } from "./graph.ts";
 import { resolveRedirects } from "./redirects.ts";
-import { shortId } from "./terms.ts";
+import { checkSelected } from "./terms.ts";
 import { DEFAULT_THRESHOLDS } from "./types.ts";
 import type {
   AuditContext,
@@ -84,6 +83,10 @@ export interface AuditResult {
   origin: string | null;
   /** Which tiers actually ran. A skipped tier is reported, never hidden. */
   tiers: Record<AuditTier, boolean>;
+  /** The `--only` terms the findings were filtered to, if any. */
+  only?: string[];
+  /** The `--skip` terms the findings were filtered by, if any. */
+  skip?: string[];
 }
 
 /** Thrown when there's no build to audit. */
@@ -121,18 +124,6 @@ const readSources = async (
     { concurrency: READ_CONCURRENCY }
   );
   return new Map(entries.filter((entry) => entry !== null));
-};
-
-/** Does a check id or its category match one of the user's `--only`/`--skip` terms? */
-const matches = (id: CheckId, terms: string[]): boolean => {
-  const meta = CHECKS.find((check) => check.id === id);
-  const short = shortId(id);
-  return terms.some((raw) => {
-    const term = raw.trim().toLowerCase();
-    return (
-      term === short || term === id.toLowerCase() || term === meta?.category
-    );
-  });
 };
 
 /** Audit a built site. */
@@ -203,25 +194,18 @@ export const runAudit = async (options: AuditOptions): Promise<AuditResult> => {
     )
   );
 
-  let diagnostics = results.flat();
-  if (options.only?.length) {
-    // SAFETY: audit diagnostics are created through `finding()`, whose codes
-    // all come from the check catalog's `CheckId` set.
-    diagnostics = diagnostics.filter((d) =>
-      matches(d.code as CheckId, options.only ?? [])
-    );
-  }
-  if (options.skip?.length) {
-    // SAFETY: same invariant — every audit diagnostic code is a catalog `CheckId`.
-    diagnostics = diagnostics.filter(
-      (d) => !matches(d.code as CheckId, options.skip ?? [])
-    );
-  }
+  // SAFETY: audit diagnostics are created through `finding()`, whose codes
+  // all come from the check catalog's `CheckId` set.
+  const diagnostics = results
+    .flat()
+    .filter((d) => checkSelected(d.code as CheckId, options));
 
   return {
     diagnostics,
+    only: options.only,
     origin,
     pages: crawl.pages.length,
+    skip: options.skip,
     staticDir,
     tiers,
   };

@@ -5,6 +5,29 @@ import type { CheckId } from "./catalog.ts";
 export const shortId = (id: CheckId): string =>
   id.replace("BLUME_AUDIT_", "").toLowerCase();
 
+/** Does a check id or its category match one of the user's `--only`/`--skip` terms? */
+const matchesTerms = (id: CheckId, terms: readonly string[]): boolean => {
+  const meta = CHECKS.find((check) => check.id === id);
+  const short = shortId(id);
+  return terms.some((raw) => {
+    const term = raw.trim().toLowerCase();
+    return (
+      term === short || term === id.toLowerCase() || term === meta?.category
+    );
+  });
+};
+
+/**
+ * Whether `--only` and `--skip` leave a check in: it matches an `--only`
+ * term, when any are given, and no `--skip` term.
+ */
+export const checkSelected = (
+  id: CheckId,
+  filter: { only?: readonly string[]; skip?: readonly string[] }
+): boolean =>
+  (!filter.only?.length || matchesTerms(id, filter.only)) &&
+  !matchesTerms(id, filter.skip ?? []);
+
 /**
  * Every term `--only`/`--skip` accept, as the audit's filter compares them:
  * each check's short id and each category. The full `BLUME_AUDIT_…` id is
