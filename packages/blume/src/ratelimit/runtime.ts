@@ -11,11 +11,14 @@
  * the shared store fails to count (logged, not blocked). A shared store
  * without its secrets or binding falls back to counting in memory.
  */
+import { z } from "zod";
+
 import { clientAddressOf } from "../core/client-address.ts";
 import type { ClientContext } from "../core/client-address.ts";
 import { RATE_LIMIT_BINDING } from "./cloudflare.ts";
 import { DEFAULT_REQUESTS, DEFAULT_WINDOW } from "./memory.ts";
 import type { RateLimitAdapter } from "./schema.ts";
+import { unkeySecrets } from "./unkey.ts";
 import { upstashSecrets } from "./upstash.ts";
 
 /** What a limiter says about one request. */
@@ -47,6 +50,10 @@ export interface LimiterRuntime {
 
 /** Past this many tracked readers, a memory limiter drops expired ones. */
 const MEMORY_SWEEP_AT = 10_000;
+
+const unkeyReplySchema = z.object({
+  data: z.object({ reset: z.number(), success: z.boolean() }),
+});
 
 /** One reader's count in the current window. */
 interface MemoryEntry {
@@ -185,6 +192,44 @@ export const createLimiter = (
     return null;
   }
   const { requests, window } = limitOf(adapter);
+  if (adapter.kind === "unkey") {
+    const [secret] = unkeySecrets(adapter.options);
+    const rootKey = runtime.secret?.(secret);
+    if (rootKey) {
+      return async (key) => {
+        const response = await (runtime.fetch ?? fetch)(
+          "https://api.unkey.com/v2/ratelimit.limit",
+          {
+            body: JSON.stringify({
+              duration: window * 1000,
+              identifier: key,
+              limit: requests,
+              namespace: adapter.options.namespace ?? "docs",
+            }),
+            headers: {
+              authorization: `Bearer ${rootKey}`,
+              "content-type": "application/json",
+            },
+            method: "POST",
+          }
+        );
+        if (!response.ok) {
+          throw new Error(`Unkey answered ${response.status}.`);
+        }
+        const reply = unkeyReplySchema.parse(await response.json());
+        return {
+          allowed: reply.data.success,
+          retryAfter: Math.max(
+            1,
+            Math.ceil((reply.data.reset - (runtime.now ?? Date.now)()) / 1000)
+          ),
+        };
+      };
+    }
+    console.warn(
+      `Rate limiting counts in memory: set ${secret} to share the count through Unkey.`
+    );
+  }
   if (adapter.kind === "cloudflare") {
     if (runtime.binding) {
       return bindingLimiter(runtime.binding, window);
