@@ -603,7 +603,51 @@ describe("directiveToCalloutPlugin", () => {
       directiveToCalloutPlugin().containerDirective(node, ctx)
     ) as ReturnType<typeof jsxFlowElement>;
     const title = result.attributes.find((a) => a.name === "title");
-    expect(title?.value).toBe("Read this now");
+    // The formatting travels as Markdown, which `<Callout>` renders.
+    expect(title?.value).toBe("Read **this** now");
+  });
+
+  it("writes every kind of [label] phrasing back as Markdown", () => {
+    const space = { type: "text", value: " " };
+    const label = {
+      children: [
+        { children: [{ type: "text", value: "em" }], type: "emphasis" },
+        space,
+        { children: [{ type: "text", value: "gone" }], type: "delete" },
+        space,
+        { type: "inlineCode", value: "a`b" },
+        space,
+        { type: "inlineCode", value: "`tick" },
+        space,
+        { type: "inlineCode", value: " pad " },
+        space,
+        {
+          children: [{ type: "text", value: "docs" }],
+          type: "link",
+          url: "/a b<c>",
+        },
+        { alt: "logo", type: "image", url: "/l.png" },
+        space,
+        { type: "html", value: "<kbd>" },
+        { type: "text", value: " snake_case *star* [x] \\ ~" },
+      ],
+      data: { directiveLabel: true },
+      type: "paragraph",
+    };
+    // SAFETY: the `note` directive maps onto a Callout, so the captured
+    // replacement is a `jsxFlowElement` result carrying its attributes.
+    const result = captureReplacement((ctx) =>
+      directiveToCalloutPlugin().containerDirective(
+        { children: [label, body], name: "note", type: "containerDirective" },
+        ctx
+      )
+    ) as ReturnType<typeof jsxFlowElement>;
+    expect(result.attributes.find((a) => a.name === "title")?.value).toBe(
+      [
+        "*em* ~~gone~~ ``a`b`` `` `tick `` `  pad  ` [docs](</a b%3Cc%3E>)",
+        String.raw`\<kbd> snake\_case \*star\* \[x\] \\ \~`,
+      ].join(" ")
+    );
   });
 
   it("keeps a non-callout directive's body between its literal fences", () => {

@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   renderInlineMarkdown,
+  renderInlineTitle,
   unwrapParagraph,
 } from "../src/components/content/inline-markdown.ts";
 
@@ -37,6 +38,42 @@ describe("renderInlineMarkdown", () => {
     expect(await renderInlineMarkdown("Mail <team@x.dev>")).toBe(
       'Mail <a href="mailto:team@x.dev">team@x.dev</a>'
     );
+  });
+});
+
+describe("renderInlineTitle", () => {
+  it("renders a title's inline Markdown, raw HTML as text", async () => {
+    expect(await renderInlineTitle("Use **bold** and `code`")).toBe(
+      "Use <strong>bold</strong> and <code>code</code>"
+    );
+    expect(await renderInlineTitle("The `x` option, [docs](/x)")).toBe(
+      'The <code>x</code> option, <a href="/x">docs</a>'
+    );
+    expect(await renderInlineTitle("`a` and <b>b</b>")).toBe(
+      "<code>a</code> and &lt;b&gt;b&lt;/b&gt;"
+    );
+  });
+
+  it("reads back the Markdown a callout label is written as", async () => {
+    expect(
+      await renderInlineTitle(
+        "*em* ~~gone~~ ``a`b`` [docs](</a b%3Cc%3E>) snake\\_case \\*star\\* \\[x\\]"
+      )
+    ).toBe(
+      '<em>em</em> <del>gone</del> <code>a`b</code> <a href="/a%20b%3Cc%3E">docs</a> snake_case *star* [x]'
+    );
+  });
+
+  it("leaves a title with no inline syntax as written", async () => {
+    // No smart quotes or entity decoding: the component prints it as is.
+    expect(
+      await renderInlineTitle(`Don't "quote" Tom & Jerry`)
+    ).toBeUndefined();
+  });
+
+  it("leaves a title that renders as more than one line as written", async () => {
+    expect(await renderInlineTitle("1. Install `blume`")).toBeUndefined();
+    expect(await renderInlineTitle("- `item`")).toBeUndefined();
   });
 });
 

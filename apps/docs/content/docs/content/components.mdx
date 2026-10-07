@@ -241,7 +241,7 @@ Illustrate a project or folder layout. Wrap a normal Markdown list and Blume sty
 
 ## Accordion
 
-Stack related collapsibles in a single bordered container with dividers between them — FAQs, optional steps, or long examples. Each child is an `AccordionItem` (`title`, optional `icon`, `description`, `defaultOpen`). For a single standalone disclosure, use [Expandable](#expandable).
+Stack related collapsibles in a single bordered container with dividers between them — FAQs, optional steps, or long examples. Each child is an `AccordionItem` (`title`, optional `icon`, `description`, `defaultOpen`). The `title` renders inline Markdown, so code spans, emphasis, and links in it show as they would in a sentence; raw HTML in it shows as text. For a single standalone disclosure, use [Expandable](#expandable).
 
 <Accordion>
   <AccordionItem title="Does it support MDX?">
@@ -265,7 +265,7 @@ Stack related collapsibles in a single bordered container with dividers between 
 
 ## Expandable
 
-A lightweight inline disclosure for nested detail — expanding a field's sub-properties or an optional aside. `title` labels the toggle (defaults to “Show more”); set `defaultOpen` to start expanded.
+A lightweight inline disclosure for nested detail — expanding a field's sub-properties or an optional aside. `title` labels the toggle (defaults to “Show more”) and renders inline Markdown, as an accordion item's does; set `defaultOpen` to start expanded.
 
 <Expandable title="Show advanced options">
   These settings are optional and rarely need changing.

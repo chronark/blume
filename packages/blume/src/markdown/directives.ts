@@ -56,6 +56,72 @@ export const calloutTypeFor = (name: string): string | null => {
   return CALLOUT_ALIASES[lower] ?? null;
 };
 
+// The characters that start inline Markdown in plain text, escaped so the
+// text reads back as written.
+const MARKDOWN_SPECIAL = /[\\`*_~[\]<]/gu;
+
+const escapeMarkdown = (text: string): string =>
+  text.replaceAll(MARKDOWN_SPECIAL, String.raw`\$&`);
+
+const BACKTICK_RUN = /`+/gu;
+
+/** A code span holding `code` verbatim. */
+const codeSpan = (code: string): string => {
+  const runs = [...code.matchAll(BACKTICK_RUN)].map(([run]) => run.length);
+  const fence = "`".repeat(Math.max(0, ...runs) + 1);
+  // A backtick at either end would join the fence, and CommonMark strips one
+  // space from each end of a span that has both: a space pads either case.
+  const pad =
+    code.startsWith("`") ||
+    code.endsWith("`") ||
+    (code.startsWith(" ") && code.endsWith(" ") && code.trim() !== "")
+      ? " "
+      : "";
+  return `${fence}${pad}${code}${pad}${fence}`;
+};
+
+// What can't sit inside a `<…>` link destination.
+const DESTINATION_UNSAFE = /[<>\n]/gu;
+
+/**
+ * A node's phrasing children (a directive label's, a paragraph's) written
+ * back as inline Markdown, for a component prop that renders it — a callout
+ * title. Text, emphasis, strong, strikethrough, code, and links keep their
+ * formatting; anything else reads as its text (an image as nothing, raw HTML
+ * as its literal source), the way a flattened title always did.
+ */
+export const phrasingMarkdown = (parent: MdastNode): string =>
+  // SAFETY: a phrasing parent's `children` is a node list.
+  ((parent.children ?? []) as MdastNode[])
+    .map((node) => {
+      switch (node.type) {
+        case "strong": {
+          return `**${phrasingMarkdown(node)}**`;
+        }
+        case "emphasis": {
+          return `*${phrasingMarkdown(node)}*`;
+        }
+        case "delete": {
+          return `~~${phrasingMarkdown(node)}~~`;
+        }
+        case "inlineCode": {
+          return codeSpan(mdastToString(node));
+        }
+        case "link": {
+          const url = String(node.url ?? "").replaceAll(
+            DESTINATION_UNSAFE,
+            encodeURIComponent
+          );
+          return `[${phrasingMarkdown(node)}](<${url}>)`;
+        }
+        default: {
+          break;
+        }
+      }
+      return escapeMarkdown(mdastToString(node, { includeImageAlt: false }));
+    })
+    .join("");
+
 /** The markers that open a text (`:name`) and a leaf (`::name`) directive. */
 const LITERAL_MARKERS = new Map([
   ["leafDirective", "::"],
@@ -194,12 +260,10 @@ const renderContainer = (
     ];
   }
 
-  // Flatten the label's phrasing children so `:::note[Read **this**]` yields
-  // `Read this`; image alt is excluded (an image is not label text), matching
-  // the historical child-values-only behavior.
+  // The label's phrasing as Markdown, which `<Callout>` renders in its title:
+  // `:::note[Read **this**]` keeps its bold.
   const title =
-    node.attributes?.title ??
-    (label ? mdastToString(label, { includeImageAlt: false }) : undefined);
+    node.attributes?.title ?? (label ? phrasingMarkdown(label) : undefined);
   const attributes = [jsxAttribute("type", type)];
   if (title) {
     attributes.push(jsxAttribute("title", title));

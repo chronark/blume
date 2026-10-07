@@ -609,7 +609,7 @@ timeline
 
 ## Callouts
 
-Callouts pull a reader's attention to context, advice, or risk. Write them as `:::type` directives; add a title in brackets, like `:::warning[Heads up]`. Directives are an MDX-only feature — in a `.md` file a `:::note` line stays literal text.
+Callouts pull a reader's attention to context, advice, or risk. Write them as `:::type` directives; add a title in brackets, like `:::warning[Heads up]`. The title keeps its inline formatting, so code, emphasis, and links in the brackets render in the title. Directives are an MDX-only feature — in a `.md` file a `:::note` line stays literal text.
 
 ### Note
 
@@ -712,6 +712,26 @@ Commit `blume.config.ts`, not `.blume/`.
 ```
 
 Write the name right after the colons. `::: tip`, with a space (the spelling VitePress, VuePress, and Docusaurus v2 use), isn't a directive, so the page shows the line as text, and Blume warns about a callout name written that way as `BLUME_DIRECTIVE_SPACED_NAME`. Inside a container, a closing fence with text after its colons still closes it, and the text is dropped: a `::: card` line inside a `:::warning` ends the callout there, and `card` never shows. Blume warns about that line as `BLUME_DIRECTIVE_CLOSING_TEXT`. To keep it inside the callout as text, give the callout a longer fence, as above, or remove the text after the colons.
+
+### GitHub alerts
+
+GitHub's alert syntax renders as a callout too: a quote whose first line is `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]`, or `[!CAUTION]`, in any case. Text after the marker on that line becomes the title.
+
+{/* prettier-ignore */}
+> [!TIP]
+> Set `deployment.site` so sitemaps and Open Graph images use absolute URLs.
+
+{/* prettier-ignore */}
+```md
+> [!TIP]
+> Set `deployment.site` so sitemaps and Open Graph images use absolute URLs.
+```
+
+`[!NOTE]` and `[!TIP]` render as the callouts of the same name, `[!IMPORTANT]` as a note, `[!WARNING]` as a warning, and `[!CAUTION]` as a danger callout, matching GitHub's red. As on GitHub, an alert quoted inside another stays a quote, and so does any other marker, such as `[!INFO]`.
+
+A formatter that joins lines, like oxfmt with `proseWrap: "never"`, pulls the first body line up beside the marker, where it becomes the title (it [collapses directives](/docs/faq#why-is-oxfmt--ultracite-collapsing-my-directives) the same way). Leave a `>` line blank after the marker to keep them apart; GitHub renders that form too.
+
+Alerts are MDX-only, like directives. In a `.md` file the quote stays a quote and shows its marker as text, and `blume dev`, `blume build`, and `blume check` warn about it as `BLUME_MD_GITHUB_ALERT`. Rename the page to `.mdx` to render it as a callout.
 
 ## Math
 

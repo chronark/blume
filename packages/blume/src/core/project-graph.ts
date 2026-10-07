@@ -1,5 +1,6 @@
 import { isAbsolute, relative } from "pathe";
 
+import { alertDiagnostics } from "./alert-diagnostics.ts";
 import { normalizePath, withBasePath } from "./base-path.ts";
 import { CHANGELOG_INDEX_ROUTE, hasChangelogIndex } from "./changelog-index.ts";
 import { codeFenceDiagnostics } from "./code-fence-diagnostics.ts";
@@ -218,7 +219,8 @@ const normalizeLoadedEntries = (
       if (normalized.pages.length > 0) {
         allDiagnostics.push(
           ...directiveDiagnostics(entry, source.name),
-          ...codeFenceDiagnostics(entry, source.name)
+          ...codeFenceDiagnostics(entry, source.name),
+          ...alertDiagnostics(entry, source.name)
         );
       }
     }

@@ -6,6 +6,7 @@ import {
   admonitionType,
 } from "../colors.ts";
 import Icon from "../Icon.astro";
+import { renderInlineTitle } from "./inline-markdown.ts";
 
 interface Props {
   type?: AdmonitionType | "check";
@@ -17,6 +18,9 @@ interface Props {
 const { color, icon, type = "info", title } = Astro.props;
 // `check` is an alias of `success`; fold it once so the tables need one row.
 const kind = admonitionType(type);
+// The title's inline Markdown (a `:::note[Use **this**]` label passes its
+// formatting through as Markdown), or undefined for a title shown as written.
+const titleHtml = title ? await renderInlineTitle(title) : undefined;
 
 const variantClass: Record<AdmonitionType, string> = {
   danger: "border-red-500/25 bg-red-500/10",
@@ -50,7 +54,13 @@ const variantClass: Record<AdmonitionType, string> = {
       the unlayered prose rule): every child a small top margin, none on the
       first, and no trailing bottom margin. */}
   <div class="flex-1 [&>*]:mt-2! [&>*]:mb-0! [&>:first-child]:mt-0!">
-    {title && <p class="font-semibold text-foreground">{title}</p>}
+    {
+      titleHtml === undefined ? (
+        title && <p class="font-semibold text-foreground">{title}</p>
+      ) : (
+        <p class="font-semibold text-foreground" set:html={titleHtml} />
+      )
+    }
     <slot />
   </div>
 </aside>

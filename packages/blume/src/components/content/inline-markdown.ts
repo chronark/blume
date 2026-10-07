@@ -29,20 +29,47 @@ export const rawHtmlAsTextPlugin = defineMdastPlugin({
  * `<p>a</p>\n<p>b</p>` would "unwrap" to `a</p>\n<p>b` — unbalanced HTML
  * injected via `set:html`.
  */
+const SINGLE_PARAGRAPH = /^<p>(?<content>(?:(?!<\/p>)[\s\S])*)<\/p>$/u;
+
 export const unwrapParagraph = (html: string): string => {
   const trimmed = html.trim();
-  const match = trimmed.match(/^<p>(?<content>(?:(?!<\/p>)[\s\S])*)<\/p>$/u);
-  return match?.groups?.content ?? trimmed;
+  return SINGLE_PARAGRAPH.exec(trimmed)?.groups?.content ?? trimmed;
+};
+
+/** Render Markdown to HTML, its raw HTML shown as text. */
+const renderMarkdown = async (value: string): Promise<string> => {
+  const processor = await createSatteriMarkdownProcessor({
+    mdastPlugins: [rawHtmlAsTextPlugin],
+  });
+  const rendered = await processor.render(value);
+  return rendered.code;
 };
 
 /**
  * Render a short Markdown text prop to inline HTML, its raw HTML shown as
  * text (see {@link rawHtmlAsTextPlugin}) and a single paragraph unwrapped.
  */
-export const renderInlineMarkdown = async (value: string): Promise<string> => {
-  const processor = await createSatteriMarkdownProcessor({
-    mdastPlugins: [rawHtmlAsTextPlugin],
-  });
-  const rendered = await processor.render(value);
-  return unwrapParagraph(rendered.code);
+export const renderInlineMarkdown = async (value: string): Promise<string> =>
+  unwrapParagraph(await renderMarkdown(value));
+
+// What inline Markdown a title can hold starts with: a backslash escape, a
+// code span, emphasis or strikethrough, or a link.
+const INLINE_SYNTAX = /[\\`*_~[]/u;
+
+/**
+ * A title prop (a callout's, an accordion item's) as inline HTML, with its
+ * Markdown rendered — `` `code` ``, `**bold**`, `[links](/x)` — and its raw
+ * HTML shown as text. Undefined when the title renders as written instead:
+ * when it holds none of that syntax, so a plain title keeps the exact text it
+ * always rendered, and when it doesn't render as one paragraph (`1. Install`
+ * is no list).
+ */
+export const renderInlineTitle = async (
+  value: string
+): Promise<string | undefined> => {
+  if (!INLINE_SYNTAX.test(value)) {
+    return undefined;
+  }
+  const html = await renderMarkdown(value);
+  return SINGLE_PARAGRAPH.exec(html.trim())?.groups?.content;
 };
