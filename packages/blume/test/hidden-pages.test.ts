@@ -137,6 +137,28 @@ describe("hidden folder index pages", () => {
     expect(skill).not.toContain("secret");
   });
 
+  it("keep a hidden home page listed, since the site's root always serves it", async () => {
+    const project = await scan({
+      ...PAGES,
+      "docs/index.md": page("Home", "hidden: true\n"),
+    });
+    // No sidebar row links the home page once it's hidden...
+    expect(
+      project.graph.navigation.sidebar.some((node) => node.route === "/")
+    ).toBeFalsy();
+    // ...but it is the site's root, so it stays listed everywhere.
+    expect(routeOf(project, "/")).toMatchObject({
+      hidden: false,
+      indexable: true,
+    });
+    expect(sitemapOf(project)).toContain(`<loc>${SITE}/</loc>`);
+    const documents = await buildSearchDocuments(project, {
+      includeWhenDisabled: true,
+    });
+    expect(documents.map((document) => document.route)).toContain("/");
+    expect(buildLlmsIndex(project)).toContain(`- [Home](${SITE}/)`);
+  });
+
   it("stay listed when an explicit sidebar group links them as its root", async () => {
     const project = await scan(
       PAGES,
@@ -238,6 +260,15 @@ describe(isHiddenPage, () => {
       navigationByVersion: { v1: { "": tree([group("/v1/guides")]) } },
     });
     expect(isHiddenPage(archived, byVersion)).toBeFalsy();
+  });
+
+  it("is false for a locale's or version's home page", () => {
+    const graph = graphOf({
+      navigationByLocale: { fr: { ...tree([]), root: "/fr" } },
+      navigationByVersion: { v1: { "": { ...tree([]), root: "/v1" } } },
+    });
+    expect(isHiddenPage(makePage("/fr", { hidden: true }), graph)).toBeFalsy();
+    expect(isHiddenPage(makePage("/v1", { hidden: true }), graph)).toBeFalsy();
   });
 
   it("treats a graph with no navigation as linking nothing", () => {

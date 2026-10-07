@@ -148,7 +148,7 @@ sidebar:
   display: page
 ```
 
-`hidden` removes the page from the sidebar and from previous/next pagination, and so from the sitemap, search, and `llms.txt` (see [Hidden pages](/docs/content/navigation#hidden-pages)). On a folder's `index` page it removes only the page's own row: the group row keeps linking to the page, so previous/next links still pass through it and the page stays in the sitemap, search, and `llms.txt`.
+`hidden` removes the page from the sidebar and from previous/next pagination, and so from the sitemap, search, and `llms.txt` (see [Hidden pages](/docs/content/navigation#hidden-pages)). On a folder's `index` page it removes only the page's own row: the group row keeps linking to the page, so previous/next links still pass through it and the page stays in the sitemap, search, and `llms.txt`. On the home page, the root `index` page, it also removes only the row: the page stays in the sitemap, search, and `llms.txt`.
 
 `display` sets the render mode of the page's folder group ([per-group overrides](/docs/content/navigation#per-group-overrides)) and is only meaningful on a folder's `index` page under the generated sidebar — anywhere else (a non-index page, the content root's own `index` page, or any page under an explicit `navigation.sidebar`) it has no group to configure, and Blume warns with `BLUME_SIDEBAR_DISPLAY_IGNORED`.
 
