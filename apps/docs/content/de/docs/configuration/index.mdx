@@ -239,7 +239,7 @@ content: {
 | --- | --- | --- |
 | `root` | `"docs"` | Ordner, den Blume nach Inhalten durchsucht. Kurzform für eine einzelne `filesystem()`-Quelle; nicht zusammen mit `sources` erlaubt. |
 | `include` | `["**/*.{md,mdx}"]` | Globs, die auf Inhaltsdateien passen. Kurzform, wie `root`. |
-| `exclude` | `["**/_*", "**/.*"]` | Zu ignorierende Globs (Dateien mit Unterstrich und Punkt am Anfang). Kurzform, wie `root`. |
+| `exclude` | `["**/_*", "**/.*"]` | Zu ignorierende Globs. Deine Einträge ergänzen die Standardwerte, die Dateien mit Unterstrich und Punkt am Anfang überspringen; ein `!`-Eintrag entfernt ein Muster, sodass `"!**/_*"` Dateien mit `_`-Präfix veröffentlicht. Kurzform, wie `root`. |
 | `sources` | eine `filesystem()` | Adapter für Inhaltsquellen aus `blume/sources`, die die Kurzform ersetzen. Siehe [Inhaltsquellen](/docs/content/sources). |
 | `pages` | `"pages"` | Ordner für benutzerdefinierte `.astro`-Seiten. |
 | `defaultType` | `"doc"` | Seiten-`type`, der verwendet wird, wenn das Frontmatter ihn weglässt. |
@@ -366,7 +366,7 @@ lastModified: "git",
 | `"git"` | Datum aus der Git-Historie lesen (Commit-Daten). |
 | `"frontmatter"` | Git nie ausführen — ausschließlich das Frontmatter-Feld `lastModified` verwenden. |
 
-Die Git-Quelle liest den jüngsten Commit, der die jeweilige Datei berührt hat, funktioniert also in jedem Git-Repository — auch in Monorepos — und benötigt die Historie des Repositorys zur Build-Zeit. CI-Plattformen checken üblicherweise einen flachen Klon aus, wodurch die meisten Daten stillschweigend verloren gehen (der Build warnt in diesem Fall mit `BLUME_SHALLOW_GIT_HISTORY`): Setze auf Vercel die Umgebungsvariable `VERCEL_DEEP_CLONE=true`; bei `actions/checkout` setze `fetch-depth: 0`. Das seiteneigene `lastModified`-Frontmatter gewinnt immer, was praktisch ist, um ein Datum festzuschreiben oder für Dateien, die noch nicht committet sind:
+Die Git-Quelle liest den jüngsten Commit, der die jeweilige Datei berührt hat, funktioniert also in jedem Git-Repository — auch in Monorepos — und benötigt die Historie des Repositorys zur Build-Zeit. Sie folgt Umbenennungen, so wie es `git log --follow` tut: Wird `page.md` in `page.mdx` umbenannt oder eine Datei in einen anderen Ordner unterhalb desselben Inhalts-Stammverzeichnisses verschoben, bleibt das Datum der Seite erhalten, solange der Commit ihren Inhalt unverändert lässt. Eine Umbenennung, bei der die Datei zugleich bearbeitet wird, datiert die Seite auf diesen Commit — ebenso das Hereinverschieben einer Datei von außerhalb des Inhalts-Stammverzeichnisses. CI-Plattformen checken üblicherweise einen flachen Klon aus, wodurch die meisten Daten stillschweigend verloren gehen (der Build warnt in diesem Fall mit `BLUME_SHALLOW_GIT_HISTORY`): Setze auf Vercel die Umgebungsvariable `VERCEL_DEEP_CLONE=true`; bei `actions/checkout` setze `fetch-depth: 0`. Das seiteneigene `lastModified`-Frontmatter gewinnt immer, was praktisch ist, um ein Datum festzuschreiben oder für Dateien, die noch nicht committet sind:
 
 ```mdx page.mdx
 ---

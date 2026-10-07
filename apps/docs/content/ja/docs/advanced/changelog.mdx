@@ -74,7 +74,33 @@ changelog: {
 
 どちらも、[ヘッダータブのラベル](/docs/content/i18n#per-locale-navigation)と同様に、ロケールコードからテキストへのマップも受け付けます。インデックスはデフォルトのロケールでレンダリングされるため、そのロケールのエントリが表示されます。どちらかを未設定のままにすると組み込みのテキストが維持され、それは [UI 文字列のオーバーライド](/docs/content/i18n#translated-ui)（`i18n.ui` 配下の `changelog.title` と `changelog.description`）で置き換えられます。
 
-このページは `/changelog` ルートが他に占有されていない場合にのみ表示されます。独自のデザインに置き換えるには、`pages/changelog.astro` に[カスタムページ](/docs/advanced/custom-pages)を追加してください — それが優先され、Blume はデフォルトのインデックスの生成を停止します。以前のタイムラインの構築に使われていた `<Update>` コンポーネントは、リリースノートをインラインで表示したいカスタムページ向けに引き続き提供されています。これは MDX コンポーネントには含まれていないため、`.astro` ページ自体でインポートしてください: `import Update from "blume/components/content/Update.astro";`。
+このページは `/changelog` ルートが他に占有されていない場合にのみ表示されます。
+
+### 独自のインデックスを書く [#writing-your-own-index]
+
+一覧の上に何か — 導入文、フィードへのリンク、リリースサイクルについての注記など — を置きたい場合は、ページを自分で書き、一覧を表示したい位置に `<Changelog />` を配置してください。一覧は引き続き Blume が受け持つため、自分で書くのは一覧の枠に収まらない部分だけです:
+
+```mdx changelog/index.mdx
+---
+title: Changelog
+description: Every Acme SDK release, newest first.
+mode: center
+---
+
+Every release, newest first. Subscribe to the [RSS feed](/changelog/rss.xml) to follow along.
+
+<Changelog />
+```
+
+`/changelog` にあるコンテンツページがルートを引き継ぐため、生成されたページは表示されなくなり、代わりにあなたのページがレンダリングされます。サイドバーの Changelog グループがこのページにリンクするよう、エントリと同じフォルダ内の `changelog/index.mdx` に配置してください — フォルダの隣に `changelog.mdx` を置くと、サイドバーに 2 つ目の Changelog 項目が追加されてしまいます。[`mode: center`](/docs/content/frontmatter#layout) を指定すると、生成されたページと同じレイアウト（サイドバーも目次もない、より幅の広い中央寄せのカラム）になります。また、生成されたページも同じコンポーネントをレンダリングしているため、両者の内容がずれることはありません。一覧はエージェント向けの出力（`/changelog.md`、llms-full.txt、MCP の `get_page`、検索）では、生成されたページとまったく同じように Markdown に変換されます。
+
+タグをどこに置いても、一覧には常にデフォルトロケールのエントリが表示されます — これは一覧を公開するすべての出力がすでに従っているルールであり、翻訳されたページでも、どのリリースが存在するかについて食い違うことなく同じリリースが一覧表示されます。日付はそのページ自身の言語で表示されます。
+
+### ページを完全に置き換える [#replacing-the-page-entirely]
+
+コンポーネントでは表現できないデザインにしたい場合は、`pages/changelog.astro` に[カスタムページ](/docs/advanced/custom-pages)を追加してください — それが優先され、Blume はデフォルトのインデックスの生成を停止します。以前のタイムラインの構築に使われていた `<Update>` コンポーネントは、リリースノートをインラインで表示したいカスタムページ向けに引き続き提供されています。これは MDX コンポーネントには含まれていないため、`.astro` ページ自体でインポートしてください: `import Update from "blume/components/content/Update.astro";`。
+
+一覧を自分で構築するということは、`<Changelog />` が行っている処理を再現することを意味し、その中には気づかないうちに失敗するものが 1 つ含まれます: ファイルシステム以外のソース（[GitHub Releases](#from-github-releases) など）からのエントリは並行する `staged` コレクションを通じてレンダリングされるため、`getCollection("docs")` だけを読み込むページにはそれらが 1 つも表示されず、警告も出ません。本当に異なるマークアップが必要な場合を除き、コンテンツページで `<Changelog />` を使うことをおすすめします。
 
 ## GitHub Releases から [#from-github-releases]
 

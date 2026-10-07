@@ -31,10 +31,14 @@ navigation: {
 }
 ```
 
-Die Tag-Gruppen der Sidebar und die Abschnitte der Übersichtsseite folgen derselben Reihenfolge: der Reihenfolge der `tags`-Liste auf oberster Ebene der Spezifikation, danach alle Tags, die sie nicht deklariert, in der Reihenfolge, in der Operationen sie zum ersten Mal verwenden.
+Die Tag-Gruppen der Sidebar und die Abschnitte der Übersichtsseite folgen derselben Reihenfolge: der Reihenfolge der `tags`-Liste auf oberster Ebene der Spezifikation, danach alle Tags, die sie nicht deklariert, in der Reihenfolge, in der Operationen sie zum ersten Mal verwenden. Innerhalb eines Tags folgen auch die Operationen der Spezifikation: Pfade in der Reihenfolge, in der sie aufgelistet sind, und die Methoden jedes Pfads in der Reihenfolge, in der sie geschrieben sind. Eine [`meta.ts`](/docs/content/meta) im Ordner eines Tags mit eigener `pages`-Liste überschreibt diese Reihenfolge.
+
+Das `x-displayName` eines Tags, die Extension von Redocly, beschriftet seine Gruppe in der Sidebar und seinen Abschnitt in der Übersicht anstelle seines Namens. Seine URL leitet sich weiterhin aus seinem Namen ab, sodass das Hinzufügen keine Seite verschiebt. Eine Operation wird so beschriftet, wie ihre Seite betitelt ist: mit ihrem `summary` oder, wenn sie keins hat, mit ihrer Methode und ihrem Pfad (`GET /pets`).
+
+Die `info.description` der Spezifikation steht am Anfang der Übersichtsseite, und die `description` jedes Tags steht dort am Anfang seines Abschnitts. Ihre Überschriften rücken eine Ebene tiefer, sodass der Titel der Seite ihre einzige Überschrift der obersten Ebene bleibt: Ein `# Authentication` in `info.description` oder in der `description` einer Operation wird als Überschrift zweiter Ebene gerendert, in der Beschreibung eines Tags als Überschrift dritter Ebene, unterhalb der Überschrift des Tags selbst.
 
 :::note
-Operationen werden für die Suche anhand ihrer **Zusammenfassung, ihrer Beschreibung, ihres Tags und ihres Endpoints** (`GET /pets/{id}`) indexiert. Die gerenderten Schematabellen und generierten Codebeispiele werden nicht im Volltext indexiert; die Suche findet den Titel, den Beschreibungstext, den Abschnitt und den Pfad einer Operation und verlinkt dann auf ihre eigene Seite. [Eigene Beispiele](#your-own-samples) werden wie jeder Codeblock indexiert, allerdings nur mit [`search.indexing.includeCodeBlocks`](/docs/configuration/search).
+Operationen werden für die Suche anhand ihrer **Zusammenfassung, ihrer Beschreibung, ihres Tags und ihres Endpoints** (`GET /pets/{id}`) indexiert sowie anhand dessen, was ihre [Markdown-Fassung](#your-own-samples) auflistet: die Properties der obersten Ebene des Request-Bodys und die Beschreibungen der Responses. Die gerenderten Schematabellen und generierten Codebeispiele werden nicht im Volltext indexiert; die Suche findet den Titel, den Beschreibungstext, den Abschnitt und den Pfad einer Operation und verlinkt dann auf ihre eigene Seite. [Eigene Beispiele](#your-own-samples) werden wie jeder Codeblock indexiert, allerdings nur mit [`search.indexing.includeCodeBlocks`](/docs/configuration/search).
 :::
 
 ## Eine lokale Spezifikation [#a-local-spec]
@@ -68,6 +72,10 @@ reference: [
 ],
 ```
 
+Das `<tag>` einer Operation ist ihr erster Tag (`operations`, wenn sie keinen hat), und ihre `<operation>` ist ihre `operationId`, sonst ihre Methode und ihr Pfad. Beides wird kleingeschrieben, wobei die Wörter durch Bindestriche getrennt werden, auch bei camelCase und PascalCase: Aus dem Tag `InboxesThreads` wird `inboxes-threads`, und aus der operationId `listThreads` wird `list-threads`. Der Slug einer Operation muss nur innerhalb ihres Tags eindeutig sein, sodass zwei Tags jeweils ein `list` haben können; ein zweites `list` im selben Tag bekommt seine Methode angehängt (`list-post`), mit einer [`BLUME_OPENAPI_DUPLICATE_OPERATION_ID`](#spec-warnings)-Warnung, wenn sich die beiden eine `operationId` teilen.
+
+Frühere Versionen von Blume haben die Wörter eines Tags zusammengeschrieben (`inboxesthreads`) und den Slug einer Operation über die gesamte Spezifikation hinweg eindeutig gemacht (`list-get` für das zweite `list`). Blume leitet jede dieser URLs samt ihrer Markdown-Fassung auf die aktuelle URL der Seite weiter, es sei denn, unter dieser URL liegt bereits eine Seite oder einer deiner [`redirects`](/docs/deployment#redirects).
+
 ## Codebeispiele und Schemas [#code-samples-and-schemas]
 
 `codeSamples` legt fest, welche Sprachen pro Operation gerendert werden, und zwar in der Reihenfolge, in der du sie auflistest. Standardmäßig ist das `["curl", "js", "python"]`, und mit `false` oder einer leeren Liste werden keine angezeigt. Mit `expandSchemas` starten verschachtelte Schemazeilen ausgeklappt statt eingeklappt:
@@ -100,14 +108,20 @@ Jedes Beispiel ist schlichter Code für den Request, den du direkt kopieren und 
 | `csharp`     | C#         | `HttpClient`        | `c#`, `cs`            |
 | `dotnet`     | .NET       | RestSharp           | `.net`, `dot-net`     |
 | `c`          | C          | libcurl             |                       |
-| `cpp`        | C++        | cpr                 | `c++`                 |
+| `cpp`        | C++        | cpr                 | `c++`, `cplusplus`    |
 | `kotlin`     | Kotlin     | OkHttp              | `kt`                  |
 | `rust`       | Rust       | reqwest             | `rs`                  |
 | `dart`       | Dart       | `package:http`      | `flutter`             |
 
 Jeder Wert wird nach den Regeln der jeweiligen Sprache maskiert, sodass ein Header wie `If-Match: "33a64df5"` oder ein Body mit einem `$` darin genau so bei der API ankommt, wie er geschrieben wurde.
 
-Schematabellen folgen – wie die Beispiele – der Richtung, in der die Daten fließen: Ein Request-Body lässt `readOnly`-Properties weg, die der Server setzt, und eine Response lässt `writeOnly`-Properties weg, die er nie zurückgibt. Der Body eines [Webhooks oder Callbacks](#webhooks-and-callbacks) ist ein Request, den deine API sendet, daher wird er wie eine Response dargestellt.
+Eine Id, für die Blume kein Beispiel generiert, etwa `objectivec` von ReadMe, wird auf jeder Seite weggelassen, mit einer `BLUME_OPENAPI_UNKNOWN_CODE_SAMPLE`-Warnung, die die obigen Ids auflistet. Um ein Beispiel in einer anderen Sprache zu zeigen, schreibe es als [eigenes Beispiel](#your-own-samples) in die Spezifikation.
+
+Schematabellen folgen – wie die Beispiele – der Richtung, in der die Daten fließen: Ein Request-Body lässt `readOnly`-Properties weg, die der Server setzt, und eine Response lässt `writeOnly`-Properties weg, die er nie zurückgibt. Der Body eines [Webhooks oder Callbacks](#webhooks-and-callbacks) ist ein Request, den deine API sendet, daher wird er wie eine Response dargestellt. Dasselbe gilt für die Request-Beispiele, das [Try it](#try-it-playground)-Formular und seine Vorbelegung sowie die Response-Beispiele, einschließlich der Beispiele, die in der Spezifikation stehen, etwa ein `example` auf Modellebene, das die `id` des Modells enthält.
+
+Enthält die `examples`-Map eines Bodys oder einer Response zwei oder mehr benannte Beispiele, wird jedes davon angezeigt, beschriftet mit seinem `summary` oder, wenn es keins hat, mit seinem Schlüssel. Eine Response bekommt pro Beispiel einen Tab hinter ihrem Status (`200 · A cat`), ein Webhook-Payload einen pro Beispiel hinter seinem Medientyp und ein Request-Body einen **Examples**-Block unter seinem Schema. Die Codebeispiele und Try it starten mit dem ersten.
+
+Bei einer Property, die als `$ref` mit Keywords daneben geschrieben ist – was OpenAPI 3.1 erlaubt –, haben diese Keywords Vorrang vor denen des referenzierten Schemas. Ihre Zeile zeigt ihre eigene `description`, und die Beispiele verwenden ihr eigenes `example` oder ihren eigenen `default`.
 
 ### Eigene Beispiele [#your-own-samples]
 
@@ -128,7 +142,7 @@ paths:
             planter list
 ```
 
-Diese Beispiele werden als eigene Tabs vor den generierten gerendert und bleiben unverändert, wenn Lesende das [Try it](#try-it-playground)-Formular ändern. Die ältere Schreibweise `x-code-samples` funktioniert ebenfalls. Um nur deine eigenen Beispiele zu zeigen, setze `codeSamples: false`. Anders als die generierten Beispiele sind sie auch in der Markdown-Fassung der Operationsseite enthalten, sodass `llms-full.txt`, der MCP-Server und der Assistent deine SDK-Aufrufe sehen.
+Diese Beispiele werden als eigene Tabs vor den generierten gerendert und bleiben unverändert, wenn Lesende das [Try it](#try-it-playground)-Formular ändern. Die ältere Schreibweise `x-code-samples` funktioniert ebenfalls. Um nur deine eigenen Beispiele zu zeigen, setze `codeSamples: false`. Anders als die generierten Beispiele sind sie auch in der Markdown-Fassung der Operationsseite enthalten, sodass `llms-full.txt`, der MCP-Server und der Assistent deine SDK-Aufrufe sehen. Diese Fassung listet außerdem den Medientyp und die Properties der obersten Ebene des Request-Bodys samt seinem Beispiel (jedem benannten) auf sowie Status und Beschreibung jeder Response, mit den Beispielen, die die Spezifikation enthält, und einem generierten Beispiel für die erste Erfolgs-Response, die keins enthält.
 
 Ein `source` kann auch ein `$ref` auf eine Datei sein, die den Code des Beispiels enthält – so, wie Redocly es beschreibt, Beispiele in eigenen Dateien abzulegen. Blume liest die Datei relativ zur Spezifikation und lädt sie herunter, wenn die Spezifikation eine URL ist. Bei einem `$ref`, den Blume nicht lesen kann, oder einem, der in ein Dokument hinein zeigt (`#/…`), wird dieses Beispiel mit einer [`BLUME_OPENAPI_CODE_SAMPLE_REF`](#spec-warnings)-Warnung weggelassen:
 
@@ -147,6 +161,8 @@ paths:
 ## Try-it-Playground
 
 Nativ gerenderte Operationsseiten bringen standardmäßig ein interaktives **Try it**-Panel mit. Blume generiert das Formular aus der Operation selbst: ein Eingabefeld pro Pfad-, Query- und Header-Parameter, einen Body-Editor, der aus dem Request-Body-Schema erstellt wird, und alles ist mit den Beispielen aus der Spezifikation vorausgefüllt. Werte werden so übertragen, wie die Spezifikation sie beschreibt: Array- und Objektparameter folgen ihrem `style` und `explode` (`tags=dog&tags=cat` in einer Query, `1,2` in einem Pfad, `filter[color]=red` bei `deepObject`), und ein `application/x-www-form-urlencoded`- oder `multipart/form-data`-Body wird als Formularfelder statt als JSON gesendet. Eine Serverauswahl listet die Server der Operation auf (ihre eigenen `servers`, sonst die ihres Pfads, sonst die der Spezifikation, wobei jede `{variable}` auf ihrem `default` steht), mit einem Freitextfeld für jede andere Basis-URL, und die Auth-Eingaben entsprechen der [aufgelösten Security](#authorization) der Operation – Bearer-Token, API-Key und Basic-Credentials, wobei OAuth2 als Feld zum Einfügen eines Tokens umgesetzt ist (bring einen Access-Token mit; Blume führt den Flow nicht aus).
+
+Wenn eine der Responses der Operation JSON ist, fordern Requests JSON an: Send und die Codebeispiele senden einen `Accept`-Header mit dem ersten JSON-Medientyp, den die Responses auflisten, wobei der einer Erfolgs-Response Vorrang vor den anderen hat. Frameworks wie Laravel beantworten einen Request ohne diesen Header so, als hätte ein Browser ihn gesendet, und leiten einen nicht authentifizierten Aufruf auf eine Login-Seite weiter, statt den 401 zurückzugeben, den die API dokumentiert. Ein `Accept`-Header-Parameter, den die Operation deklariert, tritt an seine Stelle.
 
 Panel und Codebeispiele bleiben synchron: Werte, die du ins Formular eingibst, aktualisieren die generierten Codebeispiele live, sodass ein kopierter curl-Befehl immer genau dem entspricht, was **Send** tun würde. Und das Panel steht nicht im Weg – es wird serverseitig eingeklappt gerendert, und sein JavaScript lädt erst, wenn es jemand zum ersten Mal öffnet. Wer es nie anfasst, lädt nichts davon herunter.
 
@@ -177,7 +193,7 @@ reference: [
 ],
 ```
 
-Der eingebaute Proxy leitet Requests nur an die Origins weiter, die deine Spezifikationen in `servers` deklarieren (auf Dokument-, Pfad- oder Operationsebene, mit Variablen auf ihren Standardwerten) – auch über Redirects hinweg –, sodass ein öffentliches Doku-Deployment nicht auf andere Hosts in seinem Netzwerk gerichtet werden kann. Eine im Panel eingegebene **Custom base URL** ist kein dokumentierter Server: Bei aktiviertem Proxy werden Requests an sie mit einem 403 abgelehnt. Er leitet nur die Header weiter, die das Panel selbst setzt – die eingegebenen Zugangsdaten und Header-Parameter sowie den `Content-Type` des Bodys –, sodass Cookies, Zugangsdaten, die der Browser für die Doku-Website mitschickt (etwa HTTP-Basic-Auth bei einer passwortgeschützten Preview), und Header, die dein Host hinzufügt (`X-Forwarded-For`, `CF-*`, `X-Vercel-*`), nie bei der API ankommen. Er liest einen Request-Body nur bis zu 4 MB (alles Größere erhält einen `413`), und jede Response, die er weiterleitet, enthält `Content-Security-Policy: sandbox`, `X-Content-Type-Options: nosniff` und `Cross-Origin-Resource-Policy: same-origin` – plus `Content-Disposition: attachment` bei HTML oder SVG –, sodass eine API-Fehlerseite, die ihre Eingabe zurückgibt, kein Skript auf dem Origin der Doku ausführen kann. Der Proxy ist außerdem pro lesender Person [rate-limitiert](/docs/configuration/rate-limiting), wie jede Server-Route, die Lesende aufrufen können.
+Der eingebaute Proxy leitet Requests nur an die Origins weiter, die deine Spezifikationen in `servers` deklarieren (auf Dokument-, Pfad- oder Operationsebene, mit Variablen auf ihren Standardwerten) – auch über Redirects hinweg –, sodass ein öffentliches Doku-Deployment nicht auf andere Hosts in seinem Netzwerk gerichtet werden kann. Eine im Panel eingegebene **Custom base URL** ist kein dokumentierter Server: Bei aktiviertem Proxy werden Requests an sie mit einem 403 abgelehnt. Er leitet nur die Header weiter, die das Panel selbst setzt – die eingegebenen Zugangsdaten und Header-Parameter, den `Accept`-Header und den `Content-Type` des Bodys –, sodass Cookies, Zugangsdaten, die der Browser für die Doku-Website mitschickt (etwa HTTP-Basic-Auth bei einer passwortgeschützten Preview), und Header, die dein Host hinzufügt (`X-Forwarded-For`, `CF-*`, `X-Vercel-*`), nie bei der API ankommen. Er liest einen Request-Body nur bis zu 4 MB (alles Größere erhält einen `413`), und jede Response, die er weiterleitet, enthält `Content-Security-Policy: sandbox`, `X-Content-Type-Options: nosniff` und `Cross-Origin-Resource-Policy: same-origin` – plus `Content-Disposition: attachment` bei HTML oder SVG –, sodass eine API-Fehlerseite, die ihre Eingabe zurückgibt, kein Skript auf dem Origin der Doku ausführen kann. Der Proxy ist außerdem pro lesender Person [rate-limitiert](/docs/configuration/rate-limiting), wie jede Server-Route, die Lesende aufrufen können.
 
 Wenn ein Try-it-Request blockiert wird, reproduziert [CORS-Fehler in einem Playground für API-Dokumentation beheben](/guides/api-documentation-cors-errors) das Problem, liest den Preflight aus, den der Browser sendet, und behebt es mit einer CORS-Policy auf deiner API oder mit dem eingebauten Proxy.
 
@@ -195,6 +211,8 @@ reference: [
   }),
 ],
 ```
+
+Die Gruppe einer Quelle liegt an ihrer Route, und jeder Ordner der Route darüber ist ebenfalls eine Gruppe in der Sidebar. Richte eine Spezifikation also auf den Ordner aus, den sie beschreibt: Mit `route: "/apis/messaging"` wird die Gruppe der Quelle zur eigenen Gruppe des Ordners `messaging`, benannt nach ihrem `label`, während `"/apis/messaging/openapi"` diese Gruppe in eine **Messaging**-Gruppe verschachtelt, die sonst nichts enthält.
 
 `spec` ist eine Kurzform für ein `sources` mit einem einzigen Eintrag, du greifst also nur dann zu `sources`, wenn du mehr als eine Spezifikation hast. Wenn zwei Spezifikationen unterschiedliche Anzeigeoptionen brauchen – zum Beispiel eine andere Auswahl an Codebeispielen –, liste stattdessen zwei `openapi()`-Adapter auf, jeden mit eigener `route`. Eine eingebettete [Scalar](/docs/references/scalar)-Referenz neben nativen Seiten ist ein eigener `scalar()`-Adapter in der Liste. Quellen werden in Listenreihenfolge aufgelöst, und wenn zwei auf dieselbe Route aufgelöst werden, gewinnt die erste (der Build warnt vor der verworfenen).
 
@@ -321,8 +339,28 @@ Blume validiert eine Spezifikation nicht gegen das OpenAPI-Schema – nutze daf�
 | `BLUME_OPENAPI_CODE_SAMPLE_REF` | Das `source` eines `x-codeSamples`-Eintrags ist ein `$ref`, den Blume nicht lesen kann oder der in ein Dokument hinein zeigt, daher wird dieses [Beispiel](#your-own-samples) weggelassen. |
 | `BLUME_OPENAPI_X_WEBHOOKS` | Eine Spezifikation in 3.1 oder neuer führt ihre Webhooks unter `x-webhooks`, der Extension, die 3.0-Tools lesen, und hat kein `webhooks`, daher wird keiner davon gerendert. Benenne das Feld in `webhooks` um. |
 | `BLUME_OPENAPI_REF_PATH_ITEM` | Ein Pfad oder Webhook ist ein `$ref` auf ein gemeinsam genutztes Path Item, etwa eines unter `components.pathItems`. Blume löst diese nicht auf, daher fehlen seine Operationen in der Referenz. Schreibe das Path Item direkt unter `paths` oder `webhooks`; seine Schemas, Parameter und Responses können `$ref`s bleiben. |
+| `BLUME_OPENAPI_DUPLICATE_OPERATION_ID` | Zwei Operationen teilen sich eine `operationId`, die in einer Spezifikation eindeutig sein muss. Die Warnung nennt beide. Blume hängt die Methode an die Id der zweiten in `<Operation id>` an und, wenn die beiden denselben Tag haben, auch an ihre [URL](#route). Gib jeder Operation ihre eigene `operationId`. |
+| `BLUME_OPENAPI_LOCAL_SERVER` | Ein Server, den die Spezifikation, ein Pfad oder eine Operation deklariert, ist eine lokale Adresse (`localhost`, `127.0.0.1`, `0.0.0.0`, `[::1]`), oft von einem Framework eingetragen, das die Spezifikation auf einem Entwicklungsrechner exportiert hat. Try it und die Codebeispiele würden Requests an diese Adresse senden, die für Lesende nicht erreichbar ist. Trag die öffentliche URL in `servers` ein oder setze sie mit einem [Overlay](#overlays). |
+| `BLUME_OPENAPI_NULLABLE` | Eine Spezifikation, die OpenAPI 3.1 oder neuer deklariert, verwendet `nullable`, das in 3.1 entfernt wurde. Blume zeigt diese Werte weiterhin als nullable an, aber Validatoren und SDK-Generatoren, die sich an 3.1 halten, lesen sie als niemals null. Die Warnung nennt die Stellen als JSON Pointer in die Spezifikation. Füge stattdessen `"null"` zum `type` des Schemas hinzu (`type: [string, "null"]`). |
 
 [API-Dokumentation in der CI mit Backend-Änderungen synchron halten](/guides/openapi-documentation-ci) führt diese Prüfungen in GitHub Actions aus: Die Spezifikation wird aus dem Backend exportiert, der Build schlägt fehl, wenn die Spezifikation veraltet oder ungültig ist oder Breaking Changes enthält, und die Referenz wird daraus neu gebaut.
+
+## Operationen auf deinen eigenen Seiten [#operations-in-your-own-pages]
+
+Jede MDX-Seite kann mit `<Operation>` eine Operation aus einer Referenz anzeigen: ihre Autorisierung, ihre Parameter, ihren Request-Body und ihre Responses, neben dem Try-it-Panel und den Codebeispielen, so wie die eigene Seite der Operation sie zeigt. Ein Quickstart kann so den einen Aufruf durchgehen, um den es geht, ohne Lesende auf eine andere Seite zu schicken:
+
+```mdx docs/quickstart.mdx lineNumbers
+---
+title: Quickstart
+mode: wide
+---
+
+Create your first pet:
+
+<Operation source="reference" id="add-pet" />
+```
+
+`source` benennt die Referenz über ihre Route, ohne Schrägstriche, kleingeschrieben und mit Bindestrichen (`/reference` wird zu `reference`, `/api/v2` zu `api-v2`). `id` benennt die Operation: ihre `operationId`, kleingeschrieben mit durch Bindestriche getrennten Wörtern (`addPet` wird zu `add-pet`), oder, wenn sie keine hat, ihre Methode und ihr Pfad (`post-pets`). Am sichersten bekommst du beides über die rohe MDX-Fassung einer Operationsseite unter ihrer URL plus `.mdx`, deren Body genau das Tag ist, das du kopierst. Die Operation wird zweispaltig dargestellt, gib der Seite also [`mode: wide`](/docs/content/frontmatter#layout): Neben dem Inhaltsverzeichnis ist die linke Spalte schmal. In der Markdown-Fassung der Seite wird das Tag zum Endpoint, zum Request-Body und zu den Responses, wie auf der eigenen Seite der Operation.
 
 ## Scalar stattdessen einbetten [#embedding-scalar-instead]
 

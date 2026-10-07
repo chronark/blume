@@ -23,6 +23,8 @@ export default defineComponents({
 
 As chaves são os nomes que você escreve no MDX (`<Callout>`, `<Pricing>`). Use o nome de arquivo `.tsx` quando importar componentes React.
 
+Uma tag com inicial maiúscula que não seja um componente integrado, uma [ilha](/docs/content/islands) nem uma substituição faz a página falhar ao ser renderizada, então o `blume dev`, o `blume build` e o `blume check` emitem um aviso sobre ela antes, como `BLUME_UNKNOWN_COMPONENT`, uma vez por tag, indicando todas as páginas que a utilizam.
+
 ### Forma de referência [#reference-form]
 
 Toda substituição — em `mdx` ou `layout` — aceita três formas:
@@ -105,7 +107,7 @@ Slots conectados (os nomes diferenciam maiúsculas de minúsculas; qualquer outr
 
 A variante `mobile` também recebe as [ações da página](/docs/content/navigation#page-actions) como filhos (um elemento vazio para o qual as ações são movidas a partir da coluna da direita abaixo de 1.280px), então renderize um `<slot />` nela para mantê-las em telas mais estreitas. Ela também é renderizada em páginas sem títulos, com `headings` vazio, para que as ações continuem aparecendo ali.
 
-`PageHeader` e `PageFooter` não têm componente integrado — eles não renderizam nada até você defini-los, o que os torna pontos de injeção convenientes para um banner promocional ou uma nota de "última atualização". O `Footer` integrado contém os únicos links para o seu repositório e seus perfis sociais, então uma substituição de `Footer` (o lugar para um rodapé de marketing que a configuração não consegue expressar) deve mantê-los. Com `consent` definido, mantenha também uma forma de reabrir o consentimento: qualquer elemento com `data-blume-consent-open` funciona como o link de [Configurações de cookies](/docs/configuration/consent#changing-an-answer).
+`PageHeader` e `PageFooter` não têm componente integrado — eles não renderizam nada até você defini-los, o que os torna pontos de injeção convenientes para um banner promocional ou uma nota de "última atualização". O `PageFooter` é renderizado no fim de todas as páginas que o Blume gera a partir do seu conteúdo, incluindo as páginas de operações da API, com `Feedback` e `Pagination` depois dele. Uma página no [modo `custom` ou `frame`](/docs/content/frontmatter#layout) descarta essa área de fim de página, junto com seu título e sua trilha de navegação. Uma [página personalizada](/docs/advanced/custom-pages) em `pages/` renderiza o layout em que ela mesma se envolve: o `RootLayout` aceita substituições de slots por meio da sua prop `layout`, e o `PageLayout` não tem área de fim de página. O `Footer` integrado contém os únicos links para o seu repositório e seus perfis sociais, então uma substituição de `Footer` (o lugar para um rodapé de marketing que a configuração não consegue expressar) deve mantê-los. Com `consent` definido, mantenha também uma forma de reabrir o consentimento: qualquer elemento com `data-blume-consent-open` funciona como o link de [Configurações de cookies](/docs/configuration/consent#changing-an-answer).
 
 Os slots de layout aceitam as mesmas [três formas de referência](#reference-form) das substituições MDX, então um slot pode ser uma string de caminho ou um descritor hidratado (`{ component, client }`) quando você quiser um cabeçalho ou rodapé interativo.
 

@@ -29,6 +29,8 @@ O nome do arquivo é o nome do componente, então ele **deve ser um identificado
 Ilhas são para UI **interativa**. Para um componente estático que você reutiliza entre páginas (um destaque estilizado, uma tabela de preços), use uma [substituição MDX](/docs/configuration/customization) em vez disso — ela não envia nenhum JavaScript.
 :::
 
+Uma ilha é a única forma de executar código no navegador a partir de uma página. Um manipulador de eventos JavaScript em um elemento HTML simples no MDX, como `<button onClick={() => open()}>`, nunca é executado: a página é HTML estático, então a função é escrita no atributo como texto. O Blume emite um aviso `BLUME_MDX_EVENT_HANDLER` na linha em que ele aparece. Mova essa marcação para uma ilha e use a ilha na página.
+
 ## Registrando ilhas em `components.ts` [#registering-islands-in-componentsts]
 
 Se você preferir manter as ilhas junto ao restante dos seus componentes — ou dar a elas um nome diferente do arquivo — registre-as com `defineComponents` como uma entrada `mdx` com um modo `client`. Isso é tudo o que uma ilha é: um componente MDX que é hidratado. Cada entrada está disponível em todas as páginas MDX, e uma entrada com o mesmo nome de um arquivo em `islands/` o substitui.

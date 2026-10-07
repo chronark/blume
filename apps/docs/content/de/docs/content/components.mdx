@@ -6,6 +6,8 @@ description: >-
 
 Blume liefert einen barrierefreien, themenfähigen Komponentensatz, der auf jeder `.mdx`-Seite **ohne Imports** verfügbar ist. Jede Komponente wird unten mit einer Live-Vorschau und ihrem Quellcode gezeigt. Die Komponenten sind Vanilla und React-frei; React wird nur aktiviert, wenn dein Projekt es verwendet – eine beliebige `.tsx`- oder `.jsx`-Datei im Projekt, eine React-[Island](/docs/content/islands), ein [`<Component>`](#component)-Beispiel oder ein [Komponenten-Override](/docs/configuration/customization) – oder wenn der [Assistent](/docs/configuration/assistant) eingeschaltet ist.
 
+Eine Komponente ignoriert Props, die sie nicht entgegennimmt. Die meisten zeigen ihre Kinder an, daher können Schreibweisen aus anderen Doku-Tools leer rendern: Das `<Badge type="tip" text="beta" />` aus VitePress ist ein Badge ohne Kinder und zeigt daher nichts an. Erhält eine Komponente ohne Kinder Props, die sie nicht entgegennimmt, warnt Blume mit `BLUME_UNKNOWN_PROP` und nennt dabei die Props, die sie tatsächlich entgegennimmt. Schreibe den Inhalt stattdessen zwischen die Tags: `<Badge>beta</Badge>`.
+
 ## Card and CardGroup
 
 Karten verlinken mit Icon, Titel und kurzem Text auf ein Ziel. Gruppiere sie mit `CardGroup` zu einem responsiven Raster. Setze sie auf Landingpages, in Abschnittsübersichten und bei „nächsten Schritten“ ein – überall dort, wo du die Leserschaft weiterführst.
@@ -32,7 +34,7 @@ Karten verlinken mit Icon, Titel und kurzem Text auf ein Ziel. Gruppiere sie mit
 
 `Card` nimmt `title`, ein optionales `href` (weglassen für eine nicht klickbare Karte) und ein `icon` aus Blumes integriertem Icon-Set entgegen. `CardGroup` nimmt `cols` entgegen (Standard `2`).
 
-Eine Karte nimmt außerdem `img` entgegen, ein Bild, das sich oben über die Karte erstreckt (oder mit `horizontal` ab dem Breakpoint `sm` neben dem Text steht); `cta`, eine Call-to-Action-Zeile in der Akzentfarbe unter dem Text; `arrow`, einen Pfeil nach dem Titel und dem CTA (standardmäßig nur bei externen Links angezeigt); `type`, das die Karte einfärbt und wie bei einem Callout ein passendes Icon wählt (`note`, `info`, `tip`, `check`, `warning` oder `danger`); und `color`, eine beliebige CSS-Farbe für das Icon.
+Eine Karte nimmt außerdem `img` entgegen, ein Bild, das sich oben über die Karte erstreckt (oder mit `horizontal` ab dem Breakpoint `sm` neben dem Text steht) und wie der Pfad eines Markdown-Bildes angegeben wird: eine Datei neben der Seite (`./cover.png`), ein Pfad unter `public/` oder eine URL; `cta`, eine Call-to-Action-Zeile in der Akzentfarbe unter dem Text; `arrow`, einen Pfeil nach dem Titel und dem CTA (standardmäßig nur bei externen Links angezeigt); `type`, das die Karte einfärbt und wie bei einem Callout ein passendes Icon wählt (`note`, `info`, `tip`, `check`, `warning` oder `danger`); und `color`, eine beliebige CSS-Farbe für das Icon.
 
 ## Steps
 
@@ -119,6 +121,22 @@ pip install acme-commerce
 ````
 
 Die erste Ansicht wird angezeigt, bis die Leserschaft eine andere wählt. Blume merkt sich diese Wahl über alle Seiten hinweg, die mit Ansichten geschrieben sind, und schreibt sie als `?view=Python` in die URL, sodass ein Link direkt mit derselben Ansicht öffnet. Ein Link auf eine Überschrift innerhalb einer Ansicht öffnet diese Ansicht. Verwende `<View>`, wenn sich der Großteil der Seite mit der Auswahl ändert, und [Tabs](#tabs), wenn das nur für einen Teil der Seite gilt. Das an Agenten gerichtete Markdown enthält jede Ansicht, jeweils unter ihrem Namen.
+
+## Callout
+
+`<Callout>` ist die Komponente hinter den [Callout-Direktiven](/docs/content/syntax#callouts): `:::warning[Heads up]` rendert `<Callout type="warning" title="Heads up">`. Schreibe die Komponente selbst, wenn ein Callout ein eigenes Icon oder eine eigene Farbe braucht, was eine Direktive nicht festlegen kann.
+
+<Callout type="tip" title="Ship it" icon="rocket">
+  Führe `blume build` aus, bevor du deployst.
+</Callout>
+
+```astro
+<Callout type="tip" title="Ship it" icon="rocket">
+  Run `blume build` before you deploy.
+</Callout>
+```
+
+`type` legt die Einfärbung und das Standard-Icon fest: `note`, `info` (der Standard), `tip`, `success` (oder `check`), `warning` oder `danger`. Die Aliasse `caution`, `error`, `important` und `warn` funktionieren nur in der `:::`-Form. `title` fügt eine fett gedruckte erste Zeile hinzu. `icon` ersetzt das Icon des Typs und nimmt dieselben Eingaben entgegen wie [`<Icon>`](#icon): einen Lucide-Namen, einen Bildpfad oder eine Bild-URL oder ein Inline-SVG. `color`, eine beliebige CSS-Farbe, ersetzt die Einfärbung des Typs: Rahmen, Icon und Fließtext erscheinen in dieser Farbe auf dem Seitenhintergrund.
 
 ## Badge
 
@@ -226,7 +244,7 @@ Veranschauliche ein Projekt- oder Ordnerlayout. Umschließe eine gewöhnliche Ma
 
 ## Accordion
 
-Staple zusammengehörige Aufklappbereiche in einem einzigen umrandeten Container mit Trennlinien dazwischen – FAQs, optionale Schritte oder lange Beispiele. Jedes Kind ist ein `AccordionItem` (`title`, optional `icon`, `description`, `defaultOpen`). Für einen einzelnen eigenständigen Aufklappbereich verwende [Expandable](#expandable).
+Staple zusammengehörige Aufklappbereiche in einem einzigen umrandeten Container mit Trennlinien dazwischen – FAQs, optionale Schritte oder lange Beispiele. Jedes Kind ist ein `AccordionItem` (`title`, optional `icon`, `description`, `defaultOpen`). Der `title` rendert Inline-Markdown, sodass Code-Spans, Hervorhebungen und Links darin so erscheinen wie in einem Satz; rohes HTML darin wird als Text angezeigt. Für einen einzelnen eigenständigen Aufklappbereich verwende [Expandable](#expandable).
 
 <Accordion>
   <AccordionItem title="Does it support MDX?">
@@ -250,7 +268,7 @@ Staple zusammengehörige Aufklappbereiche in einem einzigen umrandeten Container
 
 ## Expandable
 
-Ein leichtgewichtiger Inline-Aufklappbereich für verschachtelte Details – etwa die Unterattribute eines Feldes oder eine optionale Randbemerkung. `title` beschriftet den Umschalter (Standard „Show more“); setze `defaultOpen`, damit er aufgeklappt startet.
+Ein leichtgewichtiger Inline-Aufklappbereich für verschachtelte Details – etwa die Unterattribute eines Feldes oder eine optionale Randbemerkung. `title` beschriftet den Umschalter (Standard „Show more“) und rendert wie bei einem Accordion-Eintrag Inline-Markdown; setze `defaultOpen`, damit er aufgeklappt startet.
 
 <Expandable title="Show advanced options">
   Diese Einstellungen sind optional und müssen selten geändert werden.
@@ -296,7 +314,7 @@ Ordne Karten oder Blöcke in einem responsiven Raster aus gleich breiten Spalten
 
 ## CodeGroup
 
-Fasse mehrere Codeblöcke zu einem einzigen Tab-Umschalter zusammen – ein Tab pro Sprache oder Datei. Die Tab-Beschriftung ist der Titel des jeweiligen Blocks (der Text nach der Sprache), und der Kopier-Button der Gruppe sitzt in der Tab-Leiste und kopiert den gerade angezeigten Block. Füge `dropdown` hinzu, um statt über eine Tab-Leiste über ein Menü zu wechseln.
+Fasse mehrere Codeblöcke zu einem einzigen Tab-Umschalter zusammen – ein Tab pro Sprache oder Datei. Die Tab-Beschriftung ist der Titel des jeweiligen Blocks (der Text nach der Sprache) oder, bei einem Block ohne Titel, der Name seiner Sprache (`TypeScript`, `Python`), und der Kopier-Button der Gruppe sitzt in der Tab-Leiste und kopiert den gerade angezeigten Block. Füge `dropdown` hinzu, um statt über eine Tab-Leiste über ein Menü zu wechseln.
 
 <CodeGroup>
 
@@ -368,7 +386,7 @@ Umschließe ein Bild oder eine beliebige Grafik mit einem zentrierten, umrandete
 
 ## YouTube
 
-Bette ein YouTube-Video in einen responsiven, datenschutzfreundlichen (`youtube-nocookie.com`) 16:9-Rahmen ein, der kein Client-JavaScript ausliefert. Übergib eine Video-`id` oder eine vollständige `url` sowie optional einen `title` (für Barrierefreiheit) und eine `start`-Zeit in Sekunden.
+Bette ein YouTube-Video in einen responsiven, datenschutzfreundlichen (`youtube-nocookie.com`) 16:9-Rahmen ein, der kein Client-JavaScript ausliefert. Übergib eine Video-`id` oder eine vollständige `url` sowie optional einen `title` (für Barrierefreiheit) und eine `start`-Zeit in Sekunden. Eine Playlist-`url` (`youtube.com/playlist?list=…` oder `youtube.com/embed/videoseries?list=…`) bettet die gesamte Playlist ein.
 
 <YouTube id="aqz-KE-bpKQ" title="Big Buck Bunny" />
 
@@ -469,7 +487,7 @@ Eine klickbare Vorschau, die mit einer Grafik – einem Icon oder Bild – über
 
 ## Prompt
 
-Eine einzelne Zeile mit einer Beschriftung und einem Kopier-Button. Die `description` (Markdown) ist die sichtbare Beschriftung; der Body ist der Prompt selbst – ausgeblendet und beim Drücken des Buttons **Copy prompt** als Markdown in die Zwischenablage kopiert, mit intakten Links, Listen und Code. `actions` steuert die Buttons (z. B. `["copy", "cursor"]`).
+Eine einzelne Zeile mit einer Beschriftung und einem Kopier-Button. Die `description` (Markdown) ist die sichtbare Beschriftung; der Body ist der Prompt selbst – ausgeblendet und beim Drücken des Buttons **Copy prompt** als Markdown in die Zwischenablage kopiert, mit intakten Links, Listen und Code. Die Satzzeichen werden so kopiert, wie du sie getippt hast: Gerade Anführungszeichen, `--` und `...` bleiben, wie sie geschrieben sind, auch wenn der Fließtext an anderen Stellen der Seite sie als typografische Anführungszeichen, Gedankenstriche und Auslassungspunkte anzeigt. `actions` steuert die Buttons (z. B. `["copy", "cursor"]`).
 
 <Prompt
   description="Ask the model to **document** an endpoint."
@@ -781,6 +799,8 @@ import CodeBlock from "blume/components/content/CodeBlock.astro";
 ```
 
 `title` legt die Beschriftung der Kopfzeile fest – etwa einen Dateinamen –, die sonst die Sprache anzeigt, und `icons={false}` blendet das Marken-Icon der Sprache aus, so wie es [`markdown.code.icons`](/docs/content/syntax#code-blocks) für Code-Fences tut.
+
+Ohne `code` rendert `CodeBlock` seine Kinder so, wie sie geschrieben sind, sodass ein Code-Fence, der in `<CodeBlock>…</CodeBlock>` eingeschlossen ist (so wie Fern und Mintlify Code schreiben), als ebendieser Fence angezeigt wird. `title` und die übrigen Props greifen dann nicht: Gib dem Fence stattdessen nach der Sprache seinen [Titel](/docs/content/syntax#code-blocks).
 
 Um selbst zu einem HTML-String hervorzuheben (z. B. innerhalb deiner eigenen Komponente), importiere den zugrunde liegenden Helfer aus `blume/markdown`:
 

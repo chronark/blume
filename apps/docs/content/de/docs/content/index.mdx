@@ -17,6 +17,10 @@ Blume rendert zwei Arten von Dateien:
 
 Greif zu `.md`, wenn eine Seite nur aus Fließtext besteht, und zu `.mdx`, wenn sie Komponenten oder Direktiven braucht. Der Wechsel ist so einfach wie das Umbenennen der Datei.
 
+In `.mdx` beginnt `{` einen JavaScript-Ausdruck und `<` ein JSX-Tag. Text, der in `.md` problemlos funktioniert, kann deshalb eine Seite kaputt machen: eine geschweifte Klammer als reiner Text, ein HTML-Kommentar (schreib `{/* … */}`) oder ein nicht geschlossenes Element (schreib `<br />`). Blume parst jede `.mdx`-Seite beim Einlesen des Projekts. Deshalb melden `blume dev`, `blume validate`, `blume doctor` und `blume check` eine Seite, die sich nicht parsen lässt, als `BLUME_MDX_SYNTAX` — einen Fehler mit der Zeile und Spalte, an der MDX abgebrochen hat. `blume build` bricht an dieser Stelle ab, bevor überhaupt etwas kompiliert wird. Mit `--no-strict` lässt der Build die Seite weg und baut den Rest der Website. `blume dev` behält die Seite, und wenn du sie öffnest, wird der Fehler angezeigt.
+
+Ein Ausdruck kann sich parsen lassen und trotzdem beim Rendern der Seite fehlschlagen, etwa `{user.name}` auf einer Seite, auf der nichts `user` definiert. `blume build` meldet das als `BLUME_MDX_UNDEFINED_NAME` in der Zeile des Ausdrucks, und zwar in der Seite oder im [Partial](/docs/content/includes), das ihn enthält. Um geschweifte Klammern als Text anzuzeigen, maskiere jede öffnende Klammer (`\{`) oder setze den Text in Inline-Code. Für einen Wert, den alle Seiten teilen, definierst du eine [Variable](/docs/content/variables).
+
 ## Dateien und Routen [#files-and-routes]
 
 Jede Datei wird anhand ihres Pfads unterhalb des Content-Roots auf eine Route abgebildet:
@@ -41,7 +45,13 @@ Stelle einer Datei oder einem Ordner eine Zahl und ein `-`, `_` oder `.` voran, 
 02-installation.mdx  ->  /installation
 ```
 
-Eine Version oder ein ISO-Datum am Anfang eines Namens ist Teil des Namens und keine Sortierangabe: `1.2.0.mdx` wird zu `/1.2.0` und `2024-01-05-launch.mdx` zu `/2024-01-05-launch`. Nur Datei- und Ordnernamen verlieren ein Präfix (die Notizen eines Obsidian-Vaults zählen als Dateien). Ein `slug` im Frontmatter sowie eine Seite aus einer [Content-Quelle](/docs/content/sources) wie einem CMS oder GitHub Releases behalten den Namen, den sie bekommen haben.
+Eine Version oder ein Datum am Anfang eines Namens ist Teil des Namens und keine Sortierangabe: `1.2.0.mdx` wird zu `/1.2.0` und `2024-01-05-launch.mdx` zu `/2024-01-05-launch`. Diese Formen erkennt Blume als Datum:
+
+- Ein ISO-Datum, `YYYY-MM-DD`: `2024-01-05.mdx` wird zu `/2024-01-05`.
+- Zuerst Tag oder Monat, dann eine vierstellige Jahreszahl, also `D-M-YYYY` oder `M-D-YYYY` mit ein oder zwei Ziffern für Tag und Monat: `12-05-2022.mdx` wird zu `/12-05-2022`.
+- Ein Jahr und ein Monat, `YYYY-MM`: `2024-01.mdx` wird zu `/2024-01`.
+
+Ein Datum steht entweder am Ende des Namens, oder auf das Datum folgt ein `-`, `_` oder `.` und danach der Rest des Namens (`2024-01-recap.mdx`). Frühere Blume-Versionen haben bei den letzten beiden Formen die erste Zahl als Sortierpräfix gelesen. Dadurch wurde `12-05-2022.mdx` unter `/05-2022` und `2024-01.mdx` unter `/01` veröffentlicht. Diese alten URLs leiten jetzt auf die neuen weiter, sofern dort keine andere Seite liegt. Nur Datei- und Ordnernamen verlieren ein Präfix (die Notizen eines Obsidian-Vaults zählen als Dateien). Ein `slug` im Frontmatter sowie eine Seite aus einer [Content-Quelle](/docs/content/sources) wie einem CMS oder GitHub Releases behalten den Namen, den sie bekommen haben.
 
 Die Sortierung hat mehrere Ebenen — die vollständigen Vorrangregeln findest du unter [Navigation](/docs/content/navigation).
 

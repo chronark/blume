@@ -24,7 +24,9 @@ export default defineMeta({
 
 Jedes Feld ist optional — setze nur das, was du überschreiben möchtest.
 
-Blume liest `meta.ts`-Dateien nur aus Ordnern, die dein Content abdeckt: Eine Datei in einem Ordner, den deine `exclude`-Globs für den Content überspringen, oder außerhalb jedes `include`-Globs wird nie importiert. Mit `root: "."` und `exclude: ["**/_*", "**/.*", "src/**"]` bleibt eine unabhängige `src/lib/meta.ts` unberührt. Ein `exclude` ersetzt den Standardwert `["**/_*", "**/.*"]`, statt ihn zu ergänzen — führe diese beiden also ebenfalls auf, damit Partials mit `_`-Präfix und Dotfiles unveröffentlicht bleiben.
+Blume liest `meta.ts`-Dateien nur aus Ordnern, die dein Content abdeckt: Eine Datei in einem Ordner, den deine `exclude`-Globs für den Content überspringen, oder außerhalb jedes `include`-Globs wird nie importiert. Mit `root: "."` und `exclude: ["src/**"]` bleibt eine unabhängige `src/lib/meta.ts` unberührt.
+
+Eine `meta.ts` außerhalb jedes `include`-Globs wird auch dann ignoriert, wenn ihr Ordner eine Sidebar-Gruppe ist — etwa der [Tag-Ordner](#generated-groups) einer Referenz auf einer Site, deren `include` nur `guides/**` aufführt. In diesem Fall warnt Blume mit `BLUME_META_OUTSIDE_INCLUDE`: Füge einen `include`-Glob hinzu, der den Ordner erreicht, etwa `"api/**/*.{md,mdx}"`, damit Blume sie liest.
 
 ## Felder [#fields]
 
@@ -33,16 +35,20 @@ Blume liest `meta.ts`-Dateien nur aus Ordnern, die dein Content abdeckt: Eine Da
 | `title` | `string` | Die Bezeichnung der Gruppe. Standardmäßig der lesbar aufbereitete Ordnername. |
 | `icon` | `string` | Icon, das neben der Bezeichnung angezeigt wird. |
 | `order` | `number` | Position unter gleichrangigen Gruppen und Seiten. Niedrigere Zahlen werden zuerst einsortiert. |
-| `collapsed` | `boolean` | Legt im [Anzeigemodus `group`](/docs/content/navigation#display-modes) fest, ob die Gruppe eingeklappt startet. |
+| `collapsed` | `boolean` | Legt im [Anzeigemodus `group`](/docs/content/navigation#display-modes) fest, ob die Gruppe eingeklappt startet. Ohne Angabe startet sie eingeklappt, es sei denn, sie enthält die aktuelle Seite oder ist die einzige Zeile ganz oben in der Sidebar. |
 | `display` | `"flat" \| "group" \| "page"` | Darstellungsmodus für diese Gruppe; überschreibt das globale [`navigation.sidebar.display`](/docs/content/navigation#display-modes). |
 | `directory` | `"card" \| "accordion" \| "none"` | Listet die Seiten der Gruppe unterhalb des Inhalts ihrer `index`-Seite auf. Verschachtelte Ordner erben diese Einstellung. Siehe [Verzeichnislisten](/docs/content/navigation#directory-listings). |
 | `pages` | `string[]` | Explizite Reihenfolge der Kinder der Gruppe, nach Slug. |
 
-Das `pages`-Array listet die Kinder nach Slug auf — dem Ordner- oder Dateinamen ohne numerisches Präfix und ohne Klammern (aus `01-quickstart.mdx` wird also `"quickstart"`). Jedes aufgeführte Kind erhält seine Position im Array als Reihenfolge (`0`, `1`, `2`, …). Kinder, die du weglässt, erscheinen trotzdem und werden nach ihrer eigenen Reihenfolge sortiert: Eine `index`-Seite bleibt an erster Stelle, ein Kind mit `sidebar.order`, numerischem Präfix oder einem eigenen `order` in seiner `meta.ts` wird nach dieser Zahl zwischen die aufgeführten einsortiert, und ein Kind ohne all das kommt nach ihnen. Führe jedes Kind auf, wenn das Array die gesamte Reihenfolge festlegen soll.
+Das `pages`-Array listet die Kinder nach Slug auf — dem Ordner- oder Dateinamen ohne numerisches Präfix und ohne Klammern (aus `01-quickstart.mdx` wird also `"quickstart"`). Jedes aufgeführte Kind erhält seine Position im Array als Reihenfolge (`0`, `1`, `2`, …). Kinder, die du weglässt, erscheinen trotzdem und werden nach ihrer eigenen Reihenfolge sortiert: Eine `index`-Seite bleibt an erster Stelle, ein Kind mit `sidebar.order`, numerischem Präfix oder einem eigenen `order` in seiner `meta.ts` wird nach dieser Zahl zwischen die aufgeführten einsortiert, und ein Kind ohne all das kommt nach ihnen. Führe jedes Kind auf, wenn das Array die gesamte Reihenfolge festlegen soll. Ein Eintrag, der keine Seite und keinen Ordner der Gruppe benennt, sortiert nichts — Blume warnt deshalb mit `BLUME_META_UNKNOWN_PAGE` an seiner Zeile in `meta.ts` und schlägt den Slug vor, der am wahrscheinlichsten gemeint ist.
 
 Das Array sortiert Seiten untereinander und Gruppen untereinander, mischt die beiden aber nicht dort, wo lose Seiten über Gruppen aufgeführt werden: auf der obersten Ebene der Sidebar (und jedes [Tab](/docs/content/navigation#tabs)-Bereichs) sowie in jeder Gruppe mit einer [`flat`](/docs/content/navigation#display-modes)-Untergruppe, deren Überschrift sonst so wirken würde, als gehörten die nachfolgenden Seiten zu ihr. Dort listet `pages: ["advanced", "intro"]` die Seite `intro` trotzdem über der Gruppe `advanced` auf.
 
 Wie Gruppen dargestellt werden — als flache Überschriften, aufklappbare Bereiche oder Drill-in-Panels — richtet sich standardmäßig nach dem sidebarweiten `navigation.sidebar.display`; setze hier `display`, um das nur für diese Gruppe zu überschreiben. Die `index`-Seite eines Ordners kann es zudem im Frontmatter setzen, was Vorrang vor `meta.ts` hat — siehe [Overrides pro Gruppe](/docs/content/navigation#per-group-overrides).
+
+## Generierte Gruppen [#generated-groups]
+
+Eine [OpenAPI](/docs/references/openapi)-, [AsyncAPI](/docs/references/asyncapi)- oder [GraphQL](/docs/references/graphql)-Referenz benennt und sortiert ihre Tag-Gruppen anhand der Spec. Um eine davon zu ändern, lege eine `meta.ts` in den Ordner, unter dem die Seiten des Tags veröffentlicht werden: Liegt die Referenz unter `/api`, konfiguriert `api/pets/meta.ts` in deinem Content-Ordner die Gruppe **Pets**. Die Felder, die sie setzt, ersetzen die generierten, und alle übrigen behalten ihre generierten Werte — eine `meta.ts`, die nur `title` setzt, behält also den Platz des Tags in der Reihenfolge der Spec.
 
 ## Berechnetes Meta [#computed-meta]
 

@@ -6,6 +6,8 @@ description: >-
 
 O Blume vem com um conjunto de componentes acessível e personalizável, disponível em qualquer página `.mdx` **sem imports**. Cada um é mostrado abaixo com uma prévia ao vivo e seu código-fonte. Os componentes são vanilla e não usam React; o React só entra em ação quando o seu projeto o utiliza — qualquer arquivo `.tsx` ou `.jsx` no projeto, uma [ilha](/docs/content/islands) React, um exemplo de [`<Component>`](#component) ou uma [sobrescrita de componente](/docs/configuration/customization) — ou quando o [assistente](/docs/configuration/assistant) está ativado.
 
+Um componente ignora as props que não aceita. A maioria exibe seus filhos, então a sintaxe de outras ferramentas de documentação pode renderizar vazia: o `<Badge type="tip" text="beta" />` do VitePress é um Badge sem filhos, que não exibe nada. O Blume emite o aviso `BLUME_UNKNOWN_PROP` para um componente sem filhos que recebe props que ele não aceita, informando as props que ele aceita. Em vez disso, escreva o conteúdo entre as tags: `<Badge>beta</Badge>`.
+
 ## Card e CardGroup [#card-and-cardgroup]
 
 Os cards apontam para um destino com um ícone, um título e um breve resumo. Agrupe-os com `CardGroup` para obter uma grade responsiva. Use-os em páginas iniciais, índices de seção e “próximos passos” — em qualquer lugar em que você esteja guiando o leitor adiante.
@@ -32,7 +34,7 @@ Os cards apontam para um destino com um ícone, um título e um breve resumo. Ag
 
 `Card` recebe `title`, um `href` opcional (omita-o para um card não clicável) e um `icon` do conjunto de ícones integrado do Blume. `CardGroup` recebe `cols` (padrão `2`).
 
-Um card também recebe `img`, uma imagem no topo (ou ao lado do texto a partir do breakpoint `sm`, com `horizontal`); `cta`, uma linha de chamada para ação na cor de destaque abaixo do texto; `arrow`, uma seta após o título e o CTA (exibida por padrão apenas para links externos); `type`, que tinge o card e escolhe um ícone correspondente, como faz um callout (`note`, `info`, `tip`, `check`, `warning` ou `danger`); e `color`, qualquer cor CSS para o ícone.
+Um card também recebe `img`, uma imagem no topo (ou ao lado do texto a partir do breakpoint `sm`, com `horizontal`), informada como o caminho de uma imagem em Markdown: um arquivo ao lado da página (`./cover.png`), um caminho dentro de `public/` ou uma URL; `cta`, uma linha de chamada para ação na cor de destaque abaixo do texto; `arrow`, uma seta após o título e o CTA (exibida por padrão apenas para links externos); `type`, que tinge o card e escolhe um ícone correspondente, como faz um callout (`note`, `info`, `tip`, `check`, `warning` ou `danger`); e `color`, qualquer cor CSS para o ícone.
 
 ## Steps
 
@@ -121,6 +123,22 @@ pip install acme-commerce
 ````
 
 A primeira visualização é exibida até o leitor escolher outra. O Blume lembra essa escolha entre as páginas escritas com visualizações e a grava na URL como `?view=Python`, então um link abre na mesma visualização. Um link para um cabeçalho dentro de uma visualização abre essa visualização. Use `<View>` quando a maior parte da página muda conforme a escolha, e [Tabs](#tabs) quando só uma parte dela muda. O Markdown voltado a agentes inclui todas as visualizações, cada uma sob o seu nome.
+
+## Callout
+
+`<Callout>` é o componente por trás das [diretivas de callout](/docs/content/syntax#callouts): `:::warning[Heads up]` renderiza `<Callout type="warning" title="Heads up">`. Escreva o próprio componente quando um callout precisar de um ícone ou de uma cor próprios, que uma diretiva não consegue definir.
+
+<Callout type="tip" title="Publique" icon="rocket">
+  Execute `blume build` antes de fazer o deploy.
+</Callout>
+
+```astro
+<Callout type="tip" title="Ship it" icon="rocket">
+  Run `blume build` before you deploy.
+</Callout>
+```
+
+`type` define a tonalidade e o ícone padrão: `note`, `info` (o padrão), `tip`, `success` (ou `check`), `warning` ou `danger`. Os aliases `caution`, `error`, `important` e `warn` funcionam apenas na forma `:::`. `title` adiciona uma primeira linha em negrito. `icon` substitui o ícone do tipo e recebe as mesmas entradas que [`<Icon>`](#icon): um nome do Lucide, um caminho ou URL de imagem, ou um SVG em linha. `color`, qualquer cor CSS, substitui a tonalidade do tipo: a borda, o ícone e o texto do corpo assumem essa cor sobre o fundo da página.
 
 ## Badge
 
@@ -228,7 +246,7 @@ Ilustre a estrutura de um projeto ou de uma pasta. Envolva uma lista normal em M
 
 ## Accordion
 
-Empilhe elementos recolhíveis relacionados em um único contêiner com borda e divisórias entre eles — perguntas frequentes, etapas opcionais ou exemplos longos. Cada filho é um `AccordionItem` (`title`, `icon` opcional, `description`, `defaultOpen`). Para uma única divulgação independente, use [Expandable](#expandable).
+Empilhe elementos recolhíveis relacionados em um único contêiner com borda e divisórias entre eles — perguntas frequentes, etapas opcionais ou exemplos longos. Cada filho é um `AccordionItem` (`title`, `icon` opcional, `description`, `defaultOpen`). O `title` renderiza Markdown em linha, então trechos de código, ênfase e links nele aparecem como apareceriam em uma frase; HTML bruto nele aparece como texto. Para uma única divulgação independente, use [Expandable](#expandable).
 
 <Accordion>
   <AccordionItem title="Ele tem suporte a MDX?">
@@ -252,7 +270,7 @@ Empilhe elementos recolhíveis relacionados em um único contêiner com borda e 
 
 ## Expandable
 
-Uma divulgação em linha e leve para detalhes aninhados — expandindo as subpropriedades de um campo ou uma nota opcional. `title` rotula o botão de alternância (o padrão é “Mostrar mais”); defina `defaultOpen` para começar expandido.
+Uma divulgação em linha e leve para detalhes aninhados — expandindo as subpropriedades de um campo ou uma nota opcional. `title` rotula o botão de alternância (o padrão é “Mostrar mais”) e renderiza Markdown em linha, como o de um item de accordion; defina `defaultOpen` para começar expandido.
 
 <Expandable title="Mostrar opções avançadas">
   Essas configurações são opcionais e raramente precisam ser alteradas.
@@ -298,7 +316,7 @@ Disponha cards ou blocos em uma grade responsiva de colunas iguais que se reorga
 
 ## CodeGroup
 
-Agrupe vários blocos de código em um único alternador com abas — uma aba por linguagem ou arquivo. O rótulo da aba é o título de cada bloco (o texto após a linguagem), e o botão de cópia do grupo fica na barra de abas e copia o bloco que está sendo exibido. Adicione `dropdown` para alternar com um menu em vez de uma barra de abas.
+Agrupe vários blocos de código em um único alternador com abas — uma aba por linguagem ou arquivo. O rótulo da aba é o título de cada bloco (o texto após a linguagem), ou o nome da sua linguagem (`TypeScript`, `Python`) para um bloco sem título, e o botão de cópia do grupo fica na barra de abas e copia o bloco que está sendo exibido. Adicione `dropdown` para alternar com um menu em vez de uma barra de abas.
 
 <CodeGroup>
 
@@ -370,7 +388,7 @@ Envolva uma imagem ou qualquer elemento visual em um quadro centralizado e com b
 
 ## YouTube
 
-Incorpore um vídeo do YouTube em um quadro 16:9 responsivo e respeitoso com a privacidade (`youtube-nocookie.com`) que não envia nenhum JavaScript ao cliente. Passe um `id` de vídeo ou uma `url` completa, além de um `title` opcional (para acessibilidade) e um tempo de `start` em segundos.
+Incorpore um vídeo do YouTube em um quadro 16:9 responsivo e respeitoso com a privacidade (`youtube-nocookie.com`) que não envia nenhum JavaScript ao cliente. Passe um `id` de vídeo ou uma `url` completa, além de um `title` opcional (para acessibilidade) e um tempo de `start` em segundos. Uma `url` de playlist (`youtube.com/playlist?list=…` ou `youtube.com/embed/videoseries?list=…`) incorpora a playlist inteira.
 
 <YouTube id="aqz-KE-bpKQ" title="Big Buck Bunny" />
 
@@ -471,7 +489,7 @@ Uma prévia clicável que começa com um elemento visual — um ícone ou imagem
 
 ## Prompt
 
-Uma única linha com um rótulo e um botão de cópia. A `description` (Markdown) é o rótulo visível; o corpo é o próprio prompt — oculto, e copiado para a área de transferência como Markdown, com seus links, listas e código intactos, quando o botão **Copiar prompt** é pressionado. `actions` controla os botões (por exemplo, `["copy", "cursor"]`).
+Uma única linha com um rótulo e um botão de cópia. A `description` (Markdown) é o rótulo visível; o corpo é o próprio prompt — oculto, e copiado para a área de transferência como Markdown, com seus links, listas e código intactos, quando o botão **Copiar prompt** é pressionado. Sua pontuação é copiada exatamente como você a digitou: aspas retas, `--` e `...` permanecem como foram escritos, embora o texto corrido em outras partes da página os exiba como aspas curvas, travessões e reticências. `actions` controla os botões (por exemplo, `["copy", "cursor"]`).
 
 <Prompt
   description="Peça ao modelo para **documentar** um endpoint."
@@ -491,7 +509,7 @@ Uma única linha com um rótulo e um botão de cópia. A `description` (Markdown
 
 ## Visibility
 
-Mostre ou oculte conteúdo de acordo com o público. `for="web"` renderiza somente no site; `for="agents"` tem como alvo o Markdown voltado a agentes que as IAs leem (`llms-full.txt` e o espelho `.md` de cada página).
+Mostre ou oculte conteúdo de acordo com o público. `for="web"` renderiza somente no site; `for="agents"` tem como alvo o Markdown voltado a agentes que os agentes de IA leem (`llms-full.txt` e o espelho `.md` de cada página).
 
 <Visibility for="web">
   Esta nota aparece no site, mas é omitida do Markdown voltado a agentes.
@@ -782,6 +800,8 @@ import CodeBlock from "blume/components/content/CodeBlock.astro";
 ```
 
 `title` define o rótulo do cabeçalho — um nome de arquivo, por exemplo —, que, sem ele, mostra a linguagem, e `icons={false}` oculta o ícone da marca da linguagem, como [`markdown.code.icons`](/docs/content/syntax#code-blocks) faz para os blocos de crase.
+
+Sem `code`, o `CodeBlock` renderiza seus filhos como foram escritos, então um bloco de crase envolvido em `<CodeBlock>…</CodeBlock>` (do jeito que o Fern e o Mintlify escrevem código) aparece como esse bloco de crase. Nesse caso, `title` e as outras props não se aplicam a ele: em vez disso, dê ao bloco de crase o seu [título](/docs/content/syntax#code-blocks) após a linguagem.
 
 Para destacar você mesmo o código em uma string HTML (por exemplo, dentro do seu próprio componente), importe o helper subjacente de `blume/markdown`:
 

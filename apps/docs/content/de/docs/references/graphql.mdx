@@ -54,6 +54,8 @@ reference: [
 ],
 ```
 
+Eine ID, für die Blume kein Beispiel generiert, wird weggelassen. Du bekommst dann eine `BLUME_GRAPHQL_UNKNOWN_CODE_SAMPLE`-Warnung, die alle unterstützten IDs auflistet.
+
 ## Typseiten [#type-pages]
 
 Benannte Typen bekommen eigene Seiten, auf die du direkt verlinken kannst, in der Sidebar nach Art gruppiert. Sie zeigen Felder und Input-Felder mit verlinkten Typen, Enum-Werte, Union-Mitglieder und Interface-Implementierungen. Dazu kommt ein Abschnitt **Verwendet von** mit den Operationen, die den Typ zurückgeben oder akzeptieren, und den anderen Typen, die auf ihn verweisen. In der Spezifikation definierte Scalars (`String`, `Int`, …) bekommen keine eigenen Seiten. Custom Scalars schon, inklusive ihrer `specifiedBy`-URL.

@@ -74,7 +74,33 @@ changelog: {
 
 Beide akzeptieren auch eine Zuordnung von Locale-Code zu Text, wie ein [Label eines Header-Tabs](/docs/content/i18n#per-locale-navigation). Die Übersicht wird in der Standard-Locale gerendert und zeigt daher den Eintrag dieser Locale. Lässt du eines davon weg, bleibt der eingebaute Text erhalten, den ein [Überschreiben der UI-Strings](/docs/content/i18n#translated-ui) (`changelog.title` und `changelog.description` unter `i18n.ui`) ersetzt.
 
-Die Seite erscheint nur, wenn die Route `/changelog` nicht bereits belegt ist. Um sie durch dein eigenes Design zu ersetzen, füge unter `pages/changelog.astro` eine [benutzerdefinierte Seite](/docs/advanced/custom-pages) hinzu – sie übernimmt, und Blume generiert die Standard-Übersicht nicht mehr. Die `<Update>`-Komponente, aus der die bisherige Timeline aufgebaut war, steht weiterhin für eine von Hand verfasste Seite zur Verfügung, die Release Notes inline zeigen soll. Sie gehört nicht zu den MDX-Komponenten, importiere sie also direkt in der `.astro`-Seite: `import Update from "blume/components/content/Update.astro";`.
+Die Seite erscheint nur, wenn die Route `/changelog` nicht bereits belegt ist.
+
+### Eine eigene Übersicht schreiben [#writing-your-own-index]
+
+Um etwas über der Liste zu platzieren – eine Einleitung, einen Link zum Feed, einen Hinweis zu deinem Release-Rhythmus –, schreibst du die Seite selbst und setzt `<Changelog />` dort ein, wo die Liste hingehört. Die Liste verwaltet weiterhin Blume, du schreibst also nur die Teile, für die es keinen Platz vorsieht:
+
+```mdx changelog/index.mdx
+---
+title: Changelog
+description: Every Acme SDK release, newest first.
+mode: center
+---
+
+Every release, newest first. Subscribe to the [RSS feed](/changelog/rss.xml) to follow along.
+
+<Changelog />
+```
+
+Eine Inhaltsseite unter `/changelog` übernimmt die Route, sodass die generierte Seite zurücktritt und stattdessen deine gerendert wird. Lege sie unter `changelog/index.mdx` neben deinen Einträgen ab, damit die Changelog-Gruppe der Seitenleiste auf sie verlinkt – eine `changelog.mdx` neben dem Ordner fügt der Seitenleiste einen zweiten Changelog-Punkt hinzu. [`mode: center`](/docs/content/frontmatter#layout) gibt ihr das Layout der generierten Seite – keine Seitenleiste, kein Inhaltsverzeichnis, eine breitere zentrierte Spalte –, und die generierte Seite rendert dieselbe Komponente, sodass die beiden nicht auseinanderlaufen können. Auf den Agent-Oberflächen (`/changelog.md`, llms-full.txt, MCP `get_page`, Suche) wird die Liste genauso in Markdown umgewandelt wie die der generierten Seite.
+
+Die Liste enthält immer die Einträge der Standard-Locale, egal wo das Tag steht – nach dieser Regel richtet sich bereits jede Oberfläche, die sie veröffentlicht, sodass eine übersetzte Seite dieselben Releases auflistet, statt sich darüber zu widersprechen, welche existieren. Ihre Datumsangaben erscheinen in der Sprache der jeweiligen Seite.
+
+### Die Seite vollständig ersetzen [#replacing-the-page-entirely]
+
+Für ein Design, das die Komponente nicht abbilden kann, füge unter `pages/changelog.astro` eine [benutzerdefinierte Seite](/docs/advanced/custom-pages) hinzu – sie übernimmt, und Blume generiert die Standard-Übersicht nicht mehr. Die `<Update>`-Komponente, aus der die bisherige Timeline aufgebaut war, steht weiterhin für eine von Hand verfasste Seite zur Verfügung, die Release Notes inline zeigen soll. Sie gehört nicht zu den MDX-Komponenten, importiere sie also direkt in der `.astro`-Seite: `import Update from "blume/components/content/Update.astro";`.
+
+Wenn du die Liste selbst aufbaust, musst du nachbilden, was `<Changelog />` tut – einschließlich einer Sache, die stillschweigend fehlschlägt: Einträge aus einer Quelle, die nicht das Dateisystem ist (etwa [GitHub Releases](#from-github-releases)), werden über eine parallele `staged`-Collection gerendert, sodass eine Seite, die nur `getCollection("docs")` liest, keinen davon auflistet – ohne Warnung. Greif lieber zu `<Changelog />` in einer Inhaltsseite, es sei denn, du brauchst wirklich anderes Markup.
 
 ## Aus GitHub Releases [#from-github-releases]
 

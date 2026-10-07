@@ -149,7 +149,7 @@ sidebar:
   display: page
 ```
 
-`hidden` entfernt die Seite aus der Sidebar und aus der Zurück/Weiter-Paginierung und damit auch aus der Sitemap, der Suche und `llms.txt` (siehe [Versteckte Seiten](/docs/content/navigation#hidden-pages)). Auf der `index`-Seite eines Ordners entfernt es nur die eigene Zeile der Seite: Die Gruppenzeile verlinkt weiterhin auf die Seite, sodass die Zurück/Weiter-Links weiterhin durch sie hindurchführen und die Seite in der Sitemap, der Suche und `llms.txt` bleibt.
+`hidden` entfernt die Seite aus der Sidebar und aus der Zurück/Weiter-Paginierung und damit auch aus der Sitemap, der Suche und `llms.txt` (siehe [Versteckte Seiten](/docs/content/navigation#hidden-pages)). Auf der `index`-Seite eines Ordners entfernt es nur die eigene Zeile der Seite: Die Gruppenzeile verlinkt weiterhin auf die Seite, sodass die Zurück/Weiter-Links weiterhin durch sie hindurchführen und die Seite in der Sitemap, der Suche und `llms.txt` bleibt. Auf der Startseite, der `index`-Seite des Stammverzeichnisses, entfernt es ebenfalls nur die Zeile: Die Seite bleibt in der Sitemap, der Suche und `llms.txt`.
 
 `display` legt den Darstellungsmodus der Ordnergruppe der Seite fest ([Überschreibungen pro Gruppe](/docs/content/navigation#per-group-overrides)) und ist nur auf der `index`-Seite eines Ordners in der generierten Sidebar sinnvoll — überall sonst (auf einer Nicht-Index-Seite, der eigenen `index`-Seite des Content-Stammverzeichnisses oder jeder Seite unter einer expliziten `navigation.sidebar`) gibt es keine Gruppe zu konfigurieren, und Blume warnt mit `BLUME_SIDEBAR_DISPLAY_IGNORED`.
 

@@ -70,7 +70,7 @@ navigation: {
 ```
 
 - **`flat`** (padrão) — um cabeçalho não recolhível com suas páginas listadas abaixo. Páginas que não pertencem a nenhum grupo sempre aparecem primeiro, acima das seções de grupo, para que não sejam confundidas com filhos de um grupo.
-- **`group`** — um bloco recolhível `<details>` por grupo. Os grupos começam recolhidos por padrão; um grupo que contém a página atual sempre começa aberto, de modo que apenas a seção em que você está fica expandida. Defina `collapsed: false` no [meta de pasta](/docs/content/meta) para forçar um grupo a ficar aberto independentemente disso.
+- **`group`** — um bloco recolhível `<details>` por grupo. Os grupos começam recolhidos por padrão; um grupo que contém a página atual sempre começa aberto, de modo que apenas a seção em que você está fica expandida. Um grupo que é a única linha no topo da barra lateral, como uma pasta que envolve todas as páginas, também começa aberto, para que a barra lateral nunca mostre uma única linha fechada. Defina `collapsed: false` no [meta de pasta](/docs/content/meta) para forçar um grupo a ficar aberto independentemente disso, ou `collapsed: true` para manter esse grupo solitário fechado.
 - **`page`** — cada grupo é uma única linha cujo chevron desliza a barra lateral para um subpainel mostrando apenas os itens daquele grupo, com uma seta de voltar no topo. Um grupo com uma página de índice liga o nome da linha a essa página, e um grupo sem ela faz o painel deslizar a partir de qualquer ponto da linha. O painel reconhece a rota, então cair diretamente em uma página dentro do grupo abre direto nela. Depois de usar a seta de voltar, a linha da seção em que você está continua destacada.
 
 :::tip
@@ -162,7 +162,7 @@ sidebar:
 
 Uma página oculta também fica de fora do sitemap e do `llms.txt`, e também da busca do site, a menos que [`search.indexing.includeHiddenPages`](/docs/configuration/search#excluding-pages) esteja ativado.
 
-A página `index` de uma pasta aparece tanto como o link da linha do grupo quanto como a primeira linha dentro do grupo. Oculte a página de índice para manter apenas o cabeçalho com link: a linha do grupo continua abrindo a página de destino, e os links de anterior/próximo continuam passando por ela. Como a navegação continua apontando para a página, ela não é tratada como oculta em nenhum outro lugar: continua no sitemap, na busca do site e no `llms.txt`.
+A página `index` de uma pasta aparece tanto como o link da linha do grupo quanto como a primeira linha dentro do grupo. Oculte a página de índice para manter apenas o cabeçalho com link: a linha do grupo continua abrindo a página de destino, e os links de anterior/próximo continuam passando por ela. Como a navegação continua apontando para a página, ela não é tratada como oculta em nenhum outro lugar: continua no sitemap, na busca do site e no `llms.txt`. O mesmo vale para a página inicial do site, a página `index` da raiz: ocultá-la remove a linha dela da barra lateral, mas ela continua sendo servida na URL raiz do site, então também continua listada.
 
 ## Abas [#tabs]
 
@@ -190,7 +190,7 @@ navigation: {
 }
 ```
 
-O `path` de uma aba é o prefixo da sua seção, e ele também serve como destino do link. Uma seção cujo `path` não é uma página própria — uma pasta sem `index.mdx` — apontaria para um 404, então a aba recorre à primeira página da seção. Uma [página personalizada](/docs/advanced/custom-pages) estática no `path` da aba conta como a página própria da seção: com `pages/guides.astro`, uma aba `/guides` cai nessa página enquanto a pasta `guides/` preenche a sua barra lateral. O mesmo vale para o índice de [changelog](/docs/advanced/changelog) gerado, então uma aba `/changelog` abre a linha do tempo em vez da entrada mais recente.
+O `path` de uma aba é o prefixo da sua seção, e ele também serve como destino do link. Uma seção cujo `path` não é uma página própria — uma pasta sem `index.mdx` — apontaria para um 404, então a aba recorre à primeira página da seção. Isso inclui uma aba em `path: "/"` em um site sem `index.mdx` na raiz: ela aponta para a primeira página da barra lateral. Uma [página personalizada](/docs/advanced/custom-pages) estática no `path` da aba conta como a página própria da seção: com `pages/guides.astro`, uma aba `/guides` cai nessa página enquanto a pasta `guides/` preenche a sua barra lateral. O mesmo vale para o índice de [changelog](/docs/advanced/changelog) gerado, então uma aba `/changelog` abre a linha do tempo em vez da entrada mais recente.
 
 Defina `href` quando quiser que uma aba leve a outro lugar — uma página específica da seção, digamos:
 
@@ -277,7 +277,7 @@ navigation: {
 }
 ```
 
-Cada link recebe um `label`, um `href` e um `icon` opcional (um nome de [ícone integrado](/docs/content/components#icon), caminho/URL de imagem ou SVG inline — o mesmo que em qualquer outro lugar). Um `href` pode apontar para qualquer lugar: uma URL externa abre em uma nova aba, enquanto uma rota interna (`/contact`) é validada contra as suas páginas no momento da build e pelo [`blume doctor`](/docs/cli/doctor), avisando você se nada corresponder.
+Cada link recebe um `label`, um `href` e um `icon` opcional (um nome de [ícone integrado](/docs/content/components#icon), caminho/URL de imagem ou SVG inline — o mesmo que em qualquer outro lugar). Um `href` pode apontar para qualquer lugar: uma URL externa abre em uma nova aba, enquanto uma rota interna (`/contact`) é validada contra as suas páginas no momento da build e pelo [`blume doctor`](/docs/cli/doctor), avisando você se nada corresponder. Um caminho para um arquivo em `public/` (`/spec.pdf`) ou para um que o Blume gera (`/llms.txt`) também corresponde.
 
 ## Barra lateral explícita [#explicit-sidebar]
 
@@ -357,7 +357,7 @@ Um sumário na coluna direita é gerado automaticamente a partir dos títulos de
 
 Abaixo do sumário, toda página exibe um conjunto de ações rápidas. Em janelas com pelo menos 1.280px de largura, elas ficam na coluna da direita junto com o sumário. Em janelas mais estreitas e em celulares, elas ficam na parte de baixo do dropdown “Nesta página” acima do conteúdo, que aparece também em páginas sem títulos:
 
-- **Editar no GitHub** — leva direto ao arquivo-fonte. Aparece assim que você define [`github`](/docs/configuration) na sua configuração.
+- **Editar no GitHub** — leva direto ao arquivo-fonte. Aparece assim que você define [`github`](/docs/configuration) na sua configuração, em toda página cujo arquivo está no repositório: um arquivo que o git ignora, como uma referência de API gerada escrita em uma pasta ignorada pelo git, não ganha link de edição, já que o GitHub não tem arquivo para abrir.
 - **Voltar ao topo** — retorna suavemente ao topo de páginas longas. Fica apenas na coluna da direita, já que o dropdown já está no topo da página.
 
 Outras entregam a página a ferramentas de IA — **Copiar como Markdown** e **Abrir no chat** — abordadas em [Markdown para agentes](/docs/discoverability/markdown#copy-as-markdown).

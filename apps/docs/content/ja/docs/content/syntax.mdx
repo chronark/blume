@@ -8,7 +8,7 @@ Blume は、標準的な Markdown と MDX を、厳選された GitHub Flavored 
 
 ## 見出し [#headings]
 
-見出しでページを構造化します。Blume はフロントマターの `title` をページ見出しとしてレンダリングするため、コンテンツは `##` から始めてください — `##` と `###` は目次の項目になります。`##`〜`######` のすべての見出しは、それ自身のアンカーへのリンクでも囲まれるため、読者は見出しをクリックしてそのセクションへのパーマリンクをコピー、ブックマーク、共有できます（ホバーすると `#` が表示されます）。これをオフにするには、`blume.config.ts` で `markdown: { headingAnchors: false }` を指定します。
+見出しでページを構造化します。Blume はフロントマターの `title` をページ見出しとしてレンダリングするため、コンテンツは `##` から始めてください — `##` と `###` は目次の項目になります。`title` のないページは、最初の `#` 見出しをタイトルとして使います。ページがその見出しで始まる場合、見出しはページ見出しとして一度だけ表示され、その見出しのアンカーも保たれるため、そこへのリンクは引き続き機能します。`llms-full.txt` でも一度だけ記載されます。`##`〜`######` のすべての見出しは、それ自身のアンカーへのリンクでも囲まれるため、読者は見出しをクリックしてそのセクションへのパーマリンクをコピー、ブックマーク、共有できます（ホバーすると `#` が表示されます）。これをオフにするには、`blume.config.ts` で `markdown: { headingAnchors: false }` を指定します。
 
 ```md
 ## Section
@@ -20,7 +20,7 @@ Blume は、標準的な Markdown と MDX を、厳選された GitHub Flavored 
 
 ### カスタムアンカー [#custom-anchors]
 
-アンカーの id は見出しのテキストから生成されるため、見出しの文言を変えると新しいアンカーになります。代わりにアンカーを固定するには `[#custom-id]` を末尾に付けます — このマーカーはレンダリングされず、見出しの文言がどうなってもリンクは機能し続けます。固定したアンカーは[翻訳されたロケール](/docs/content/i18n)間でも同一のまま保たれます。自動生成された id では言語ごとに異なってしまうためです。
+アンカーの id は見出しのテキストから生成されるため、見出しの文言を変えると新しいアンカーになります。見出し内の `<Badge>` はラベルであり、そのテキストの一部ではありません：`## Install <Badge>beta</Badge>` のアンカーは `#install` となり、目次には「Install」と表示されます。id がダッシュで終わることはないため、`## Features ✨` のアンカーは `#features` となり、見出しの先頭や末尾にあるコンポーネントや画像によってダッシュが追加されることもありません。代わりにアンカーを固定するには `[#custom-id]` を末尾に付けます — このマーカーはレンダリングされず、見出しの文言がどうなってもリンクは機能し続けます。固定したアンカーは[翻訳されたロケール](/docs/content/i18n)間でも同一のまま保たれます。自動生成された id では言語ごとに異なってしまうためです。
 
 ```md
 ## Getting started [#setup]
@@ -28,13 +28,19 @@ Blume は、標準的な Markdown と MDX を、厳選された GitHub Flavored 
 
 `/page#setup` としてリンクします。この構文は Fumadocs と一致するため、移行したコンテンツはそのまま動作します。
 
-Pandoc、kramdown、および Markdown ベースの仕様策定ツールチェーンで使われる `{#custom-id}` 形式は、`.md` ファイルでは同等のものとして受け付けられます。アンカーを固定するのは、このスペースを含まない書き方だけです：スペースを含む `{ #custom-id }` や kramdown の `{: #custom-id }`（どちらも MkDocs の `attr_list` に由来します）は、見出しのテキストにそのまま残ります。`.mdx` では、裸の `{…}` は JSX 式となりページのコンパイルに失敗します — `blume check` はこれら 3 つの書き方をすべて `BLUME_MDX_CURLY_ANCHOR` として報告します — そのため、そこでは `[#custom-id]` と書くか、波括弧をエスケープしてください。エスケープした形式はどちらのフォーマットでも同じアンカーを固定するため、`.mdx` ページが[インクルード](/docs/content/includes)するパーシャルにはこの書き方が適しています：
+Pandoc、kramdown、および Markdown ベースの仕様策定ツールチェーンで使われる `{#custom-id}` 形式は、`.md` ファイルでは同等のものとして受け付けられます。アンカーを固定するのは、このスペースを含まない書き方だけです：スペースを含む `{ #custom-id }` や kramdown の `{: #custom-id }`（どちらも MkDocs の `attr_list` に由来します）、そしてクラスや属性と並べて id を設定する属性リスト（`{ #custom-id .wide }`）は、見出しのテキストとそのアンカーにそのまま残り、`blume check` は `.md` においてこれらを `BLUME_MD_CURLY_ANCHOR` として警告します。`.mdx` では、裸の `{…}` は JSX 式となりページのコンパイルに失敗します — `blume check` はこれら 3 つの書き方をすべて `BLUME_MDX_CURLY_ANCHOR` として報告します — そのため、そこでは `[#custom-id]` と書くか、波括弧をエスケープしてください。エスケープした形式はどちらのフォーマットでも同じアンカーを固定するため、`.mdx` ページが[インクルード](/docs/content/includes)するパーシャルにはこの書き方が適しています：
 
 ```md
 ## Getting started \{#setup\}
 ```
 
-フラグメントリンクは、`id` を持つ生の HTML 要素（`<a id="setup"></a>`）を対象にすることもできます。`blume validate` は見出しアンカーと並んでそれらも受け付けます。
+フラグメントリンクは、`id` を持つ生の HTML 要素（`<a id="setup"></a>`）や `<a name="setup">` を対象にすることもできます。`blume validate` は見出しアンカーと並んでそれらも受け付けます。
+
+見出し内の空の `<a>` は、GitBook のエクスポート（`<a href="#setup" id="setup"></a>`）や wiki（`<a name="setup"></a>`）の書き方と同様に、その見出し自身のアンカーとして扱われます。Blume はそれを見出しから取り除き、その `id`（なければ `name`）を見出しに与えるため、`#setup` へのリンクは引き続きそこに到達し、見出しも自身へのリンクを保ちます。同じ見出しに `[#custom-id]` マーカーがある場合は、そちらが優先されます。
+
+```md
+## Getting started <a id="setup"></a>
+```
 
 ### 目次マーカー [#table-of-contents-markers]
 
@@ -151,6 +157,10 @@ E = mc^2^ and H~2~O.
 
 相対ページリンク（`./install`、`../guides/setup`）は、そのページ自身のフォルダを基準に解決されます — インデックスページの場合は、そのページが紹介するフォルダが基準になります — また、Markdown ファイルへのリンク（`./setup.md`、`../intro.mdx`）は、そのファイルが公開するページ（`slug` も反映されます）に遷移します。ドットを含むページ名（`node.js.mdx` ページに対する `./node.js`）は、その場所でページが公開されていればページリンクとして扱われ、コンポーネントの文字列の `href`（`<Card href="./install">`）も同じように解決されます。Blume はビルドされたページでそれぞれをルート相対のパスとして書き出すため、GitHub や Docusaurus 向けに書かれたリンクもそのまま機能し、[`blume validate`](/docs/cli/validate) も同じ方法でそれらをチェックします。
 
+Markdown ファイルへのルート相対リンク（VitePress や Docsify の書き方である `/guides/setup.md`）も、コンテンツのルートを基準に読み取られ、そのファイルのページに遷移します。[デプロイの `base`](/docs/deployment#subpath-deploys) を設定している場合、base で始まるリンクは base を含むものとして読み取られます。コンテンツ内のどのファイルも指していないリンクは、パスがそのまま保たれます。`/guides/setup.md` はそのページの [Markdown コピー](/docs/discoverability/markdown#raw-markdown)の URL でもあるためです。ファイル名に関係なくページの Markdown コピーにリンクするには、パスがそのまま保たれる生の `<a href="/guides/setup.md">` を書くか、コピーの完全な URL を書いてください。
+
+存在しない Markdown ファイルへのリンクは、まずもう一方の拡張子を持つ同名のファイルを試します。そのため、`setup.md` を `setup.mdx` にリネームした後も、`./setup.md` へのリンクはそのファイルのページ（`slug` や順序付けのプレフィックスも反映されます）に遷移し、`blume validate` もそれを通過させます。どちらのファイルも指していないリンクは、拡張子を取り除いた通常の相対リンクにフォールバックします。いずれの場合も、そのリンクはもはや実在するファイルを指していないため、GitHub のように Markdown をファイルとして読む場所ではリンク切れになります。ファイルをリネームしたら、リンク内の拡張子も更新してください。
+
 まずは[クイックスタート](/docs/quickstart)をお読みください。
 
 ```md
@@ -166,6 +176,10 @@ Read the [quickstart](/docs/quickstart) to get started.
 ```md
 ![Build output](./images/build-output.png)
 ```
+
+Astro がサイズを読み取れない SVG は、ビルドを失敗させる代わりにそのまま配信されます。Astro は SVG のサイズを `<svg>` タグから読み取りますが、このタグには width と height、または viewBox が必要で、かつファイルの先頭 1,000 バイト以内で終わっている必要があります。draw.io のエクスポートは図全体をそのタグの `content` 属性に格納するため、タグがその範囲を超えてしまいます。Blume は、そうした SVG をそれぞれ埋め込んでいる行で `BLUME_SVG_UNOPTIMIZED` として警告します。画像は引き続き表示されますが、最適化された画像が持つ固有のサイズは付与されません。最適化させるには、ソースのコピーを含めずに図をエクスポートするか、`content` 属性を削除してください。
+
+コンテンツの隣にあるページ以外のファイルへのリンク（`[the spec](./spec.pdf)`、`[data](../files/data.csv)`、または `[spec]: ./spec.pdf` のような参照定義）は、そのファイルをページとともに公開し、ビルドされたリンクは公開されたコピーを指します。`#page=2` のようなサフィックスも保たれます。そうしたファイルを指す HTML 要素も同様です：`.md` 内の生の HTML や `.mdx` 内の要素として書かれた、`<img>`、`<video>`、`<source>`、`<audio>` の `src`、および `<a>` や `<Card>` のようなコンポーネントの `href` が対象です。これらのコピーは、画像の埋め込みに適用される最適化なしでそのまま配信されます。ページの隣にあるどのファイルも指していない相対リンクはパスがそのまま保たれるため、`public/` 以下のファイルへのリンクも引き続き機能します。
 
 `public/` 以下の絶対パス（`![Alt text](/screenshot.png)`）は最適化なしでそのまま配信されます — ドキュメントの外から参照されるロゴのように、バイト列と URL を厳密に保つ必要があるファイルに使ってください。リモート画像も、そのホストが [`image` 設定](/docs/configuration#images)で許可されていない限り、手を加えずにそのまま渡されます。
 
@@ -202,6 +216,20 @@ export default defineConfig({
 });
 ```
 ````
+
+タイトルは言語の後に続くすべての単語なので、` ```js Install the client ` はブロックに「Install the client」というタイトルを付けます。`lineNumbers` や `wrap` のようなキーワード、`{1,4-5}` のような行範囲、`key="value"` 形式のオプションはタイトルに含まれず、`title="..."` を使うとタイトルを明示的に設定できます。` ```ts [blume.config.ts] ` のように角括弧で囲んだタイトルは角括弧なしで表示され、` ```ts [blume.config.ts]{2} ` のように角括弧に続けて書いた行範囲も、引き続きその行をハイライトします。
+
+言語には、任意の [Shiki 言語](https://shiki.style/languages)の id またはエイリアスを、大文字・小文字を問わず指定できます：` ```JSON ` は ` ```json ` と同じようにハイライトされます。Shiki が認識しない言語のブロックはプレーンテキストとしてレンダリングされ、Blume はそのフェンスを `BLUME_UNKNOWN_CODE_LANGUAGE` として警告します。意図的にプレーンテキストにしたいブロックには `text` と書いてください。
+
+他のドキュメントツールが読み取るオプションはここでは何の効果もなく、Blume はそれぞれを `BLUME_CODE_FENCE_OPTION` として、代わりに使うべき書き方とともに警告します：MkDocs の `hl_lines="2 3"`（ここでは `{2,3}` の範囲）と `linenums="1"`（`lineNumbers`）、`showLineNumbers`（`lineNumbers`）、Mintlify の `lines`（`lineNumbers`）、Fern の `wordWrap`（`wrap`）、そして `filename="app.js"`（`title="app.js"`）です。Rust のブロックでは、rustdoc と mdBook の `ignore`、`no_run`、`should_panic`、`compile_fail`、`edition2015`〜`edition2024`、`noplayground`、`editable` も警告の対象です：Blume はコードブロックをコンパイル、テスト、実行することは一切ないため、これらは削除してください。いずれもタイトルの一部にはなりません。
+
+`console`（または `shellsession`）ブロックはターミナルセッションを表します：`$` のようなプロンプトに続くコマンドと、その出力です。コピーボタンはプロンプトを除いたコマンドだけをコピーするため、そのままターミナルに貼り付けられます。`\` で終わるコマンドは、継続行も保持されます。
+
+```console
+$ npm install blume
+added 1 package in 2s
+$ npx blume dev
+```
 
 インラインコードもハイライトできます：バッククォートで囲んだ範囲の中に `{:lang}` マーカーを追加すると、小さなコードブロックのように色付けされます — `useState(){:js}` や `T extends object{:ts}` のように。マーカーを追加したときだけ有効になるので、通常のインラインコードはそのままです — 何かを有効にする必要はありません。
 
@@ -337,6 +365,13 @@ import { createServer } from "node:http"; // [!code word:createServer]
 createServer().listen(3000);
 ```
 
+`// [!code error]` または `// [!code warning]` で行を問題箇所として示すと、それぞれ赤と琥珀色で着色されます：
+
+```ts
+const port = process.env.PORT; // [!code warning]
+server.listen(port.trim()); // [!code error]
+```
+
 `// [!code focus]` で印を付けた行以外をすべて暗くします（残りはホバーすると鮮明になります）：
 
 ```ts
@@ -346,7 +381,7 @@ export default defineConfig({
 });
 ```
 
-または、コメントの代わりに**行番号**で行をハイライトすることもできます — コードを編集できない場合に便利です。言語の後に波括弧で範囲を書きます。単一行、カンマ区切りのリスト、`start-end` の範囲がすべて使えます：
+または、コメントの代わりに**行番号**で行をハイライトすることもできます — コードを編集できない場合に便利です。言語の後に波括弧で範囲を書きます。間にスペースを入れても入れなくても構いません（` ```ts{1,4-5} ` でも動作します）。単一行、カンマ区切りのリスト、`start-end` の範囲がすべて使えます：
 
 ```ts {1,4-5}
 import { defineConfig } from "blume";
@@ -581,7 +616,7 @@ timeline
 
 ## コールアウト [#callouts]
 
-コールアウトは、背景情報・助言・リスクに読者の注意を向けます。`:::type` ディレクティブとして書き、`:::warning[Heads up]` のように角括弧でタイトルを追加できます。ディレクティブは MDX 専用の機能です — `.md` ファイルでは `:::note` の行はそのまま文字列として残ります。
+コールアウトは、背景情報・助言・リスクに読者の注意を向けます。`:::type` ディレクティブとして書き、`:::warning[Heads up]` のように角括弧でタイトルを追加できます。タイトルではインラインの書式が保たれるため、角括弧内のコード、強調、リンクはタイトル内でそのままレンダリングされます。ディレクティブは MDX 専用の機能です — `.md` ファイルでは `:::note` の行はそのまま文字列として残り、`blume dev`、`blume build`、`blume check` はこれを `BLUME_MD_DIRECTIVE` として警告します。コールアウトとしてレンダリングするには、ページを `.mdx` にリネームしてください。
 
 ### Note
 
@@ -683,7 +718,27 @@ Commit `blume.config.ts`, not `.blume/`.
 ::::
 ```
 
-名前はコロンの直後に書いてください。スペースを挟んだ `::: tip`（VitePress、VuePress、Docusaurus v2 で使われる書き方）はディレクティブではないため、その行はページ上にテキストとして表示されます。Blume は、このように書かれたコールアウト名を `BLUME_DIRECTIVE_SPACED_NAME` として警告します。コンテナの内部では、コロンの後ろにテキストがある閉じフェンスでもコンテナは閉じられ、そのテキストは破棄されます：`:::warning` の中にある `::: card` の行はそこでコールアウトを終了させ、`card` は表示されません。Blume はその行を `BLUME_DIRECTIVE_CLOSING_TEXT` として警告します。その行をテキストとしてコールアウトの中に残すには、上記のようにコールアウトにより長いフェンスを使うか、コロンの後ろのテキストを削除してください。
+名前はコロンの直後に書いてください。スペースを挟んだ `::: tip`（VitePress、VuePress、Docusaurus v2 で使われる書き方）はディレクティブではないため、その行はページ上にテキストとして表示されます。Blume は、このように書かれたコールアウト名を `BLUME_DIRECTIVE_SPACED_NAME` として警告します。タイトルは角括弧で囲みます：`:::tip Some title` のように名前の後ろに書いたテキストはコールアウトを開きますが表示されることはなく、Blume はこれを `BLUME_DIRECTIVE_OPENING_TEXT` として、角括弧を使った書き方 `:::tip[Some title]` とともに警告します。コンテナの内部では、コロンの後ろにテキストがある閉じフェンスでもコンテナは閉じられ、そのテキストは破棄されます：`:::warning` の中にある `::: card` の行はそこでコールアウトを終了させ、`card` は表示されません。Blume はその行を `BLUME_DIRECTIVE_CLOSING_TEXT` として警告します。その行をテキストとしてコールアウトの中に残すには、上記のようにコールアウトにより長いフェンスを使うか、コロンの後ろのテキストを削除してください。
+
+### GitHub アラート [#github-alerts]
+
+GitHub のアラート構文もコールアウトとしてレンダリングされます：最初の行が `[!NOTE]`、`[!TIP]`、`[!IMPORTANT]`、`[!WARNING]`、`[!CAUTION]` のいずれか（大文字・小文字は問いません）である引用です。その行でマーカーの後ろに続くテキストはタイトルになります。
+
+{/* prettier-ignore */}
+> [!TIP]
+> `deployment.site` を設定すると、サイトマップと Open Graph 画像が絶対 URL を使うようになります。
+
+{/* prettier-ignore */}
+```md
+> [!TIP]
+> Set `deployment.site` so sitemaps and Open Graph images use absolute URLs.
+```
+
+`[!NOTE]` と `[!TIP]` は同名のコールアウトとして、`[!IMPORTANT]` は note として、`[!WARNING]` は warning として、`[!CAUTION]` は GitHub の赤色に合わせて danger コールアウトとしてレンダリングされます。GitHub と同様に、別の引用の中に入れたアラートは引用のままとなり、`[!INFO]` のようなその他のマーカーも同様です。
+
+`proseWrap: "never"` を指定した oxfmt のように行を結合するフォーマッターは、本文の最初の行をマーカーの横に引き上げてしまい、その行がタイトルになります（同じように[ディレクティブも崩してしまいます](/docs/faq#why-is-oxfmt--ultracite-collapsing-my-directives)）。両者を分けておくには、マーカーの後ろに空の `>` 行を入れてください。GitHub もこの形式をレンダリングします。
+
+アラートは、ディレクティブと同様に MDX 専用です。`.md` ファイルでは引用は引用のままで、マーカーもテキストとして表示され、`blume dev`、`blume build`、`blume check` はこれを `BLUME_MD_GITHUB_ALERT` として警告します。コールアウトとしてレンダリングするには、ページを `.mdx` にリネームしてください。
 
 ## 数式 [#math]
 
@@ -718,3 +773,14 @@ Blume は、書いているそばから直線的な引用符やダッシュを�
 ```md
 "Quotes" become curly, -- becomes an en dash, --- an em dash, and ... an ellipsis.
 ```
+
+## 他のツールの構文 [#syntax-from-other-tools]
+
+Blume が読み取るのはこのページで紹介した構文だけです。他のドキュメントツールが読み取る構文は、書いたとおりページに表示されるか、レンダリング時に `.mdx` ページを壊してしまうため、`blume dev`、`blume build`、`blume check` はその行でそれを警告します。コードブロック、インラインコード、コメントはチェックの対象外なので、例をテキストとして表示するにはインラインコードで囲んでください。
+
+- `BLUME_TEMPLATE_TAG`：`.md` ページ内の Liquid または Markdoc のタグ（`{% include note.html %}`、`{% /callout %}`）や Liquid の出力（`{{ site.title }}`）。Blume はテンプレート言語を一切実行しないため、タグはそれが生成していた内容に、サイト全体で共通の値は[変数](/docs/content/variables)に置き換えてください。変数になり得る `{{name}}` は、ここでは報告されません。
+- `BLUME_WIKILINK_UNSUPPORTED`：サイトのいずれかのページをファイル名またはタイトルで指す wiki リンク（`[[Home]]`、`[[Text|Page]]`）、または `|` を含むすべての wiki リンク。wiki リンクを読み取るのは [Obsidian vault](/docs/content/sources/obsidian) ソースだけです。警告には、置き換え先となる Markdown リンクが示されます。
+- `BLUME_MDC_SYNTAX`：Nuxt Content（MDC）のブロックコンポーネント（`::callout` … `::`）またはインラインコンポーネント（`:badge[New]{color="primary"}`）。代わりに、対応する[コンポーネント](/docs/content/components)か `:::` コールアウトを使ってください。
+- `BLUME_MDX_ATTRIBUTE_LIST`：`.mdx` ページ内の属性リスト（`{ width="300" }`、`{: .note }`）。MDX は波括弧を JavaScript として読み取るため、ページのビルドに失敗します。代わりに JSX 要素に属性を設定し（`<img src="…" width="300" />`）、見出しのアンカーは `[#id]` で固定してください。
+- `BLUME_MD_ATTRIBUTE_LIST`：`.md` ページ内の属性リスト。例えば、単独の行やブロックの後ろに置かれた kramdown の `{: .note }` や `{: #intro }`、画像の後ろの `{ width="300" }` などです。ページには書いたとおりに表示されます。代わりに HTML 要素に属性を設定し（`<img src="…" width="300">`）、見出しのアンカーは `[#id]` で固定してください。見出しの `{#id}` マーカーは、こちらではなく [`BLUME_MD_CURLY_ANCHOR`](#custom-anchors) の対象です。
+- `BLUME_MDX_UNCLOSED_ELEMENT`：`.mdx` ページ内、または `.mdx` ページが[インクルード](/docs/content/includes)するパーシャル内にある、閉じスラッシュのない HTML の空要素（`<img …>`、`<br>`）。MDX はこれを閉じられていない JSX 要素として読み取るため、`<br />` のように閉じてください。

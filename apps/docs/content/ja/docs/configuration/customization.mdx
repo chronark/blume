@@ -22,6 +22,8 @@ export default defineComponents({
 
 キーは MDX 内で記述する名前です（`<Callout>`、`<Pricing>`）。React コンポーネントをインポートする場合は `.tsx` のファイル名を使用してください。
 
+組み込みコンポーネント、[アイランド](/docs/content/islands)、上書きのいずれでもない大文字始まりのタグがあると、レンダリング時にそのページが失敗します。そのため、`blume dev`、`blume build`、`blume check` は事前にそれを `BLUME_UNKNOWN_COMPONENT` として警告します。警告はタグごとに 1 回出力され、そのタグを使用しているすべてのページが示されます。
+
 ### 参照の形式 [#reference-form]
 
 `mdx` と `layout` のいずれにおいても、すべての上書きは 3 つの形式を受け付けます。
@@ -104,7 +106,7 @@ export default defineComponents({
 
 `mobile` バリアントは [ページアクション](/docs/content/navigation#page-actions) も子要素として受け取ります（幅 1,280px 未満で右側のレールからアクションが移動してくる空の要素です）。そのため、狭い画面でもアクションを表示し続けるには、その中で `<slot />` をレンダリングしてください。見出しのないページでも `headings` が空の状態でレンダリングされるため、そうしたページでもアクションは表示されます。
 
-`PageHeader` と `PageFooter` には組み込みコンポーネントがありません。設定するまで何もレンダリングされないため、プロモーションバナーや「最終更新日」の注記などの便利な挿入ポイントになります。組み込みの `Footer` はリポジトリとソーシャルプロフィールへの唯一のリンクを保持しているため、`Footer` の上書き（設定では表現できないマーケティング用フッターを置く場所）でもそれらを残してください。`consent` を設定している場合は、それを再び開く手段も残してください。`data-blume-consent-open` を持つ任意の要素が [Cookie 設定](/docs/configuration/consent#changing-an-answer) のリンクとして機能します。
+`PageHeader` と `PageFooter` には組み込みコンポーネントがありません。設定するまで何もレンダリングされないため、プロモーションバナーや「最終更新日」の注記などの便利な挿入ポイントになります。`PageFooter` は、API オペレーションページを含め、Blume がコンテンツからビルドするすべてのページの末尾にレンダリングされ、その後に `Feedback` と `Pagination` が続きます。[`custom` または `frame` モード](/docs/content/frontmatter#layout)のページでは、タイトルやパンくずリストとともにこのページ末尾の領域が省略されます。`pages/` 配下の[カスタムページ](/docs/advanced/custom-pages)では、そのページが自身をラップしているレイアウトがレンダリングされます。`RootLayout` は `layout` プロップを通じてスロットの上書きを受け取り、`PageLayout` にはページ末尾の領域がありません。組み込みの `Footer` はリポジトリとソーシャルプロフィールへの唯一のリンクを保持しているため、`Footer` の上書き（設定では表現できないマーケティング用フッターを置く場所）でもそれらを残してください。`consent` を設定している場合は、それを再び開く手段も残してください。`data-blume-consent-open` を持つ任意の要素が [Cookie 設定](/docs/configuration/consent#changing-an-answer) のリンクとして機能します。
 
 レイアウトスロットは MDX の上書きと同じ[3 つの参照形式](#reference-form)を受け付けます。そのため、インタラクティブなヘッダーやフッターが必要な場合は、スロットにパス文字列やハイドレーション付きのディスクリプタ（`{ component, client }`）を指定できます。
 

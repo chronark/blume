@@ -39,4 +39,6 @@ Um `{{name}}` não definido no texto gera um erro de build, `BLUME_UNDEFINED_VAR
 
 Para mostrar uma referência no texto sem defini-la, coloque-a em código inline: `` `{{name}}` ``.
 
-Um site que não define nenhuma variável não é afetado: `{{…}}` nas páginas dele fica como foi escrito.
+Um site que não define nenhuma variável não é afetado: `{{…}}` nas páginas `.md` dele fica como foi escrito. Em `.mdx`, as chaves são uma expressão JavaScript, então um `{{name}}` não definido faz a página falhar ao renderizar, reportado como [`BLUME_MDX_UNDEFINED_NAME`](/docs/content#markdown-and-mdx) na linha em que aparece. Escape as duas chaves de abertura (`\{\{name}}`) ou coloque-o em código inline.
+
+Um `{{…}}` que contém mais do que um nome, como `{{ site.title }}` ou `{{ page.url | relative_url }}` do Liquid, nunca é uma variável. O Blume emite o aviso `BLUME_TEMPLATE_TAG` quando encontra um desses em uma página `.md`, já que a página o mostraria como foi escrito.

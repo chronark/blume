@@ -43,7 +43,7 @@ blume <command> [options]
 - `blume dev --content-dir <dir>` – scannt einen anderen Content-Ordner, ohne dass du `blume.config.ts` bearbeiten musst.
 - `blume dev --debug` – ausführliches Astro-/Vite-Logging zur Fehlersuche.
 - `blume dev --preview` / `blume build --preview` – bezieht Entwürfe und unveröffentlichte CMS-Inhalte mit ein.
-- `blume build --no-strict` – baut trotz Diagnosefehlern. Standardmäßig schlägt `blume build` bei jeder Fehlerdiagnose fehl (Exit 1), weil Seiten, deren Frontmatter-Validierung fehlschlägt, aus der Ausgabe entfernt werden; mit `--no-strict` ist der Build erfolgreich und meldet, wie viele Seiten fehlen. Mit `blume dev --strict` aktivierst du dasselbe Fail-Fast-Verhalten auch für dev.
+- `blume build --no-strict` – baut trotz Diagnosefehlern. Standardmäßig schlägt `blume build` bei jeder Fehlerdiagnose fehl (Exit 1), weil Seiten, deren Frontmatter-Validierung fehlschlägt, und `.mdx`-Seiten, die sich nicht [parsen](/docs/content#markdown-and-mdx) lassen, aus der Ausgabe entfernt werden; mit `--no-strict` ist der Build erfolgreich und meldet, wie viele Seiten fehlen. Ein Fehler, den erst der Build selbst findet, etwa eine Seite, die beim Rendern einen Fehler wirft, lässt ihn trotzdem fehlschlagen. Mit `blume dev --strict` aktivierst du dasselbe Fail-Fast-Verhalten auch für dev.
 - `blume build --analyze` – gibt nach dem Build die Größen der Client-JavaScript-Bundles aus (die größten zuerst).
 - `blume build --budget-js <kb> --budget-css <kb>` – lässt den Build fehlschlagen, wenn das gesamte Client-JavaScript/-CSS das Budget überschreitet, und macht so aus einem Performance-Ziel ein CI-Gate.
 - `blume build --isolated` – baut in eine temporäre `.blume-verify/`-Runtime (mit eigenem `dist/`) statt in `.blume/`, sodass ein laufender `blume dev`-Server und dein echtes `dist/` unberührt bleiben. Siehe [Überprüfen, während der Dev-Server läuft](#verifying-while-the-dev-server-runs).
@@ -108,3 +108,5 @@ Lege im Root deines Projekts eine `tsconfig.json` an, die die Astro-Konfiguratio
 ```
 
 Ohne eine `tsconfig.json` im Projekt wird nur die generierte Runtime geprüft.
+
+Auch der Build liest diese Datei, um Importe aufzulösen. Ein `extends`, das sich nicht auflösen lässt (ein nicht installiertes Paket, eine verschobene Datei), bricht `blume build`, `blume dev` und `blume check` deshalb mit `BLUME_TSCONFIG_EXTENDS` ab und verweist dabei auf die Zeile, in der es eingetragen ist. Installiere das Paket oder entferne den Eintrag aus `extends`.

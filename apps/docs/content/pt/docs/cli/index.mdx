@@ -43,7 +43,7 @@ blume <command> [options]
 - `blume dev --content-dir <dir>` — escaneia outra pasta de conteúdo sem editar o `blume.config.ts`.
 - `blume dev --debug` — logs detalhados do Astro/Vite para solucionar problemas.
 - `blume dev --preview` / `blume build --preview` — inclui rascunhos e conteúdo de CMS não publicado.
-- `blume build --no-strict` — gera o build mesmo com erros de diagnóstico. Por padrão, o `blume build` falha (exit 1) em qualquer diagnóstico de erro, porque páginas que não passam na validação do frontmatter são descartadas da saída; com `--no-strict`, o build é concluído e informa quantas páginas estão faltando. `blume dev --strict` ativa no dev o mesmo comportamento de falhar logo no primeiro erro.
+- `blume build --no-strict` — gera o build mesmo com erros de diagnóstico. Por padrão, o `blume build` falha (exit 1) em qualquer diagnóstico de erro, porque páginas que não passam na validação do frontmatter, e páginas `.mdx` em que o [parse](/docs/content#markdown-and-mdx) falha, são descartadas da saída; com `--no-strict`, o build é concluído e informa quantas páginas estão faltando. Uma falha que só o próprio build encontra, como uma página que lança um erro durante a renderização, continua fazendo o build falhar. `blume dev --strict` ativa no dev o mesmo comportamento de falhar logo no primeiro erro.
 - `blume build --analyze` — mostra os tamanhos dos bundles de JavaScript do cliente (dos maiores para os menores) depois do build.
 - `blume build --budget-js <kb> --budget-css <kb>` — faz o build falhar quando o total de JavaScript/CSS do cliente passa do orçamento, transformando uma meta de performance em um gate de CI.
 - `blume build --isolated` — gera o build em um runtime descartável `.blume-verify/` (com o próprio `dist/`) em vez de `.blume/`, para que um servidor `blume dev` em execução e o seu `dist/` real fiquem intactos. Veja [Verificando enquanto o servidor de desenvolvimento roda](#verifying-while-the-dev-server-runs).
@@ -108,3 +108,5 @@ Adicione na raiz do projeto um `tsconfig.json` que estenda a configuração do A
 ```
 
 Sem um `tsconfig.json` no projeto, só o runtime gerado é verificado.
+
+O build também lê esse arquivo para resolver imports, então um `extends` que não se resolve (um pacote que não está instalado, um arquivo que foi movido) interrompe `blume build`, `blume dev` e `blume check` com `BLUME_TSCONFIG_EXTENDS`, apontando a linha que o referencia. Instale o pacote ou remova a entrada do `extends`.

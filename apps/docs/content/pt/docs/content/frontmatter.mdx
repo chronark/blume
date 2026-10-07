@@ -149,7 +149,7 @@ sidebar:
   display: page
 ```
 
-`hidden` remove a página da barra lateral e da paginação anterior/próxima e, com isso, também do sitemap, da busca e do `llms.txt` (veja [Páginas ocultas](/docs/content/navigation#hidden-pages)). Na página `index` de uma pasta, ele remove só a linha da própria página: a linha do grupo continua apontando para a página, então os links de anterior/próxima ainda passam por ela e a página continua no sitemap, na busca e no `llms.txt`.
+`hidden` remove a página da barra lateral e da paginação anterior/próxima e, com isso, também do sitemap, da busca e do `llms.txt` (veja [Páginas ocultas](/docs/content/navigation#hidden-pages)). Na página `index` de uma pasta, ele remove só a linha da própria página: a linha do grupo continua apontando para a página, então os links de anterior/próxima ainda passam por ela e a página continua no sitemap, na busca e no `llms.txt`. Na página inicial, a página `index` da raiz, ele também remove só a linha: a página continua no sitemap, na busca e no `llms.txt`.
 
 `display` define o modo de renderização do grupo da pasta da página ([substituições por grupo](/docs/content/navigation#per-group-overrides)) e só faz sentido na página `index` de uma pasta dentro da barra lateral gerada. Em qualquer outro lugar (uma página que não é index, a própria página `index` da raiz do conteúdo ou qualquer página sob um `navigation.sidebar` explícito), não existe grupo para configurar, e o Blume emite o aviso `BLUME_SIDEBAR_DISPLAY_IGNORED`.
 

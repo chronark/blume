@@ -15,7 +15,7 @@ sidebar:
 | ---------------- | ------------- |
 | ビルドコマンド   | `blume build` |
 | 出力ディレクトリ | `dist`        |
-| Node バージョン  | 22.12 以降    |
+| Node バージョン  | 22.19 以降    |
 
 これらの設定は Vercel、Netlify、Cloudflare Pages、GitHub Pages、その他あらゆるバケットや CDN で動作します。ホストがビルドを実行できるよう、`blume` が依存関係に含まれていることを確認してください。
 
@@ -69,9 +69,16 @@ blume preview
 
 `blume preview` は静的ビルドと、`node()` および `cloudflare()` のサーバービルドを配信します。Vercel と Netlify のアダプターにはローカルのプレビューサーバーがないため、`vercel()` または `netlify()` のサーバービルドの後では、代わりにエラーを出して停止します。サイトを試すには `blume dev` を使うか、`vercel deploy` または `netlify deploy` でプレビューをデプロイしてください。
 
+静的ビルドでは、`blume preview` は `dist/` 内のファイルを配信するだけでなく、ホストと同じように応答します。ビルドが書き出すホスト用のファイルと同様に、パターンを含む [リダイレクト](#redirects) を設定されたステータスで適用します。また、末尾のスラッシュも静的ホストと同じように処理します:
+
+- 末尾にスラッシュが付いたページの URL（`/guide/`）は、クエリ文字列を維持したままページ（`/guide`）にリダイレクトされます。
+- `public/` に配置した HTML のフォルダー（`public/demo/index.html`）は `/demo/` で配信され、`/demo` はそこにリダイレクトされるため、その中の相対リンクが正しく解決されます。
+
+`blume dev` も末尾のスラッシュを同じように処理します。
+
 ## サブパスへのデプロイ [#subpath-deploys]
 
-`example.com/docs` のようなパス配下でドキュメントを配信しますか？ `base` を設定してください — GitHub Pages のプロジェクトサイトでよくあるケースです。ルートを含むサイト全体がそのベース配下に移動し、内部リンクとアセットもベースを含むように書き換えられます。
+`example.com/docs` のようなパス配下でドキュメントを配信しますか？ `base` を設定してください — GitHub Pages のプロジェクトサイトでよくあるケースです。ルートを含むサイト全体がそのベース配下に移動し、内部リンクとアセット、そして生の HTML 内のルート相対の `href` や `src`（`<a href="/guide">`、`<img src="/logo.png">`）もベースを含むように書き換えられます。
 
 ```ts blume.config.ts lineNumbers
 deployment: {
@@ -154,6 +161,8 @@ deployment: netlify({ output: "static" }),
 
 サーバービルドには静的ビルドのすべてに加えて、追加した Astro のエンドポイントやミドルウェアが含まれます。`node()` アダプターは、`node dist/server/entry.mjs` で直接実行できるスタンドアロンのサーバーを生成します。起動時に環境変数 `HOST` と `PORT` を設定しない限り、サーバーは `localhost:4321` で待ち受けます（`HOST=0.0.0.0 PORT=8080 node dist/server/entry.mjs`）。`node()` に渡した `host` と `port` は効果がありません。`@astrojs/node` がそれらを Astro 自身のサーバー設定で置き換えるためです。リバースプロキシの背後では、[レート制限](/docs/configuration/rate-limiting#behind-a-reverse-proxy) が閲覧者ごとに個別にカウントされるよう `allowedDomains` を設定してください。このサーバーはプロジェクトの `node_modules` へのリンクを通じてパッケージを解決するため、`dist/` だけでなく、依存関係をインストールした状態のプロジェクトごとデプロイしてください。サイトがディスカバリーファイルを公開している場合、コンテンツソースがダウンロードした画像を配信する場合、またはリダイレクトを設定している場合、Blume は Astro のエントリー（同じ場所の `astro-entry.mjs` に移動されます）の手前に小さなラッパーを配置します。このラッパーは `.well-known` のディスカバリーファイルを適切なメディアタイプと CORS ヘッダー付きで配信し、ダウンロードした SVG をサンドボックス化して配信します。これらはスタンドアロンサーバーの静的ハンドラーだけではできないためです。また、各リダイレクトには設定されたステータスで応答します。
 
+`vercel()` のサーバービルドは、アダプターがトレースした関数バンドルを調べ、インポートされているのにコピーされていないパッケージがないかを確認します。そのようなパッケージがあると、Vercel 上で関数がクラッシュするためです。自分でインポートしたものが欠けている場合は警告になります。Blume の依存関係が欠けている場合はビルドが停止し、ビルドは `.vercel/output/config.json` を削除します。これにより、Blume が追加するルートを欠いた出力を `vercel deploy --prebuilt` でデプロイできないようにします。
+
 `cloudflare()` のサーバービルドは Cloudflare Workers でのみ動作します。`@astrojs/cloudflare` がバージョン 13 で Cloudflare Pages のサポートを終了したためです。静的ビルドはこのパッケージを読み込まないため、その `dist/` は引き続き Pages にデプロイできます。サーバービルドは、`blume build` の後にプロジェクトのルートで `npx wrangler deploy` を実行してデプロイします: Blume は Wrangler のリダイレクト設定（redirected config）を `.wrangler/deploy/` に書き出し（`.gitignore` に `.wrangler/` も追加します）、Worker にはプロジェクトに基づいた名前を付けます — `package.json` の `name`、なければサイトのホスト名、それもなければフォルダー名です — ただし、プロジェクトのルートに置いた独自の `wrangler.jsonc` で `name` を設定している場合を除きます。
 
 Vercel と Cloudflare では、サーバービルドによって [`Accept: text/markdown` のコンテンツネゴシエーション](/docs/discoverability/markdown#content-negotiation) も有効になり、そのヘッダー付きで任意のコンテンツページをリクエストしたエージェントは、同じ URL で生の Markdown 版を受け取れます。Vercel では、Blume がデプロイのルーティング設定にヘッダー条件付きのリライトを挿入します。Cloudflare では、Astro の Worker の手前に小さな Worker を生成し、フィンガープリント付きのビルドアセットと生の `.md`、`.txt`、`.json`、`.well-known` ファイルを除くすべてのパスに `assets.run_worker_first` を適用します — そうしないと、プラットフォームはサーバーコードが実行される前に事前レンダリング済みページ（および対応するページがない URL に対しては `404.html`）を配信してしまうためです。除外されたファイルは Worker を介さない高速パスを維持します。また、事前レンダリング済みのページごとの JSON ドキュメント（`/api/docs/pages/{route}.json`）へのリクエストがこの Worker に届いた場合も、Worker がアセットバインディングから応答します。そうしないと、Astro がそのリクエストを `/api/` のキャッチオールにルーティングしてしまうためです。
@@ -191,9 +200,13 @@ Blume 自体にはサインイン機能がありません。静的ビルドは�
 redirects: [{ from: "/old", to: "/new", status: 301 }],
 ```
 
-`status` は `301`、`302`、`307`、`308` を受け付けます（デフォルトは `301`）。サーバービルドではリダイレクトをリクエスト時に、設定されたステータスで処理します。`blume dev` も同様です。静的ビルドではリダイレクトページ**に加えて**ホストが読み取るプラットフォーム用のファイルも出力するため、ホストが本物の HTTP リダイレクトを返せます: `netlify()` と `cloudflare()` には `_redirects`、`vercel()` には `vercel.json`、そしてホストを指定していない場合はその両方に加えて `blume-redirects.json` — その他の環境（nginx/Apache のルール、エッジワーカーなど）向けの構造化マニフェストです。`public/` に配置した `_redirects` や `vercel.json` はそのまま維持されます。
+`status` は `301`、`302`、`307`、`308` を受け付けます（デフォルトは `301`）。サーバービルドではリダイレクトをリクエスト時に、設定されたステータスで処理します。`blume dev` と `blume preview` も同様です。静的ビルドではリダイレクトページ**に加えて**ホストが読み取るプラットフォーム用のファイルも出力するため、ホストが本物の HTTP リダイレクトを返せます: `netlify()` と `cloudflare()` には `_redirects`、`vercel()` には `vercel.json`、そしてホストを指定していない場合はその両方に加えて `blume-redirects.json` — その他の環境（nginx/Apache のルール、エッジワーカーなど）向けの構造化マニフェストです。`public/` に配置した `_redirects` や `vercel.json` はそのまま維持されます。
 
 あるページを別のページへ移動するリダイレクトは、そのページの [生の Markdown](/docs/discoverability/markdown#raw-markdown) も一緒に移動します: `blume dev` とすべてのビルドで、`/old.md` と `/old.mdx` は同じステータスで `/new.md` と `/new.mdx` にリダイレクトされます。ただし、移行元のサイトの `/old.html` のような `.html` の URL からのリダイレクトでは、生の Markdown は移動しません。その URL には Markdown のコピーが存在したことがないためです。Markdown の URL がすでにコピーを配信しているリダイレクトでも移動しません: `/index.md` はホームページのコピーなので、`/index` から `/` へのリダイレクトではそのまま残ります。
+
+`/guide/index.html` から `/guide` へのリダイレクトのように、ページ自身の `index.html` の URL からのリダイレクトには、静的ビルドではリダイレクトページが作られません。そのファイルにはページ自体が書き出されるためです。リダイレクト用のファイルを読み取るホストは、リダイレクトで応答します。それ以外のホストは、その URL でページを配信します。
+
+Blume が自ら追加するリダイレクトが 1 種類あります: 以前のバージョンでより短い URL で公開されていた日付名のページ（例えば `/changelog/05-2022` で公開されていた `changelog/12-05-2022.mdx`）は、その URL から自身の URL へリダイレクトされます（[数値プレフィックスによる並び替え](/docs/content#ordering-with-numeric-prefixes) を参照）。古い URL に別のページが存在する場合や、設定したリダイレクトがすでにその URL から始まっている場合は追加されません。
 
 次の 2 つのホストでは、ファイルを出力するだけでは不十分です:
 
@@ -218,12 +231,14 @@ redirects: [
 ```
 
 - `:name` は 1 つのセグメント全体にマッチします: `/blog/:slug` は `/blog/hello` にはマッチしますが、`/blog/a/b` にはマッチしません。
-- 最後のセグメントに置いた `:name*` は、パスの残りの部分（任意の数のセグメント）にマッチします: `/beta/:slug*` は `/beta/guides/setup` を `/v2/guides/setup` に、`/beta` 自体を `/v2` に転送します。最後のセグメントが `*` の場合も同じです。
+- 最後のセグメントに置いた `:name*` は、パスの残りの部分（任意の数のセグメント）にマッチします: `/beta/:slug*` は `/beta/guides/setup` を `/v2/guides/setup` に、`/beta` 自体を `/v2` に転送します。最後のセグメントが `*` の場合も同じです。この `/beta` だけのパスは、どのホストにも独立したルールとして渡されるため（`_redirects` では `/beta /v2`）、すべてのホストで同じ場所に転送されます。`blume audit` は転送先を確認し、ビルドが配信していない `/v2` へ `/beta` が転送される場合は、壊れたリダイレクトとして報告します。
 - セグメントの末尾にある `*` は、その位置以降のパスの残りの部分にマッチします: `/articles/concepts-*` は `/articles/concepts-overview` にマッチします。
 
 `to` では、キャプチャを名前でセグメント全体として（`/:slug*`、`/:slug`）参照するか、`*` で `from` の `*` がマッチした部分を参照します（`_redirects` での表記である `:splat` でも参照できます）。キャプチャを参照しない `to` は、パターンがカバーするすべてのパスを 1 つのページに転送します。同じパスをカバーするパターンよりも完全一致のリダイレクトが優先され、パターンは記述した順に試されます。
 
-各ホストには、それぞれの構文でパターンが渡されます: `_redirects` ではスプラット、`vercel.json` では `path-to-regexp` 形式のソース、そして `vercel()` または `netlify()` のサーバービルドではルーティング設定です。`node()` と `cloudflare()` のサーバーは自身でパターンをマッチングし、`blume dev` も同様です。静的ビルドはパターンに対してリダイレクトページを書き出しません。パターンがカバーするすべてのパスに 1 ページずつ必要になるためです。そのため、これらのファイルをいずれも読み取らないホスト（GitHub Pages など）では、完全一致のリダイレクトのみが適用されます。`blume-redirects.json` には、パターンが記述したとおりに記載されます。
+各ホストには、それぞれの構文でパターンが渡されます: `_redirects` ではスプラット、`vercel.json` では `path-to-regexp` 形式のソース、そして `vercel()` または `netlify()` のサーバービルドではルーティング設定です。`node()` と `cloudflare()` のサーバーは自身でパターンをマッチングし、`blume dev` と `blume preview` も同様です。静的ビルドはパターンに対してリダイレクトページを書き出しません。パターンがカバーするすべてのパスに 1 ページずつ必要になるためです。そのため、これらのファイルをいずれも読み取らないホスト（GitHub Pages など）では、完全一致のリダイレクトのみが適用されます。`blume-redirects.json` には、パターンが記述したとおりに記載されます。
+
+[`blume validate`](/docs/cli/validate) は、各リダイレクトの転送先を確認します。完全一致の `to` は、ページ、`public/` 内のファイルまたは Blume が生成するファイル、あるいは別のリダイレクトの `from` でなければなりません。パターンの場合は、`to` の最初のキャプチャより前のリテラル部分（`/v2/:slug*` の `/v2/`）の配下で何かが配信されている必要があります。どこにも行き着かないリダイレクトは、その `to` に対して `BLUME_BROKEN_REDIRECT` の警告を出します。[`blume audit`](/docs/cli/audit) は、ビルドされたサイト上ですべてのリダイレクトを実際にたどります。
 
 パターンがページにもマッチすることはできません: 両者のどちらが応答するかはホストによって異なるため、ビルドはそのページを示して `BLUME_REDIRECT_MATCHES_PAGE` で停止します。パターンを移動したパスだけに絞り込んでください。ページ自身の URL からの完全一致のリダイレクトはどのホストでも同じように応答し、その URL を引き継ぐためページは公開されません。そのため、この場合は同じコードが警告として出されます: ページを移動した場合はページを削除し、そうでなければリダイレクトを削除してください。`/guide.md` やホームページの `/index.md` のような、ページの Markdown コピーからのリダイレクトも同様に警告となります。そのコピーがエージェントから利用できなくなるため、リダイレクトを削除してください。
 
@@ -255,7 +270,7 @@ poweredBy: false,
 | [レート制限](/docs/configuration/rate-limiting)（`upstash()`） | `UPSTASH_REDIS_REST_URL` と `UPSTASH_REDIS_REST_TOKEN` |
 | Mixedbread 検索 | `MIXEDBREAD_API_KEY` |
 | [ナレーション](/docs/configuration/narration)（生成音声） | `gateway()` には `AI_GATEWAY_API_KEY`（または Vercel OIDC）、`openai()` には `OPENAI_API_KEY`（`baseUrl` を指定した場合は、変数名を指定しない限り不要）、またはいずれかに渡した `apiKeyEnv` |
-| [コンテンツソース](/docs/content/sources) | `NOTION_TOKEN`（`notion()`）、`SANITY_TOKEN`（`sanity()`）、`CONTENTFUL_ACCESS_TOKEN`（`contentful()`。`--preview` には `CONTENTFUL_PREVIEW_TOKEN` も必要で、ない場合は失敗します）、`PAYLOAD_API_KEY`（`payload()`）、`STRAPI_API_TOKEN`（`strapi()`）、`GITHUB_TOKEN`（`githubReleases()`、および GitHub から読み込む `mdxRemote()`） |
+| [コンテンツソース](/docs/content/sources) | `NOTION_TOKEN`（`notion()`）、`SANITY_TOKEN`（`sanity()`）、`CONTENTFUL_ACCESS_TOKEN`（`contentful()`。`--preview` には `CONTENTFUL_PREVIEW_TOKEN` も必要で、ない場合は失敗します）、`PAYLOAD_API_KEY`（`payload()`）、`STRAPI_API_TOKEN`（`strapi()`）、`GITHUB_TOKEN`（`githubReleases()`、および `github` を指定した `mdxRemote()`） |
 
 ローカル開発では `.env.local` に、本番ではホストの環境に設定してください。コンテンツソースは `blume dev` と `blume build` の実行中、コンテンツを取得する際にトークンを読み取り、ナレーションは `blume build` の実行中にキーを読み取るため、これらはサイトをビルドする環境に設定してください。検索インデックスの同期に必要なビルド時のシークレット（`ALGOLIA_ADMIN_API_KEY`、`ORAMA_PRIVATE_API_KEY`、`TYPESENSE_ADMIN_API_KEY`）は、同期ステップ自体がチェックします: 未設定の場合、ビルドは警告を出して同期をスキップし、設定されている場合は、同期が失敗すると [ビルドも失敗します](/docs/configuration/search#adapters)。[GitHub info](/docs/content/components#github-info) カードも、`GITHUB_TOKEN` が設定されている場合は GitHub の API レート制限を緩和するためにそれを送信します。
 

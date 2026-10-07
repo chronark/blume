@@ -15,7 +15,7 @@ sidebar:
 | ------------------ | ----------------- |
 | Comando de build   | `blume build`     |
 | Diretório de saída | `dist`            |
-| Versão do Node     | 22.12 ou superior |
+| Versão do Node     | 22.19 ou superior |
 
 Essas configurações funcionam na Vercel, Netlify, Cloudflare Pages, GitHub Pages, ou em qualquer bucket ou CDN. Certifique-se de que `blume` seja uma dependência para que o host possa executar o build.
 
@@ -69,9 +69,16 @@ blume preview
 
 `blume preview` serve builds estáticos e builds de servidor com `node()` e `cloudflare()`. Os adaptadores da Vercel e da Netlify não têm servidor de pré-visualização local, então, depois de um build de servidor com `vercel()` ou `netlify()`, ele para com um erro. Teste o site com `blume dev` ou implante uma pré-visualização com `vercel deploy` ou `netlify deploy`.
 
+Em um build estático, o `blume preview` também responde como o host responderia, além dos arquivos em `dist/`. Ele aplica os [redirecionamentos](#redirects), incluindo os padrões, com o status configurado, assim como fazem os arquivos de host que o build grava. Ele também trata as barras finais do jeito que os hosts estáticos tratam:
+
+- A URL de uma página com barra final (`/guide/`) redireciona para a página (`/guide`), mantendo a query string.
+- Uma pasta de HTML que você inclui em `public/` (`public/demo/index.html`) é servida em `/demo/`, e `/demo` redireciona para lá, para que os links relativos dentro dela funcionem.
+
+O `blume dev` trata as barras finais da mesma forma.
+
 ## Implantações em subcaminho [#subpath-deploys]
 
-Está servindo a documentação sob um caminho como `example.com/docs`? Defina `base` — comum em sites de projeto do GitHub Pages. O site inteiro, incluindo a raiz, passa a ficar sob a base, e os links internos e os recursos são reescritos para incluí-la.
+Está servindo a documentação sob um caminho como `example.com/docs`? Defina `base` — comum em sites de projeto do GitHub Pages. O site inteiro, incluindo a raiz, passa a ficar sob a base, e os links internos e os recursos são reescritos para incluí-la, assim como um `href` ou `src` relativo à raiz em HTML bruto (`<a href="/guide">`, `<img src="/logo.png">`).
 
 ```ts blume.config.ts lineNumbers
 deployment: {
@@ -154,6 +161,8 @@ deployment: netlify({ output: "static" }),
 
 Um build de servidor inclui tudo o que um build estático inclui, além de quaisquer endpoints ou middlewares do Astro que você adicionar. O adaptador `node()` produz um servidor autônomo que você pode executar diretamente com `node dist/server/entry.mjs`. Ele escuta em `localhost:4321`, a menos que você defina as variáveis de ambiente `HOST` e `PORT` ao iniciá-lo (`HOST=0.0.0.0 PORT=8080 node dist/server/entry.mjs`); `host` e `port` passados para `node()` não têm efeito, porque o `@astrojs/node` os substitui pelas próprias configurações de servidor do Astro. Atrás de um proxy reverso, defina `allowedDomains` para que o [limite de taxa](/docs/configuration/rate-limiting#behind-a-reverse-proxy) conte cada leitor separadamente. O servidor resolve seus pacotes por meio de links para o `node_modules` do seu projeto, então implante o projeto com suas dependências instaladas, e não apenas o `dist/`. Quando o site publica arquivos de descoberta, serve imagens que uma fonte de conteúdo baixou ou configura redirecionamentos, o Blume coloca um pequeno wrapper na frente do ponto de entrada do Astro (movido para `astro-entry.mjs`, ao lado dele). Ele envia os arquivos de descoberta em `.well-known` com seus tipos de mídia e cabeçalhos CORS e os SVGs baixados em sandbox, algo que o handler estático do servidor autônomo não consegue fazer por conta própria, e responde a cada redirecionamento com o status configurado.
 
+Um build de servidor com `vercel()` verifica o bundle da função que o adaptador rastreou em busca de pacotes que ele importa, mas não copiou, o que faria a função falhar na Vercel. Uma importação sua que esteja faltando gera um aviso. Uma dependência do Blume que esteja faltando interrompe o build, e o build remove o `.vercel/output/config.json`, para que o `vercel deploy --prebuilt` não consiga publicar a saída sem as rotas que o Blume adiciona a ela.
+
 Um build de servidor com `cloudflare()` roda apenas no Cloudflare Workers, já que o `@astrojs/cloudflare` deixou de suportar o Cloudflare Pages na versão 13; um build estático não carrega o pacote, então seu `dist/` ainda pode ser implantado no Pages. O build de servidor é implantado com `npx wrangler deploy` a partir da raiz do projeto, depois do `blume build`: o Blume grava a configuração redirecionada do Wrangler em `.wrangler/deploy/` (e adiciona `.wrangler/` ao `.gitignore`) e dá ao Worker o nome do seu projeto — o `name` do `package.json`, senão o hostname do site, senão a pasta —, a menos que um `wrangler.jsonc` seu na raiz do projeto defina `name`.
 
 Na Vercel e na Cloudflare, um build de servidor também ativa a [negociação de conteúdo com `Accept: text/markdown`](/docs/discoverability/markdown#content-negotiation), de modo que um agente que solicite qualquer página de conteúdo com esse cabeçalho recebe seu espelho em Markdown puro na mesma URL. Na Vercel, o Blume insere reescritas condicionadas ao cabeçalho na configuração de roteamento da implantação; na Cloudflare, ele gera um pequeno Worker na frente do Worker do Astro e aponta `assets.run_worker_first` para todos os caminhos, exceto os recursos de build com fingerprint e os arquivos brutos `.md`, `.txt`, `.json` e `.well-known`, já que, de outra forma, a plataforma serviria as páginas pré-renderizadas — e o seu `404.html` para uma URL que nenhuma página atende — antes de qualquer código de servidor ser executado; esses arquivos isentos mantêm seu caminho rápido sem Worker. Esse Worker também responde aos documentos JSON pré-renderizados de cada página (`/api/docs/pages/{route}.json`) a partir do binding de recursos quando uma requisição para um deles chega até ele, já que, de outra forma, o Astro a encaminharia para a rota catch-all de `/api/`.
@@ -191,9 +200,13 @@ Mapeie URLs antigas para novas em `blume.config.ts`:
 redirects: [{ from: "/old", to: "/new", status: 301 }],
 ```
 
-`status` aceita `301`, `302`, `307` ou `308` (padrão `301`). Os builds de servidor respondem aos redirecionamentos em tempo de requisição com o status configurado, assim como o `blume dev`. Os builds estáticos geram páginas de redirecionamento **e** os arquivos de plataforma que seu host lê, para que ele emita um redirecionamento HTTP real: `_redirects` para `netlify()` e `cloudflare()`, `vercel.json` para `vercel()` e — quando nenhum host é indicado — ambos, além de `blume-redirects.json`, um manifesto estruturado para qualquer outro caso (regras de nginx/Apache, um edge worker). Um `_redirects` ou `vercel.json` que você inclua em `public/` permanece intocado.
+`status` aceita `301`, `302`, `307` ou `308` (padrão `301`). Os builds de servidor respondem aos redirecionamentos em tempo de requisição com o status configurado, assim como o `blume dev` e o `blume preview`. Os builds estáticos geram páginas de redirecionamento **e** os arquivos de plataforma que seu host lê, para que ele emita um redirecionamento HTTP real: `_redirects` para `netlify()` e `cloudflare()`, `vercel.json` para `vercel()` e — quando nenhum host é indicado — ambos, além de `blume-redirects.json`, um manifesto estruturado para qualquer outro caso (regras de nginx/Apache, um edge worker). Um `_redirects` ou `vercel.json` que você inclua em `public/` permanece intocado.
 
 Um redirecionamento que move uma página para outra leva junto o [Markdown bruto](/docs/discoverability/markdown#raw-markdown) da página: `/old.md` e `/old.mdx` redirecionam para `/new.md` e `/new.mdx` com o mesmo status, no `blume dev` e em todos os builds. Um redirecionamento a partir de uma URL `.html`, como `/old.html` de um site que você migrou, não faz isso, já que essa URL nunca teve uma cópia em Markdown. Nem um cuja URL em Markdown já serve uma cópia: o `/index.md` é a cópia da página inicial, então um redirecionamento de `/index` para `/` o deixa intacto.
+
+Um redirecionamento a partir da própria URL `index.html` de uma página, como de `/guide/index.html` para `/guide`, não recebe página de redirecionamento em um build estático, porque a própria página é gravada nesse arquivo. Os hosts que leem os arquivos de redirecionamento respondem com o redirecionamento. Qualquer outro host serve a página nessa URL.
+
+O próprio Blume adiciona um tipo de redirecionamento: uma página nomeada com uma data que uma versão anterior publicava sob uma URL mais curta, como `changelog/12-05-2022.mdx` em `/changelog/05-2022`, redireciona dessa URL para a sua própria (consulte [ordenação com prefixos numéricos](/docs/content#ordering-with-numeric-prefixes)). Ele não adiciona nenhum quando outra página fica na URL antiga ou quando um redirecionamento que você configurou já começa ali.
 
 Dois hosts precisam de mais do que o arquivo:
 
@@ -218,12 +231,14 @@ redirects: [
 ```
 
 - `:name` corresponde a um segmento inteiro: `/blog/:slug` cobre `/blog/hello`, mas não `/blog/a/b`.
-- `:name*` como último segmento corresponde ao restante do caminho, com qualquer número de segmentos: `/beta/:slug*` envia `/beta/guides/setup` para `/v2/guides/setup`, e o próprio `/beta` para `/v2`. Um último segmento `*` faz o mesmo.
+- `:name*` como último segmento corresponde ao restante do caminho, com qualquer número de segmentos: `/beta/:slug*` envia `/beta/guides/setup` para `/v2/guides/setup`, e o próprio `/beta` para `/v2`. Um último segmento `*` faz o mesmo. Cada host recebe esse caminho sozinho como uma regra própria (`/beta /v2` no `_redirects`), então todos o enviam para o mesmo lugar. O `blume audit` verifica aonde ele chega e informa como redirecionamento quebrado um `/beta` que vai para um `/v2` que o build não serve.
 - `*` no final de um segmento corresponde ao restante do caminho a partir dali: `/articles/concepts-*` cobre `/articles/concepts-overview`.
 
 O `to` lê uma captura pelo nome, como um segmento inteiro (`/:slug*`, `/:slug`), ou um `*` para o que o `*` em `from` capturou (`:splat`, como o `_redirects` o escreve, também o lê). Um `to` que não lê nenhuma captura envia todos os caminhos que o padrão cobre para uma única página. Um redirecionamento exato tem prioridade sobre um padrão que cubra o mesmo caminho, e os padrões são testados na ordem em que você os lista.
 
-Cada host recebe os padrões na própria sintaxe: splats no `_redirects`, sources no formato `path-to-regexp` no `vercel.json` e a configuração de roteamento de um build de servidor com `vercel()` ou `netlify()`. Os servidores de `node()` e `cloudflare()` fazem a correspondência por conta própria, assim como o `blume dev`. Um build estático não grava nenhuma página de redirecionamento para um padrão, já que precisaria de uma para cada caminho que o padrão cobre, então um host que não lê nenhum desses arquivos (o GitHub Pages, por exemplo) aplica apenas os redirecionamentos exatos; o `blume-redirects.json` lista os padrões como você os escreveu.
+Cada host recebe os padrões na própria sintaxe: splats no `_redirects`, sources no formato `path-to-regexp` no `vercel.json` e a configuração de roteamento de um build de servidor com `vercel()` ou `netlify()`. Os servidores de `node()` e `cloudflare()` fazem a correspondência por conta própria, assim como o `blume dev` e o `blume preview`. Um build estático não grava nenhuma página de redirecionamento para um padrão, já que precisaria de uma para cada caminho que o padrão cobre, então um host que não lê nenhum desses arquivos (o GitHub Pages, por exemplo) aplica apenas os redirecionamentos exatos; o `blume-redirects.json` lista os padrões como você os escreveu.
+
+O [`blume validate`](/docs/cli/validate) verifica para onde cada redirecionamento leva. Um `to` exato precisa ser uma página, um arquivo em `public/` ou um que o Blume gere, ou o `from` de outro redirecionamento; para um padrão, algo precisa ser servido sob a parte literal de `to` antes da primeira captura (`/v2/` em `/v2/:slug*`). Um que não leva a lugar nenhum gera o aviso `BLUME_BROKEN_REDIRECT` no seu `to`. O [`blume audit`](/docs/cli/audit) segue cada redirecionamento pelo site gerado.
 
 Um padrão não pode corresponder também a uma página: os hosts divergem sobre qual dos dois responde, então o build para com `BLUME_REDIRECT_MATCHES_PAGE`, indicando a página. Restrinja o padrão aos caminhos que mudaram de lugar. Um redirecionamento exato a partir da própria URL de uma página responde da mesma forma em todos os hosts, assumindo a URL de modo que a página nunca é publicada, então ali o mesmo código é um aviso: apague a página se ela mudou de lugar, ou remova o redirecionamento. O mesmo vale para um redirecionamento a partir da cópia em Markdown de uma página, como `/guide.md` ou o `/index.md` da página inicial, que tira essa cópia dos agentes: remova o redirecionamento.
 
@@ -255,7 +270,7 @@ Quando um recurso precisa de um segredo, o Blume avisa no `blume dev`/`build` ca
 | [Limitação de taxa](/docs/configuration/rate-limiting) (`upstash()`) | `UPSTASH_REDIS_REST_URL` e `UPSTASH_REDIS_REST_TOKEN` |
 | Busca Mixedbread | `MIXEDBREAD_API_KEY` |
 | [Narração](/docs/configuration/narration) (vozes geradas) | `AI_GATEWAY_API_KEY` (ou OIDC da Vercel) para `gateway()`, `OPENAI_API_KEY` para `openai()` (nenhuma com um `baseUrl`, a menos que você indique uma), ou o `apiKeyEnv` que você passou a qualquer um deles |
-| [Fontes de conteúdo](/docs/content/sources) | `NOTION_TOKEN` (`notion()`), `SANITY_TOKEN` (`sanity()`), `CONTENTFUL_ACCESS_TOKEN` (`contentful()`, além de `CONTENTFUL_PREVIEW_TOKEN` para `--preview`, que falha sem ele), `PAYLOAD_API_KEY` (`payload()`), `STRAPI_API_TOKEN` (`strapi()`), `GITHUB_TOKEN` (`githubReleases()` e `mdxRemote()` lendo do GitHub) |
+| [Fontes de conteúdo](/docs/content/sources) | `NOTION_TOKEN` (`notion()`), `SANITY_TOKEN` (`sanity()`), `CONTENTFUL_ACCESS_TOKEN` (`contentful()`, além de `CONTENTFUL_PREVIEW_TOKEN` para `--preview`, que falha sem ele), `PAYLOAD_API_KEY` (`payload()`), `STRAPI_API_TOKEN` (`strapi()`), `GITHUB_TOKEN` (`githubReleases()` e `mdxRemote()` com `github`) |
 
 Defina-as no `.env.local` para o desenvolvimento local e no ambiente do seu host para produção. Uma fonte de conteúdo lê seu token ao buscar o conteúdo, durante o `blume dev` e o `blume build`, e a narração lê sua chave durante o `blume build`, então defina-os onde o build do seu site é feito. Os segredos em tempo de build para a sincronização do índice de busca (`ALGOLIA_ADMIN_API_KEY`, `ORAMA_PRIVATE_API_KEY`, `TYPESENSE_ADMIN_API_KEY`) são verificados pela própria etapa de sincronização: quando um deles não está definido, o build avisa e pula a sincronização, e, quando está definido, uma sincronização com falha [faz o build falhar](/docs/configuration/search#adapters). O card de [informações do GitHub](/docs/content/components#github-info) também envia o `GITHUB_TOKEN`, quando ele está definido, para aumentar o limite de taxa da API do GitHub.
 

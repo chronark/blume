@@ -48,7 +48,7 @@ description: >-
 
 `/openapi.json` にある **OpenAPI ドキュメント**は、ビルドごとに設定から生成されるため、デプロイされたサイトが実際に提供するものだけを記述します。一意の `operationId`、型付きパラメータ、レスポンススキーマを備えたすべての JSON エンドポイントに加えて、併せて提供されるテキストサーフェス — [`.md` ミラー](/docs/discoverability/markdown)、[`llms.txt`](/docs/discoverability/llms-txt) と `llms-full.txt`、[`agent-readability.json`](/docs/discoverability/agent-discovery#agent-readability) — そして有効になっている場合は [MCP エンドポイント](/docs/discoverability/mcp)も含まれます。OpenAPI 記述からツールを構築するフレームワークは、MCP クライアントと同じ範囲にアクセスできます。このドキュメントは、[API カタログ](/docs/discoverability/agent-discovery#api-catalog)、[readability マニフェスト](/docs/discoverability/agent-discovery#agent-readability)、ホームページの `Link` ヘッダー（`rel="service-desc"`）、そして `llms.txt` からリンクされています。
 
-これらはいずれも、あなた自身の [API リファレンス](/docs/references/openapi)には影響しません。ドキュメント化された仕様はページとしてレンダリングされ、`/openapi.json` で配信されることはなく、カタログには両方が掲載されます。自分で配置した `public/openapi.json` があれば、そのルートを引き継ぎます（JSON エンドポイントはそのまま残ります）。`/api/…` のキャッチオールは、ドキュメントセクションが `/api` 名前空間から配信される場合（`content/api/overview.md`）や、カスタムページが `/api/` 配下の残りのルートを所有している場合には道を譲るため、それらのページが優先されます。
+これらはいずれも、あなた自身の [API リファレンス](/docs/references/openapi)には影響しません。ドキュメント化された仕様はページとしてレンダリングされ、`/openapi.json` で配信されることはなく、カタログには両方が掲載されます。自分で配置した `public/openapi.json` があれば、そのルートを引き継ぎます（JSON エンドポイントはそのまま残ります）。その際、`BLUME_PUBLIC_OPENAPI_JSON` 警告が表示されます。カタログは引き続き `/openapi.json` をドキュメント API の記述として掲載するため、エージェントはあなたのファイルをその記述として読み取ってしまうからです。独自の仕様ファイルを公開するには、`public/specs/openapi.json` のような別のパスに配置してください。`/api/…` のキャッチオールは、ドキュメントセクションが `/api` 名前空間から配信される場合（`content/api/overview.md`）や、カスタムページが `/api/` 配下の残りのルートを所有している場合には道を譲るため、それらのページが優先されます。
 
 ## 無効にする [#turning-it-off]
 

@@ -6,6 +6,8 @@ description: >-
 
 Blume には、アクセシブルでテーマ設定可能なコンポーネントセットが同梱されており、**インポート不要**で任意の `.mdx` ページで利用できます。以下ではそれぞれをライブプレビューとソースとともに紹介します。コンポーネントはバニラ実装で React を使いません。React が有効になるのは、プロジェクトで React を使っている場合 — プロジェクト内の `.tsx` や `.jsx` ファイル、React の [アイランド](/docs/content/islands)、[`<Component>`](#component) のサンプル、[コンポーネントのオーバーライド](/docs/configuration/customization) のいずれかがある場合 — か、[アシスタント](/docs/configuration/assistant) が有効になっている場合のみです。
 
+コンポーネントは、受け取らないプロパティを無視します。ほとんどのコンポーネントは子要素を表示するため、他のドキュメントツールの書き方では何も表示されないことがあります。例えば VitePress の `<Badge type="tip" text="beta" />` は子要素のない Badge なので、何も表示されません。子要素がなく、受け取らないプロパティが指定されたコンポーネントについて、Blume は `BLUME_UNKNOWN_PROP` として警告し、受け取れるプロパティを示します。代わりに、`<Badge>beta</Badge>` のように内容をタグの間に記述してください。
+
 ## Card と CardGroup [#card-and-cardgroup]
 
 カードは、アイコン、タイトル、短い説明文とともにリンク先を示します。`CardGroup` でまとめるとレスポンシブなグリッドになります。ランディングページ、セクションのインデックス、「次のステップ」など、読者を先へ導きたい場所で活用してください。
@@ -32,7 +34,7 @@ Blume には、アクセシブルでテーマ設定可能なコンポーネン�
 
 `Card` は `title`、任意の `href`（省略するとクリックできないカードになります）、そして Blume 組み込みのアイコンセットから選ぶ `icon` を受け取ります。`CardGroup` は `cols`（デフォルトは `2`）を受け取ります。
 
-カードはさらに次のプロパティも受け取ります。`img` はカード上部に表示される画像です（`horizontal` を指定すると、`sm` ブレークポイント以上ではテキストの横に並びます）。`cta` はテキストの下にアクセントカラーで表示される行動喚起（CTA）の行です。`arrow` はタイトルと CTA の後ろに矢印を表示します（デフォルトでは外部リンクの場合のみ表示されます）。`type` はコールアウトと同じようにカードに色を付け、対応するアイコンを選びます（`note`、`info`、`tip`、`check`、`warning`、`danger` のいずれか）。`color` はアイコンの色で、任意の CSS カラーを指定できます。
+カードはさらに次のプロパティも受け取ります。`img` はカード上部に表示される画像です（`horizontal` を指定すると、`sm` ブレークポイント以上ではテキストの横に並びます）。パスは Markdown の画像と同じように指定します — ページと同じ場所にあるファイル（`./cover.png`）、`public/` 配下のパス、または URL です。`cta` はテキストの下にアクセントカラーで表示される行動喚起（CTA）の行です。`arrow` はタイトルと CTA の後ろに矢印を表示します（デフォルトでは外部リンクの場合のみ表示されます）。`type` はコールアウトと同じようにカードに色を付け、対応するアイコンを選びます（`note`、`info`、`tip`、`check`、`warning`、`danger` のいずれか）。`color` はアイコンの色で、任意の CSS カラーを指定できます。
 
 ## Steps
 
@@ -123,6 +125,22 @@ pip install acme-commerce
 ````
 
 読者が別のビューを選ぶまでは、最初のビューが表示されます。Blume はその選択をビューで書かれたページ間で記憶し、URL に `?view=Python` として書き込むため、リンクを開くと同じビューが表示されます。ビュー内の見出しへのリンクを開くと、そのビューが表示されます。選択に応じてページの大部分が変わる場合は `<View>` を、ページの一部だけが変わる場合は [Tabs](#tabs) を使ってください。エージェント向け Markdown にはすべてのビューが、それぞれの名前の下に含まれます。
+
+## Callout
+
+`<Callout>` は [コールアウトディレクティブ](/docs/content/syntax#callouts) の基盤となるコンポーネントです。`:::warning[Heads up]` は `<Callout type="warning" title="Heads up">` として描画されます。ディレクティブでは設定できない独自のアイコンや色がコールアウトに必要な場合は、コンポーネントを直接記述してください。
+
+<Callout type="tip" title="公開する" icon="rocket">
+  デプロイする前に `blume build` を実行してください。
+</Callout>
+
+```astro
+<Callout type="tip" title="Ship it" icon="rocket">
+  Run `blume build` before you deploy.
+</Callout>
+```
+
+`type` は色合いとデフォルトのアイコンを設定します（`note`、`info`（デフォルト）、`tip`、`success`（または `check`）、`warning`、`danger` のいずれか）。エイリアスの `caution`、`error`、`important`、`warn` は `:::` 形式でのみ使えます。`title` は太字の 1 行目を追加します。`icon` は type のアイコンを置き換え、[`<Icon>`](#icon) と同じ入力を受け取ります — Lucide の名前、画像のパスや URL、インライン SVG のいずれかです。`color` には任意の CSS カラーを指定でき、type の色合いを置き換えます。枠線、アイコン、本文テキストが、ページの背景の上でその色になります。
 
 ## Badge
 
@@ -230,7 +248,7 @@ Blume は Lucide 専用です — 名前だけを指定すると Lucide から�
 
 ## Accordion
 
-関連する折りたたみ要素を、区切り線の入った 1 つの枠線付きコンテナにまとめます — FAQ、任意の手順、長い例などに。各子要素は `AccordionItem` です（`title`、任意の `icon`、`description`、`defaultOpen`）。単独の開閉要素には [Expandable](#expandable) を使ってください。
+関連する折りたたみ要素を、区切り線の入った 1 つの枠線付きコンテナにまとめます — FAQ、任意の手順、長い例などに。各子要素は `AccordionItem` です（`title`、任意の `icon`、`description`、`defaultOpen`）。`title` はインライン Markdown として描画されるため、その中のコードスパン、強調、リンクは文中と同じように表示されます。生の HTML はテキストとして表示されます。単独の開閉要素には [Expandable](#expandable) を使ってください。
 
 <Accordion>
   <AccordionItem title="MDX に対応していますか？">
@@ -254,7 +272,7 @@ Blume は Lucide 専用です — 名前だけを指定すると Lucide から�
 
 ## Expandable
 
-入れ子の詳細（フィールドのサブプロパティの展開や補足の余談など）のための軽量なインライン開閉要素です。`title` がトグルのラベルになります（デフォルトは「Show more」）。`defaultOpen` を指定すると展開された状態で始まります。
+入れ子の詳細（フィールドのサブプロパティの展開や補足の余談など）のための軽量なインライン開閉要素です。`title` がトグルのラベルになり（デフォルトは「Show more」）、アコーディオンの項目と同様にインライン Markdown として描画されます。`defaultOpen` を指定すると展開された状態で始まります。
 
 <Expandable title="詳細オプションを表示">
   これらの設定は任意で、変更が必要になることはほとんどありません。
@@ -300,7 +318,7 @@ Blume は Lucide 専用です — 名前だけを指定すると Lucide から�
 
 ## CodeGroup
 
-複数のコードブロックを 1 つのタブ切り替え式にまとめます — 言語ごと、ファイルごとに 1 タブ。タブのラベルは各ブロックのタイトル（言語の後に続くテキスト）になり、グループのコピーボタンはタブバーに配置され、表示中のブロックをコピーします。`dropdown` を追加すると、タブバーの代わりにメニューで切り替えます。
+複数のコードブロックを 1 つのタブ切り替え式にまとめます — 言語ごと、ファイルごとに 1 タブ。タブのラベルは各ブロックのタイトル（言語の後に続くテキスト）になり、タイトルのないブロックでは言語名（`TypeScript`、`Python`）になります。グループのコピーボタンはタブバーに配置され、表示中のブロックをコピーします。`dropdown` を追加すると、タブバーの代わりにメニューで切り替えます。
 
 <CodeGroup>
 
@@ -372,7 +390,7 @@ fn greet(name: &str) -> String {
 
 ## YouTube
 
-YouTube 動画を、レスポンシブでプライバシーに配慮した（`youtube-nocookie.com`）16:9 のフレームに埋め込みます。クライアント JavaScript は一切含まれません。動画の `id` または完全な `url` に加え、任意の `title`（アクセシビリティ用）と秒単位の `start` 時間を渡せます。
+YouTube 動画を、レスポンシブでプライバシーに配慮した（`youtube-nocookie.com`）16:9 のフレームに埋め込みます。クライアント JavaScript は一切含まれません。動画の `id` または完全な `url` に加え、任意の `title`（アクセシビリティ用）と秒単位の `start` 時間を渡せます。プレイリストの `url`（`youtube.com/playlist?list=…` または `youtube.com/embed/videoseries?list=…`）を指定すると、プレイリスト全体が埋め込まれます。
 
 <YouTube id="aqz-KE-bpKQ" title="Big Buck Bunny" />
 
@@ -481,7 +499,7 @@ Hover the <Tooltip tip="A set of protocols software uses to communicate." headli
 
 ## Prompt
 
-ラベルとコピーボタンからなる 1 行の要素です。`description`（Markdown）が表示されるラベルで、本文がプロンプトそのものになります。本文は非表示で、**Copy prompt** ボタンを押すと、リンク、リスト、コードをそのまま保った Markdown としてクリップボードにコピーされます。`actions` でボタンを制御します（例: `["copy", "cursor"]`）。
+ラベルとコピーボタンからなる 1 行の要素です。`description`（Markdown）が表示されるラベルで、本文がプロンプトそのものになります。本文は非表示で、**Copy prompt** ボタンを押すと、リンク、リスト、コードをそのまま保った Markdown としてクリップボードにコピーされます。句読点は入力したとおりにコピーされます。ページ上の他の本文ではカーリークォート、ダッシュ、三点リーダーとして表示されますが、ここではストレートクォート、`--`、`...` が書いたまま残ります。`actions` でボタンを制御します（例: `["copy", "cursor"]`）。
 
 <Prompt
   description="エンドポイントを**ドキュメント化**するようモデルに依頼します。"
@@ -793,6 +811,8 @@ import CodeBlock from "blume/components/content/CodeBlock.astro";
 ```
 
 `title` はヘッダーのラベル（例えばファイル名）を設定します。指定しない場合は言語が表示されます。`icons={false}` を指定すると、フェンスに対する [`markdown.code.icons`](/docs/content/syntax#code-blocks) と同様に、言語のブランドアイコンが非表示になります。
+
+`code` を指定しない場合、`CodeBlock` は子要素を書かれたとおりに描画します。そのため、`<CodeBlock>…</CodeBlock>` でラップしたフェンス付きブロック（Fern や Mintlify でのコードの書き方）は、そのフェンスとして表示されます。この場合、`title` やその他のプロパティは適用されません。代わりに、フェンスの言語の後に [タイトル](/docs/content/syntax#code-blocks) を指定してください。
 
 （独自コンポーネントの中などで）自分で HTML 文字列にハイライトしたい場合は、`blume/markdown` から基盤となるヘルパーをインポートします。
 

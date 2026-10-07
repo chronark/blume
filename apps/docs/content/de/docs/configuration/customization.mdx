@@ -23,6 +23,8 @@ export default defineComponents({
 
 Die Schlüssel sind die Namen, die du in MDX schreibst (`<Callout>`, `<Pricing>`). Verwende den Dateinamen mit `.tsx`, wenn du React-Komponenten importierst.
 
+Ein großgeschriebenes Tag, das weder eine eingebaute Komponente noch ein [Island](/docs/content/islands) noch ein Override ist, lässt die Seite beim Rendern fehlschlagen. Deshalb warnen `blume dev`, `blume build` und `blume check` schon vorher mit `BLUME_UNKNOWN_COMPONENT` davor — einmal pro Tag-Name, und sie nennen dabei jede Seite, die es verwendet.
+
 ### Referenzformen [#reference-form]
 
 Jedes Override — in `mdx` oder `layout` — akzeptiert drei Formen:
@@ -105,7 +107,7 @@ Verdrahtete Slots (bei den Namen wird zwischen Groß- und Kleinschreibung unters
 
 Die `mobile`-Variante erhält außerdem die [Seitenaktionen](/docs/content/navigation#page-actions) als Children (ein leeres Element, in das die Aktionen unterhalb von 1.280px aus der rechten Leiste verschoben werden), rendere darin also einen `<slot />`, damit sie auf schmaleren Bildschirmen erhalten bleiben. Sie wird auch auf einer Seite ohne Überschriften gerendert, dann mit leerem `headings`, sodass die Aktionen auch dort angezeigt werden.
 
-`PageHeader` und `PageFooter` haben keine eingebaute Komponente — sie rendern nichts, bis du sie setzt, was sie zu praktischen Einfügepunkten für ein Werbebanner oder einen „Zuletzt aktualisiert“-Hinweis macht. Der eingebaute `Footer` enthält die einzigen Links zu deinem Repository und deinen Social-Media-Profilen, daher sollte ein `Footer`-Override (der Ort für einen Marketing-Footer, den die Konfiguration nicht abbilden kann) sie beibehalten. Wenn `consent` gesetzt ist, behalte außerdem eine Möglichkeit bei, die Einwilligungsabfrage erneut zu öffnen: Jedes Element mit `data-blume-consent-open` funktioniert als Link zu den [Cookie-Einstellungen](/docs/configuration/consent#changing-an-answer).
+`PageHeader` und `PageFooter` haben keine eingebaute Komponente — sie rendern nichts, bis du sie setzt, was sie zu praktischen Einfügepunkten für ein Werbebanner oder einen „Zuletzt aktualisiert“-Hinweis macht. `PageFooter` wird am Fuß jeder Seite gerendert, die Blume aus deinem Content baut, API-Operationsseiten eingeschlossen, gefolgt von `Feedback` und `Pagination`. Eine Seite im [`custom`- oder `frame`-Modus](/docs/content/frontmatter#layout) lässt diesen Bereich am Seitenende weg, zusammen mit ihrem Titel und ihren Breadcrumbs. Eine [eigene Seite](/docs/advanced/custom-pages) unter `pages/` rendert das Layout, in das sie sich selbst einbettet: `RootLayout` nimmt Slot-Overrides über seine `layout`-Prop entgegen, und `PageLayout` hat keinen Bereich am Seitenende. Der eingebaute `Footer` enthält die einzigen Links zu deinem Repository und deinen Social-Media-Profilen, daher sollte ein `Footer`-Override (der Ort für einen Marketing-Footer, den die Konfiguration nicht abbilden kann) sie beibehalten. Wenn `consent` gesetzt ist, behalte außerdem eine Möglichkeit bei, die Einwilligungsabfrage erneut zu öffnen: Jedes Element mit `data-blume-consent-open` funktioniert als Link zu den [Cookie-Einstellungen](/docs/configuration/consent#changing-an-answer).
 
 Layout-Slots akzeptieren dieselben [drei Referenzformen](#reference-form) wie MDX-Overrides, sodass ein Slot ein Pfad-String oder ein hydratisierter Descriptor (`{ component, client }`) sein kann, wenn du einen interaktiven Header oder Footer möchtest.
 

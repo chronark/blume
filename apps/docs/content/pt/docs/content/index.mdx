@@ -17,6 +17,10 @@ O Blume renderiza dois tipos de arquivo:
 
 Opte pelo `.md` quando uma página for só prosa, e pelo `.mdx` quando ela precisar de componentes ou diretivas. Trocar é tão simples quanto renomear o arquivo.
 
+No `.mdx`, `{` inicia uma expressão JavaScript e `<` inicia uma tag JSX, então um texto que funciona bem no `.md` pode quebrar uma página: uma chave literal, um comentário HTML (escreva `{/* … */}`) ou um elemento deixado aberto (escreva `<br />`). O Blume analisa todas as páginas `.mdx` quando lê o projeto, então o `blume dev`, o `blume validate`, o `blume doctor` e o `blume check` reportam uma página que não pode ser analisada como `BLUME_MDX_SYNTAX`, um erro na linha e na coluna em que o MDX parou, e o `blume build` para ali antes de compilar qualquer coisa. Com `--no-strict`, o build deixa a página de fora e gera o resto do site. O `blume dev` mantém a página, e abrir ela mostra o erro.
+
+Uma expressão pode ser analisada sem problemas e ainda assim falhar quando a página é renderizada, como `{user.name}` numa página em que nada define `user`. O `blume build` reporta isso como `BLUME_MDX_UNDEFINED_NAME` na linha da expressão, na página ou no [partial](/docs/content/includes) que contém ela. Para mostrar chaves como texto, escape cada chave de abertura (`\{`) ou coloque o texto em código inline. Para um valor que todas as páginas compartilham, defina uma [variável](/docs/content/variables).
+
 ## Arquivos e rotas [#files-and-routes]
 
 Cada arquivo corresponde a uma rota pelo seu caminho na raiz de conteúdo:
@@ -41,7 +45,13 @@ Prefixe um arquivo ou pasta com um número e um `-`, `_` ou `.` para controlar a
 02-installation.mdx  ->  /installation
 ```
 
-Uma versão ou uma data ISO no início de um nome faz parte do nome, e não indica uma ordem: `1.2.0.mdx` vira a rota `/1.2.0`, e `2024-01-05-launch.mdx` vira `/2024-01-05-launch`. Só nomes de arquivos e pastas perdem o prefixo (as notas de um vault do Obsidian contam como arquivos). Um `slug` definido no frontmatter e uma página vinda de uma [fonte de conteúdo](/docs/content/sources), como um CMS ou o GitHub Releases, mantêm o nome que receberam.
+Uma versão ou uma data no início de um nome faz parte do nome, e não indica uma ordem: `1.2.0.mdx` vira a rota `/1.2.0`, e `2024-01-05-launch.mdx` vira `/2024-01-05-launch`. O Blume lê estes formatos como datas:
+
+- Uma data ISO, `YYYY-MM-DD`: `2024-01-05.mdx` vira a rota `/2024-01-05`.
+- Um dia ou um mês primeiro e depois um ano de quatro dígitos, `D-M-YYYY` ou `M-D-YYYY`, com um ou dois dígitos para o dia e o mês: `12-05-2022.mdx` vira a rota `/12-05-2022`.
+- Um ano e um mês, `YYYY-MM`: `2024-01.mdx` vira a rota `/2024-01`.
+
+Uma data encerra o nome ou vem seguida de um `-`, `_` ou `.` e do resto do nome (`2024-01-recap.mdx`). Versões anteriores do Blume liam o primeiro número das duas últimas formas como um prefixo de ordenação, então `12-05-2022.mdx` era publicado em `/05-2022` e `2024-01.mdx` em `/01`. Essas URLs antigas agora redirecionam para as novas, a menos que outra página já esteja nelas. Só nomes de arquivos e pastas perdem o prefixo (as notas de um vault do Obsidian contam como arquivos). Um `slug` definido no frontmatter e uma página vinda de uma [fonte de conteúdo](/docs/content/sources), como um CMS ou o GitHub Releases, mantêm o nome que receberam.
 
 A ordenação tem várias camadas — veja [Navegação](/docs/content/navigation) para as regras completas de precedência.
 

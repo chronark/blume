@@ -39,4 +39,6 @@ Ein `{{name}}` im Fließtext, der nicht definiert ist, löst den Build-Fehler `B
 
 Wenn du eine Referenz im Fließtext zeigen willst, ohne sie zu definieren, setz sie in Inline-Code: `` `{{name}}` ``.
 
-Eine Website ohne definierte Variablen ist davon nicht betroffen: `{{…}}` bleibt auf ihren Seiten unverändert.
+Eine Website ohne definierte Variablen ist davon nicht betroffen: `{{…}}` bleibt auf ihren `.md`-Seiten unverändert. In `.mdx` sind geschweifte Klammern ein JavaScript-Ausdruck. Deshalb schlägt eine Seite mit einem undefinierten `{{name}}` beim Rendern fehl. Der Fehler wird als [`BLUME_MDX_UNDEFINED_NAME`](/docs/content#markdown-and-mdx) mit der betroffenen Zeile gemeldet. Escape beide öffnenden Klammern (`\{\{name}}`) oder setz die Referenz in Inline-Code.
+
+Ein `{{…}}`, das mehr als einen Namen enthält, etwa `{{ site.title }}` oder `{{ page.url | relative_url }}` aus Liquid, ist nie eine Variable. Auf einer `.md`-Seite gibt Blume dafür die Warnung `BLUME_TEMPLATE_TAG` aus, weil die Seite es unverändert anzeigen würde.

@@ -42,7 +42,7 @@ blume <command> [options]
 - `blume dev --content-dir <dir>` — `blume.config.ts` を編集せずに、別のコンテンツフォルダを読み込みます。
 - `blume dev --debug` — トラブルシューティング用に、Astro/Vite の詳細なログを出力します。
 - `blume dev --preview` / `blume build --preview` — 下書きや未公開の CMS コンテンツも含めます。
-- `blume build --no-strict` — 診断エラーがあってもビルドします。フロントマターの検証に失敗したページは出力から除外されるため、デフォルトでは `blume build` はエラーの診断が 1 つでもあると失敗します（終了コード 1）。`--no-strict` を指定するとビルドは成功し、欠けているページの数が報告されます。`blume dev --strict` を指定すると、開発サーバーでも同じようにエラー時にすぐ失敗させられます。
+- `blume build --no-strict` — 診断エラーがあってもビルドします。フロントマターの検証に失敗したページや、[パース](/docs/content#markdown-and-mdx)できない `.mdx` ページは出力から除外されるため、デフォルトでは `blume build` はエラーの診断が 1 つでもあると失敗します（終了コード 1）。`--no-strict` を指定するとビルドは成功し、欠けているページの数が報告されます。ただし、レンダリング中に例外を投げるページなど、ビルドそのものでしか検出できないエラーがある場合は、引き続きビルドが失敗します。`blume dev --strict` を指定すると、開発サーバーでも同じようにエラー時にすぐ失敗させられます。
 - `blume build --analyze` — ビルド後に、クライアント JavaScript のバンドルサイズを大きい順に表示します。
 - `blume build --budget-js <kb> --budget-css <kb>` — クライアント JavaScript/CSS の合計サイズが上限を超えた場合にビルドを失敗させます。これにより、パフォーマンス目標を CI のチェック項目にできます。
 - `blume build --isolated` — `.blume/` の代わりに使い捨ての `.blume-verify/` ランタイム（とその専用の `dist/`）にビルドするため、実行中の `blume dev` サーバーや本来の `dist/` には影響しません。詳しくは[開発サーバーの実行中に検証する](#verifying-while-the-dev-server-runs)をご覧ください。
@@ -107,3 +107,5 @@ export BLUME_RUNTIME_DIR=.blume-verify
 ```
 
 プロジェクトに `tsconfig.json` がない場合は、生成されたランタイムだけがチェックされます。
+
+ビルドでもインポートを解決するためにこのファイルを読み込みます。そのため、`extends` に解決できない参照（インストールされていないパッケージや、移動されたファイルなど）があると、`blume build`、`blume dev`、`blume check` は `BLUME_TSCONFIG_EXTENDS` エラーで停止し、その参照が書かれている行を示します。パッケージをインストールするか、`extends` からそのエントリを削除してください。

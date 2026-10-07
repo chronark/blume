@@ -29,7 +29,7 @@ Befunde werden nach Check gruppiert statt pro Seite aufgelistet, sodass sich der
 - `--url <origin>` – prüft zusätzlich ein Live-Deployment auf Statuscodes, Response-Header und konfigurierte Weiterleitungen.
 - `--external` – prüft ausgehende Links über das Netzwerk.
 - `--ignore <glob>` – zusammen mit `--external`: prüft keinen ausgehenden Link, dessen URL auf den Glob passt, etwa `--ignore "https://api.acme.example/**"`. Wiederhole das Flag für weitere Muster. Der Abgleich funktioniert genauso wie bei [`blume validate --ignore`](/docs/cli/validate#flags), und interne Links werden immer geprüft.
-- `--only <check|category>` / `--skip <check|category>` – beschränkt den Bericht auf diese Checks oder Kategorien bzw. schließt sie aus (kommagetrennt). Ein Begriff, der weder einen Check noch eine Kategorie bezeichnet, führt zu einem Fehler, der den nächstliegenden Treffer vorschlägt – so kann ein Tippfehler den Bericht nicht unbemerkt leeren.
+- `--only <check|category>` / `--skip <check|category>` – beschränkt den Bericht auf diese Checks oder Kategorien bzw. schließt sie aus (kommagetrennt). Die Audit-Anzahl in der Zusammenfassung berücksichtigt nur die verbleibenden Checks. Ein Begriff, der weder einen Check noch eine Kategorie bezeichnet, führt zu einem Fehler, der den nächstliegenden Treffer vorschlägt – so kann ein Tippfehler den Bericht nicht unbemerkt leeren.
 - `--list-checks` – gibt jeden Check aus, den das Audit melden kann, und beendet sich dann.
 - `--verbose` – listet jede betroffene Seite mit allen Details jedes Befunds auf statt nur der ersten paar.
 - `--json` – gibt den Bericht als JSON auf stdout aus.

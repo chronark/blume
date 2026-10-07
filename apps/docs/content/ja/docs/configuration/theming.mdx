@@ -37,6 +37,8 @@ theme: {
 
 文字列を指定すると両方のカラーモードに適用されます。[モードごとに異なるアクセント](#dark-mode-colors)を設定したい場合はオブジェクトを渡してください。
 
+`"deep purple"` や `#` のない 16 進数の値のように、プリセットでも CSS カラーでもない値を指定すると、その値を設定している `blume.config.ts` の行で `BLUME_THEME_COLOR_INVALID` の警告が出ます。ブラウザーはその値を使うスタイルを無視するためです。同じチェックは `action`、`background`、そして [Open Graph カード](/docs/discoverability/open-graph)の `seo.og.palette` にも適用されます。カスタムプロパティ（`var(--brand)`）、`color-mix()`、その他のカラー関数は、書いたとおりにそのまま受け付けられます。
+
 ボタンのラベルやステップの番号など、アクセントまたはアクションの塗りの上に置かれるテキストは、その色に対して白が AA を満たす場合は白になり、そうでない場合は暗い色になります。明るいアクセントには、追加の設定なしで暗いラベルが使われます。[`blume audit`](/docs/cli/audit#theme-contrast-low) は、カスタムのアクセント、アクション、背景を同じ基準でチェックします。
 
 ### 角丸 [#radius]
@@ -232,6 +234,8 @@ theme: {
 | `--blume-code-highlight`, `--blume-code-highlight-border` | ハイライトされたコード行の背景と左罫線（`// [!code highlight]` または `{1,4-5}` の範囲指定） |
 | `--blume-code-add`, `--blume-code-add-border` | 追加された行の背景と左罫線（`// [!code ++]`） |
 | `--blume-code-remove`, `--blume-code-remove-border` | 削除された行の背景と左罫線（`// [!code --]`） |
+| `--blume-code-error`, `--blume-code-error-border` | エラー行の背景と左罫線（`// [!code error]`） |
+| `--blume-code-warning`, `--blume-code-warning-border` | 警告行の背景と左罫線（`// [!code warning]`） |
 | `--blume-code-word`, `--blume-code-word-border` | ハイライトされた単語の背景とアウトライン（`// [!code word:…]`） |
 | `--blume-content-width` | 本文カラムの最大幅 — 記事、パンくずリスト、目次、フィードバック、ページネーション（デフォルトは `42rem`） |
 | `--blume-radius` | 角の丸み |
@@ -249,7 +253,7 @@ theme: {
 
 ## Tailwind ユーティリティ [#tailwind-utilities]
 
-Blume のテーマは内部的に Tailwind v4 で構築されており、プロジェクトの `.astro`、`.tsx`、`.jsx` ファイルもスキャンされます。そのため、Tailwind のセットアップなしで、カスタムコンポーネントやページをユーティリティクラスでスタイリングできます。すべてのトークンがユーティリティとして公開されているので、コンポーネントは自動的にテーマに追従します:
+Blume のテーマは内部的に Tailwind v4 で構築されており、プロジェクトの `.astro`、`.jsx`、`.mdx`、`.ts`、`.tsx` ファイルもスキャンされます。そのため、Tailwind のセットアップなしで、カスタムコンポーネントやページをユーティリティクラスでスタイリングできます。すべてのトークンがユーティリティとして公開されているので、コンポーネントは自動的にテーマに追従します:
 
 | トークン                    | ユーティリティ             |
 | --------------------------- | -------------------------- |
@@ -274,10 +278,10 @@ Blume のテーマは内部的に Tailwind v4 で構築されており、プロ�
 スタイルは 3 つのレイヤーで解決され、後のレイヤーが前のレイヤーを上書きします:
 
 <Steps>
-  <Step title="ベース">
+  <Step title="Base">
     Blume のリセット、デフォルトのトークン、コンポーネントのスタイル。
   </Step>
-  <Step title="設定トークン">
+  <Step title="Config tokens">
     `theme` から来る `--blume-accent`、`--blume-radius`、`--blume-font-*`
     トークン。
   </Step>

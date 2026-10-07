@@ -8,7 +8,7 @@ Blume rendert standardmäßiges Markdown und MDX mit einem kuratierten, GitHub-F
 
 ## Überschriften [#headings]
 
-Gliedere eine Seite mit Überschriften. Blume rendert den `title` aus deinem Frontmatter als Seitenüberschrift, beginne deinen Inhalt also bei `##` — `##` und `###` werden zu Einträgen im Inhaltsverzeichnis. Jede Überschrift von `##` bis `######` wird außerdem in einen Link auf ihren eigenen Anker eingefasst, sodass Leser eine Überschrift anklicken können, um einen Permalink direkt zu diesem Abschnitt zu kopieren, als Lesezeichen zu speichern oder zu teilen (mit dem Mauszeiger darüberfahren, um das `#` einzublenden). Schalte das mit `markdown: { headingAnchors: false }` in `blume.config.ts` ab.
+Gliedere eine Seite mit Überschriften. Blume rendert den `title` aus deinem Frontmatter als Seitenüberschrift, beginne deinen Inhalt also bei `##` — `##` und `###` werden zu Einträgen im Inhaltsverzeichnis. Eine Seite ohne `title` nimmt ihre erste `#`-Überschrift als Titel, und wenn die Seite mit dieser Überschrift beginnt, erscheint sie nur einmal, als Seitenüberschrift, die den Anker der Überschrift behält, sodass Links darauf weiterhin dort landen. Auch `llms-full.txt` führt sie nur einmal auf. Jede Überschrift von `##` bis `######` wird außerdem in einen Link auf ihren eigenen Anker eingefasst, sodass Leser eine Überschrift anklicken können, um einen Permalink direkt zu diesem Abschnitt zu kopieren, als Lesezeichen zu speichern oder zu teilen (mit dem Mauszeiger darüberfahren, um das `#` einzublenden). Schalte das mit `markdown: { headingAnchors: false }` in `blume.config.ts` ab.
 
 ```md
 ## Section
@@ -20,7 +20,7 @@ Gliedere eine Seite mit Überschriften. Blume rendert den `title` aus deinem Fro
 
 ### Eigene Anker [#custom-anchors]
 
-Anker-IDs werden aus dem Überschriftentext erzeugt, eine umformulierte Überschrift bekommt also einen neuen Anker. Hänge stattdessen `[#custom-id]` an, um den Anker festzunageln — der Marker wird nie gerendert, und Links funktionieren weiter, egal wie die Überschrift lautet. Festgenagelte Anker bleiben außerdem über [übersetzte Locales](/docs/content/i18n) hinweg identisch, wo automatisch erzeugte IDs sonst je Sprache abweichen würden.
+Anker-IDs werden aus dem Überschriftentext erzeugt, eine umformulierte Überschrift bekommt also einen neuen Anker. Ein `<Badge>` in einer Überschrift ist ein Label und kein Teil dieses Textes: `## Install <Badge>beta</Badge>` erhält den Anker `#install` und steht im Inhaltsverzeichnis als „Install“. Eine ID endet nie auf einem Bindestrich, `## Features ✨` erhält also den Anker `#features`, und eine Komponente oder ein Bild am Anfang oder Ende einer Überschrift fügt keinen Bindestrich hinzu. Hänge stattdessen `[#custom-id]` an, um den Anker festzunageln — der Marker wird nie gerendert, und Links funktionieren weiter, egal wie die Überschrift lautet. Festgenagelte Anker bleiben außerdem über [übersetzte Locales](/docs/content/i18n) hinweg identisch, wo automatisch erzeugte IDs sonst je Sprache abweichen würden.
 
 ```md
 ## Getting started [#setup]
@@ -28,13 +28,19 @@ Anker-IDs werden aus dem Überschriftentext erzeugt, eine umformulierte Übersch
 
 Verlinke darauf als `/page#setup`. Die Syntax entspricht der von Fumadocs, migrierte Inhalte funktionieren also wortwörtlich.
 
-Die von Pandoc, kramdown und Markdown-basierten Spezifikations-Toolchains verwendete Form `{#custom-id}` wird in `.md`-Dateien als gleichwertig akzeptiert. Nur diese Schreibweise ohne Leerzeichen nagelt einen Anker fest: Das `{ #custom-id }` mit Leerzeichen und das `{: #custom-id }` von kramdown (beide aus `attr_list` von MkDocs) bleiben im Überschriftentext stehen. In `.mdx` ist ein nacktes `{…}` ein JSX-Ausdruck und die Seite lässt sich nicht kompilieren — `blume check` meldet alle drei Schreibweisen als `BLUME_MDX_CURLY_ANCHOR` —, schreibe dort also `[#custom-id]` oder escape die geschweiften Klammern. Die escapte Form nagelt in beiden Formaten denselben Anker fest, was sie zur richtigen Schreibweise für ein Partial macht, das `.mdx`-Seiten [einbinden](/docs/content/includes):
+Die von Pandoc, kramdown und Markdown-basierten Spezifikations-Toolchains verwendete Form `{#custom-id}` wird in `.md`-Dateien als gleichwertig akzeptiert. Nur diese Schreibweise ohne Leerzeichen nagelt einen Anker fest: Das `{ #custom-id }` mit Leerzeichen und das `{: #custom-id }` von kramdown (beide aus `attr_list` von MkDocs) sowie eine Attributliste, die die ID neben Klassen oder Attributen setzt (`{ #custom-id .wide }`), bleiben im Text der Überschrift und in ihrem Anker stehen, und `blume check` warnt in `.md` davor als `BLUME_MD_CURLY_ANCHOR`. In `.mdx` ist ein nacktes `{…}` ein JSX-Ausdruck und die Seite lässt sich nicht kompilieren — `blume check` meldet alle drei Schreibweisen als `BLUME_MDX_CURLY_ANCHOR` —, schreibe dort also `[#custom-id]` oder escape die geschweiften Klammern. Die escapte Form nagelt in beiden Formaten denselben Anker fest, was sie zur richtigen Schreibweise für ein Partial macht, das `.mdx`-Seiten [einbinden](/docs/content/includes):
 
 ```md
 ## Getting started \{#setup\}
 ```
 
-Fragment-Links können auch auf ein rohes HTML-Element mit einer `id` zeigen (`<a id="setup"></a>`); `blume validate` akzeptiert diese neben Überschriften-Ankern.
+Fragment-Links können auch auf ein rohes HTML-Element mit einer `id` (`<a id="setup"></a>`) oder auf ein `<a name="setup">` zeigen; `blume validate` akzeptiert diese neben Überschriften-Ankern.
+
+Ein leeres `<a>` innerhalb einer Überschrift ist der eigene Anker der Überschrift, so wie GitBook-Exporte (`<a href="#setup" id="setup"></a>`) und Wikis (`<a name="setup"></a>`) ihn schreiben. Blume nimmt es aus der Überschrift heraus und gibt der Überschrift seine `id` oder andernfalls seinen `name`, sodass `#setup`-Links weiterhin dort landen und die Überschrift ihren eigenen Selbstlink behält. Ein `[#custom-id]`-Marker an derselben Überschrift hat Vorrang.
+
+```md
+## Getting started <a id="setup"></a>
+```
 
 ### Inhaltsverzeichnis-Marker [#table-of-contents-markers]
 
@@ -151,6 +157,10 @@ Verlinke auf andere Seiten oder externe Websites. Bilder akzeptieren einen relat
 
 Ein relativer Seitenlink (`./install`, `../guides/setup`) wird vom eigenen Ordner der Seite aus aufgelöst — bei einer Index-Seite von dem Ordner, den sie einleitet —, und ein Link auf eine Markdown-Datei (`./setup.md`, `../intro.mdx`) landet auf der Seite, die diese Datei veröffentlicht, einschließlich ihres `slug`. Ein Seitenname mit Punkt (`./node.js` für eine `node.js.mdx`-Seite) zählt als Seitenlink, wenn dort eine Seite veröffentlicht wird, und ein String-`href` einer Komponente (`<Card href="./install">`) wird auf dieselbe Weise aufgelöst. Blume schreibt jeden dieser Links als root-relative Route in die gebaute Seite, sodass Links, die für GitHub oder Docusaurus geschrieben wurden, weiter funktionieren, und [`blume validate`](/docs/cli/validate) prüft sie auf dieselbe Weise.
 
+Auch ein root-relativer Link auf eine Markdown-Datei (`/guides/setup.md`, so wie VitePress und Docsify ihn schreiben) landet auf der Seite dieser Datei, aufgelöst ab deinem Content-Root; unter einer [Deployment-`base`](/docs/deployment#subpath-deploys) wird ein Link, der mit der Base beginnt, so gelesen, als enthielte er sie. Ein Link, der keine Datei in deinen Inhalten benennt, behält seinen Pfad, denn `/guides/setup.md` ist auch die URL der [Markdown-Kopie](/docs/discoverability/markdown#raw-markdown) dieser Seite. Um auf die Markdown-Kopie einer Seite zu verlinken, egal wie ihre Datei heißt, schreibe ein rohes `<a href="/guides/setup.md">`, das seinen Pfad behält, oder die vollständige URL der Kopie.
+
+Ein Link auf eine Markdown-Datei, die nicht existiert, probiert zuerst dieselbe Datei mit der jeweils anderen Endung. Nachdem du `setup.md` in `setup.mdx` umbenannt hast, landet ein Link auf `./setup.md` also weiterhin auf der Seite dieser Datei, einschließlich ihres `slug` und Sortierpräfixes, und `blume validate` lässt ihn durchgehen. Ein Link, der keine der beiden Dateien benennt, fällt auf einen einfachen relativen Link ohne Endung zurück. So oder so benennt der Link keine echte Datei mehr und bricht deshalb überall dort, wo das Markdown als Dateien gelesen wird, etwa auf GitHub. Passe die Endung in deinen Links an, wenn du eine Datei umbenennst.
+
 Lies den [Schnellstart](/docs/quickstart), um loszulegen.
 
 ```md
@@ -166,6 +176,10 @@ Externe Links öffnen sich standardmäßig im selben Tab. Setze `markdown: { ext
 ```md
 ![Build output](./images/build-output.png)
 ```
+
+Ein SVG, dessen Größe Astro nicht auslesen kann, wird unverändert ausgeliefert, statt den Build fehlschlagen zu lassen. Astro liest die Größe eines SVG aus seinem `<svg>`-Tag, das eine Breite und Höhe oder eine viewBox braucht und innerhalb der ersten 1.000 Bytes der Datei enden muss; ein draw.io-Export legt sein gesamtes Diagramm in einem `content`-Attribut auf diesem Tag ab, wodurch das Tag über diese Grenze hinausreicht. Blume warnt vor jedem solchen SVG als `BLUME_SVG_UNOPTIMIZED` an der Zeile, die es einbindet. Das Bild wird trotzdem angezeigt, allerdings ohne die intrinsische Größe, die ein optimiertes Bild mitbringt; exportiere das Diagramm ohne die Kopie seines Quelltexts oder entferne das `content`-Attribut, damit es optimiert wird.
+
+Ein Link auf eine Datei neben deinen Inhalten, die keine Seite ist (`[the spec](./spec.pdf)`, `[data](../files/data.csv)` oder eine Referenzdefinition wie `[spec]: ./spec.pdf`), veröffentlicht diese Datei zusammen mit der Seite, und der gebaute Link zeigt auf die veröffentlichte Kopie und behält dabei ein Suffix wie `#page=2`. Dasselbe gilt für ein HTML-Element, das eine solche Datei benennt: das `src` eines `<img>`, `<video>`, `<source>` oder `<audio>` und das `href` eines `<a>` oder einer Komponente wie `<Card>`, als rohes HTML in `.md` oder als Element in `.mdx`. Diese Kopien werden unverändert ausgeliefert, ohne die Optimierung, die ein eingebettetes Bild erhält. Ein relativer Link, der keine Datei neben der Seite benennt, behält seinen Pfad, sodass ein Link auf eine Datei unter `public/` weiterhin funktioniert.
 
 Absolute Pfade unter `public/` (`![Alt text](/screenshot.png)`) werden unverändert ausgeliefert, ohne Optimierung — nutze sie für Dateien, die ihre exakten Bytes und ihre URL behalten müssen, etwa ein Logo, das von außerhalb deiner Doku referenziert wird. Auch entfernte Bilder werden unangetastet durchgereicht, sofern ihr Host nicht in der [`image`-Konfiguration](/docs/configuration#images) autorisiert ist.
 
@@ -202,6 +216,20 @@ export default defineConfig({
 });
 ```
 ````
+
+Der Titel besteht aus allen Wörtern nach der Sprache, ` ```js Install the client ` gibt dem Block also den Titel „Install the client“. Schlüsselwörter wie `lineNumbers` und `wrap`, Zeilenbereiche wie `{1,4-5}` und `key="value"`-Optionen gehören nicht dazu, und `title="..."` setzt den Titel explizit. Ein Titel in eckigen Klammern wie ` ```ts [blume.config.ts] ` wird ohne diese angezeigt, und ein Zeilenbereich, der direkt an die Klammern anschließt, wie in ` ```ts [blume.config.ts]{2} `, hebt seine Zeilen trotzdem hervor.
+
+Als Sprache taugt jede ID und jeder Alias einer [Shiki-Sprache](https://shiki.style/languages), in beliebiger Groß- und Kleinschreibung: ` ```JSON ` wird wie ` ```json ` hervorgehoben. Ein Block in einer Sprache, die Shiki nicht kennt, wird als reiner Text gerendert, und Blume warnt vor seinem Fence als `BLUME_UNKNOWN_CODE_LANGUAGE`; schreibe `text` für einen Block, der absichtlich reiner Text ist.
+
+Optionen, die andere Doku-Tools auswerten, bewirken hier nichts, und Blume warnt vor jeder davon als `BLUME_CODE_FENCE_OPTION` und nennt die Schreibweise, die du stattdessen verwenden solltest: `hl_lines="2 3"` von MkDocs (hier ein `{2,3}`-Bereich) und `linenums="1"` (`lineNumbers`), `showLineNumbers` (`lineNumbers`), `lines` von Mintlify (`lineNumbers`), `wordWrap` von Fern (`wrap`) und `filename="app.js"` (`title="app.js"`). Bei einem Rust-Block lösen auch `ignore`, `no_run`, `should_panic`, `compile_fail`, `edition2015` bis `edition2024`, `noplayground` und `editable` von rustdoc und mdBook eine Warnung aus: Blume kompiliert, testet oder führt nie einen Codeblock aus, entferne sie also. Keine davon wird Teil des Titels.
+
+Ein `console`-Block (oder `shellsession`-Block) ist eine Terminal-Sitzung: Befehle nach einem Prompt wie `$`, samt ihrer Ausgabe. Sein Kopieren-Button kopiert nur die Befehle, ohne ihre Prompts, sodass sich die Kopie direkt in ein Terminal einfügen lässt. Ein Befehl, der auf `\` endet, behält seine Fortsetzungszeilen.
+
+```console
+$ npm install blume
+added 1 package in 2s
+$ npx blume dev
+```
 
 Auch Inline-Code lässt sich hervorheben: Setze einen `{:lang}`-Marker in eine Backtick-Spanne, und sie wird wie ein winziger Codeblock eingefärbt — `useState(){:js}` oder `T extends object{:ts}`. Das greift nur, wenn du den Marker hinzufügst, sodass einfacher Inline-Code unberührt bleibt — nichts, was aktiviert werden müsste.
 
@@ -310,7 +338,7 @@ Beide lassen sich mit einem Titel und `lineNumbers` kombinieren. Um jeden Block 
 
 ### Hervorhebung [#highlighting]
 
-Versieh Code mit Kommentaren im GitHub-Stil, um Aufmerksamkeit auf Zeilen, Wörter und Änderungen zu lenken. Die Kommentare werden aus der gerenderten Ausgabe entfernt, sodass der Code sauber kopierbar bleibt. Alle vier sind standardmäßig aktiv — keine Konfiguration nötig.
+Versieh Code mit Kommentaren im GitHub-Stil, um Aufmerksamkeit auf Zeilen, Wörter und Änderungen zu lenken. Die Kommentare werden aus der gerenderten Ausgabe entfernt, sodass der Code sauber kopierbar bleibt. Sie alle sind standardmäßig aktiv — keine Konfiguration nötig.
 
 Markiere eine Zeile mit `// [!code highlight]`, um ihr einen hervorgehobenen Hintergrund zu geben:
 
@@ -337,6 +365,13 @@ import { createServer } from "node:http"; // [!code word:createServer]
 createServer().listen(3000);
 ```
 
+Kennzeichne eine Zeile mit `// [!code error]` oder `// [!code warning]` als Problem, rot beziehungsweise bernsteinfarben eingefärbt:
+
+```ts
+const port = process.env.PORT; // [!code warning]
+server.listen(port.trim()); // [!code error]
+```
+
 Blende alles außer den mit `// [!code focus]` markierten Zeilen ab (der Rest wird beim Überfahren mit der Maus wieder scharf):
 
 ```ts
@@ -346,7 +381,7 @@ export default defineConfig({
 });
 ```
 
-Oder hebe Zeilen per **Nummer** statt per Kommentar hervor — nützlich, wenn du den Code nicht bearbeiten kannst. Setze einen Bereich in geschweiften Klammern hinter die Sprache; einzelne Zeilen, Kommalisten und `start-end`-Spannen funktionieren alle:
+Oder hebe Zeilen per **Nummer** statt per Kommentar hervor — nützlich, wenn du den Code nicht bearbeiten kannst. Setze einen Bereich in geschweiften Klammern hinter die Sprache, mit oder ohne Leerzeichen dazwischen (` ```ts{1,4-5} ` funktioniert auch); einzelne Zeilen, Kommalisten und `start-end`-Spannen funktionieren alle:
 
 ```ts {1,4-5}
 import { defineConfig } from "blume";
@@ -581,7 +616,7 @@ timeline
 
 ## Callouts
 
-Callouts lenken die Aufmerksamkeit der Leser auf Kontext, Ratschläge oder Risiken. Schreibe sie als `:::type`-Direktiven; einen Titel fügst du in eckigen Klammern hinzu, etwa `:::warning[Heads up]`. Direktiven sind eine reine MDX-Funktion — in einer `.md`-Datei bleibt eine `:::note`-Zeile wörtlicher Text.
+Callouts lenken die Aufmerksamkeit der Leser auf Kontext, Ratschläge oder Risiken. Schreibe sie als `:::type`-Direktiven; einen Titel fügst du in eckigen Klammern hinzu, etwa `:::warning[Heads up]`. Der Titel behält seine Inline-Formatierung, sodass Code, Betonung und Links in den Klammern im Titel gerendert werden. Direktiven sind eine reine MDX-Funktion — in einer `.md`-Datei bleibt eine `:::note`-Zeile wörtlicher Text, und `blume dev`, `blume build` und `blume check` warnen davor als `BLUME_MD_DIRECTIVE`. Benenne die Seite in `.mdx` um, damit die Direktive als Callout gerendert wird.
 
 ### Note
 
@@ -683,7 +718,27 @@ Commit `blume.config.ts`, not `.blume/`.
 ::::
 ```
 
-Schreibe den Namen direkt hinter die Doppelpunkte. `::: tip` mit Leerzeichen (die Schreibweise, die VitePress, VuePress und Docusaurus v2 verwenden) ist keine Direktive, die Seite zeigt die Zeile also als Text an, und Blume warnt vor einem so geschriebenen Callout-Namen als `BLUME_DIRECTIVE_SPACED_NAME`. Innerhalb eines Containers schließt ein schließender Fence mit Text nach seinen Doppelpunkten diesen trotzdem, und der Text wird verworfen: Eine `::: card`-Zeile innerhalb eines `:::warning` beendet das Callout an dieser Stelle, und `card` wird nie angezeigt. Blume warnt vor dieser Zeile als `BLUME_DIRECTIVE_CLOSING_TEXT`. Um die Zeile als Text im Callout zu behalten, gib dem Callout wie oben einen längeren Fence oder entferne den Text nach den Doppelpunkten.
+Schreibe den Namen direkt hinter die Doppelpunkte. `::: tip` mit Leerzeichen (die Schreibweise, die VitePress, VuePress und Docusaurus v2 verwenden) ist keine Direktive, die Seite zeigt die Zeile also als Text an, und Blume warnt vor einem so geschriebenen Callout-Namen als `BLUME_DIRECTIVE_SPACED_NAME`. Ein Titel gehört in eckige Klammern: Text nach dem Namen, wie in `:::tip Some title`, öffnet das Callout, wird aber nie angezeigt, und Blume warnt davor als `BLUME_DIRECTIVE_OPENING_TEXT` und nennt die Schreibweise mit Klammern, `:::tip[Some title]`. Innerhalb eines Containers schließt ein schließender Fence mit Text nach seinen Doppelpunkten diesen trotzdem, und der Text wird verworfen: Eine `::: card`-Zeile innerhalb eines `:::warning` beendet das Callout an dieser Stelle, und `card` wird nie angezeigt. Blume warnt vor dieser Zeile als `BLUME_DIRECTIVE_CLOSING_TEXT`. Um die Zeile als Text im Callout zu behalten, gib dem Callout wie oben einen längeren Fence oder entferne den Text nach den Doppelpunkten.
+
+### GitHub-Alerts
+
+Auch die Alert-Syntax von GitHub wird als Callout gerendert: ein Zitat, dessen erste Zeile `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` oder `[!CAUTION]` lautet, in beliebiger Groß- und Kleinschreibung. Text nach dem Marker in dieser Zeile wird zum Titel.
+
+{/* prettier-ignore */}
+> [!TIP]
+> Setze `deployment.site`, damit Sitemaps und Open-Graph-Bilder absolute URLs verwenden.
+
+{/* prettier-ignore */}
+```md
+> [!TIP]
+> Set `deployment.site` so sitemaps and Open Graph images use absolute URLs.
+```
+
+`[!NOTE]` und `[!TIP]` werden als die gleichnamigen Callouts gerendert, `[!IMPORTANT]` als Note, `[!WARNING]` als Warning und `[!CAUTION]` als Danger-Callout, passend zum Rot von GitHub. Wie auf GitHub bleibt ein Alert, der innerhalb eines anderen zitiert wird, ein normales Zitat, und dasselbe gilt für jeden anderen Marker, etwa `[!INFO]`.
+
+Ein Formatter, der Zeilen zusammenführt, etwa oxfmt mit `proseWrap: "never"`, zieht die erste Inhaltszeile neben den Marker hoch, wo sie zum Titel wird (auf dieselbe Weise [fasst er Direktiven zusammen](/docs/faq#why-is-oxfmt--ultracite-collapsing-my-directives)). Lass nach dem Marker eine `>`-Zeile leer, um beide getrennt zu halten; GitHub rendert auch diese Form.
+
+Alerts sind wie Direktiven eine reine MDX-Funktion. In einer `.md`-Datei bleibt das Zitat ein Zitat und zeigt seinen Marker als Text an, und `blume dev`, `blume build` und `blume check` warnen davor als `BLUME_MD_GITHUB_ALERT`. Benenne die Seite in `.mdx` um, damit der Alert als Callout gerendert wird.
 
 ## Mathematik [#math]
 
@@ -718,3 +773,14 @@ Blume wandelt gerade Anführungszeichen und Bindestriche schon beim Schreiben in
 ```md
 "Quotes" become curly, -- becomes an en dash, --- an em dash, and ... an ellipsis.
 ```
+
+## Syntax aus anderen Tools [#syntax-from-other-tools]
+
+Blume liest die Syntax auf dieser Seite und sonst nichts. Syntax, die ein anderes Doku-Tool auswertet, erscheint so auf der Seite, wie sie geschrieben wurde, oder lässt eine `.mdx`-Seite beim Rendern scheitern, daher warnen `blume dev`, `blume build` und `blume check` an ihrer Zeile davor. Codeblöcke, Inline-Code und Kommentare werden übersprungen, packe ein Beispiel also in Inline-Code, um es als Text zu zeigen.
+
+- `BLUME_TEMPLATE_TAG`: ein Liquid- oder Markdoc-Tag (`{% include note.html %}`, `{% /callout %}`) oder eine Liquid-Ausgabe (`{{ site.title }}`) in einer `.md`-Seite. Blume führt keine Template-Sprache aus, ersetze das Tag also durch das, was es erzeugt hat, und einen siteweiten Wert durch eine [Variable](/docs/content/variables). Ein `{{name}}`, das eine Variable sein könnte, wird hier nicht gemeldet.
+- `BLUME_WIKILINK_UNSUPPORTED`: ein Wiki-Link (`[[Home]]`, `[[Text|Page]]`), der eine der Seiten der Site über ihren Dateinamen oder Titel benennt, oder jeder Wiki-Link mit einem `|`. Nur ein [Obsidian-Vault](/docs/content/sources/obsidian) als Quelle liest Wiki-Links. Die Warnung nennt den Markdown-Link, der ihn ersetzt.
+- `BLUME_MDC_SYNTAX`: eine Block-Komponente (`::callout` … `::`) oder Inline-Komponente (`:badge[New]{color="primary"}`) von Nuxt Content (MDC). Verwende stattdessen die passende [Komponente](/docs/content/components) oder ein `:::`-Callout.
+- `BLUME_MDX_ATTRIBUTE_LIST`: eine Attributliste (`{ width="300" }`, `{: .note }`) in einer `.mdx`-Seite. MDX liest die geschweiften Klammern als JavaScript, daher schlägt der Build der Seite fehl. Setze die Attribute stattdessen an einem JSX-Element (`<img src="…" width="300" />`) und nagle den Anker einer Überschrift mit `[#id]` fest.
+- `BLUME_MD_ATTRIBUTE_LIST`: eine Attributliste in einer `.md`-Seite, etwa `{: .note }` oder `{: #intro }` von kramdown in einer eigenen Zeile oder nach einem Block, oder `{ width="300" }` nach einem Bild. Die Seite zeigt sie so an, wie sie geschrieben wurde. Setze die Attribute stattdessen an einem HTML-Element (`<img src="…" width="300">`) und nagle den Anker einer Überschrift mit `[#id]` fest. Ein `{#id}`-Marker an einer Überschrift fällt stattdessen unter [`BLUME_MD_CURLY_ANCHOR`](#custom-anchors).
+- `BLUME_MDX_UNCLOSED_ELEMENT`: ein leeres HTML-Element (Void-Element) ohne schließenden Schrägstrich (`<img …>`, `<br>`) in einer `.mdx`-Seite oder in einem Partial, das eine `.mdx`-Seite [einbindet](/docs/content/includes). MDX liest es als nicht geschlossenes JSX-Element, schließe es also: `<br />`.

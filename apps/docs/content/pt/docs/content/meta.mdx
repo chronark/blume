@@ -24,7 +24,9 @@ export default defineMeta({
 
 Todos os campos são opcionais — defina apenas o que você quiser sobrescrever.
 
-O Blume só lê arquivos `meta.ts` de pastas que o seu conteúdo abrange: um arquivo em uma pasta ignorada pelos globs de `exclude` do seu conteúdo, ou fora de todos os globs de `include`, nunca é importado. Com `root: "."` e `exclude: ["**/_*", "**/.*", "src/**"]`, um `src/lib/meta.ts` não relacionado é deixado de lado. Um `exclude` substitui o padrão `["**/_*", "**/.*"]` em vez de se somar a ele, então liste esses dois também para que os partials com prefixo `_` e os arquivos iniciados por ponto continuem sem ser publicados.
+O Blume só lê arquivos `meta.ts` de pastas que o seu conteúdo abrange: um arquivo em uma pasta ignorada pelos globs de `exclude` do seu conteúdo, ou fora de todos os globs de `include`, nunca é importado. Com `root: "."` e `exclude: ["src/**"]`, um `src/lib/meta.ts` não relacionado é deixado de lado.
+
+Um `meta.ts` fora de todos os globs de `include` continua sendo ignorado mesmo quando a pasta dele é um grupo da barra lateral, como a [pasta de tag](#generated-groups) de uma referência em um site cujo `include` lista apenas `guides/**`. O Blume emite um aviso sobre esse caso como `BLUME_META_OUTSIDE_INCLUDE`: adicione um glob de `include` que alcance a pasta, como `"api/**/*.{md,mdx}"`, para que o Blume o leia.
 
 ## Campos [#fields]
 
@@ -33,16 +35,20 @@ O Blume só lê arquivos `meta.ts` de pastas que o seu conteúdo abrange: um arq
 | `title` | `string` | O rótulo do grupo. O padrão é o nome da pasta humanizado. |
 | `icon` | `string` | Ícone exibido ao lado do rótulo. |
 | `order` | `number` | Posição entre grupos e páginas irmãos. Números menores vêm primeiro. |
-| `collapsed` | `boolean` | Sob o [modo de exibição `group`](/docs/content/navigation#display-modes), define se o grupo começa recolhido. |
+| `collapsed` | `boolean` | Sob o [modo de exibição `group`](/docs/content/navigation#display-modes), define se o grupo começa recolhido. Se não for definido, ele começa recolhido, a menos que contenha a página atual ou seja a única linha no topo da barra lateral. |
 | `display` | `"flat" \| "group" \| "page"` | Modo de renderização deste grupo; sobrescreve o [`navigation.sidebar.display`](/docs/content/navigation#display-modes) global. |
 | `directory` | `"card" \| "accordion" \| "none"` | Lista as páginas do grupo abaixo do conteúdo da sua página `index`. As pastas aninhadas herdam essa configuração. Veja [listagens de diretório](/docs/content/navigation#directory-listings). |
 | `pages` | `string[]` | Ordem explícita dos filhos do grupo, por slug. |
 
-O array `pages` lista os filhos por slug — o nome da pasta ou do arquivo com o prefixo numérico e quaisquer parênteses removidos (portanto `01-quickstart.mdx` é `"quickstart"`). Cada filho listado recebe sua posição no array como ordem (`0`, `1`, `2`, …). Os filhos que você deixar de fora ainda aparecem, ordenados pela própria ordem: uma página `index` continua em primeiro lugar, um filho com `sidebar.order`, prefixo numérico ou um `order` no próprio `meta.ts` é posicionado por esse número entre os listados, e um filho sem nenhum deles vai depois deles. Liste todos os filhos quando o array tiver que definir a ordem completa.
+O array `pages` lista os filhos por slug — o nome da pasta ou do arquivo com o prefixo numérico e quaisquer parênteses removidos (portanto `01-quickstart.mdx` é `"quickstart"`). Cada filho listado recebe sua posição no array como ordem (`0`, `1`, `2`, …). Os filhos que você deixar de fora ainda aparecem, ordenados pela própria ordem: uma página `index` continua em primeiro lugar, um filho com `sidebar.order`, prefixo numérico ou um `order` no próprio `meta.ts` é posicionado por esse número entre os listados, e um filho sem nenhum deles vai depois deles. Liste todos os filhos quando o array tiver que definir a ordem completa. Uma entrada que não corresponde a nenhuma página ou pasta do grupo não ordena nada, então o Blume emite um aviso sobre ela como `BLUME_META_UNKNOWN_PAGE`, na linha dela no `meta.ts`, e sugere o slug a que ela mais provavelmente se refere.
 
 O array ordena páginas entre páginas e grupos entre grupos, mas não intercala os dois onde as páginas soltas são listadas acima dos grupos: no topo da barra lateral (e de cada seção de [aba](/docs/content/navigation#tabs)) e em qualquer grupo com um subgrupo [`flat`](/docs/content/navigation#display-modes), cujo cabeçalho, de outra forma, pareceria englobar as páginas que vêm depois dele. Nesses casos, `pages: ["advanced", "intro"]` ainda lista a página `intro` acima do grupo `advanced`.
 
 Como os grupos são renderizados — cabeçalhos planos, blocos recolhíveis ou painéis de navegação em profundidade — o padrão é o `navigation.sidebar.display` de toda a barra lateral; defina `display` aqui para sobrescrevê-lo apenas para este grupo. A página `index` de uma pasta também pode defini-lo pelo frontmatter, o que tem precedência sobre o `meta.ts` — veja [sobrescritas por grupo](/docs/content/navigation#per-group-overrides).
+
+## Grupos gerados [#generated-groups]
+
+Uma referência [OpenAPI](/docs/references/openapi), [AsyncAPI](/docs/references/asyncapi) ou [GraphQL](/docs/references/graphql) nomeia e ordena seus grupos de tags a partir da especificação. Para alterar um deles, adicione um `meta.ts` na pasta sob a qual as páginas da tag são publicadas: com a referência em `/api`, um `api/pets/meta.ts` na sua pasta de conteúdo configura o grupo **Pets**. Os campos que ele define substituem os gerados, e os demais mantêm os valores gerados, então um `meta.ts` que define apenas `title` mantém a posição da tag na ordem da especificação.
 
 ## Meta computado [#computed-meta]
 

@@ -24,7 +24,7 @@ Hier siehst du es live — der folgende Hinweis stammt aus einem gemeinsam genut
 
 ## Partials
 
-Jede Datei, deren Name (oder Ordner) mit einem Unterstrich beginnt, ist standardmäßig von Routing, Navigation, Suche und Sitemaps ausgeschlossen — diese Konvention ist der natürliche Ort für gemeinsam genutzte Snippets:
+Jede Datei, deren Name (oder Ordner) mit einem Unterstrich beginnt, ist von Routing, Navigation, Suche und Sitemaps ausgeschlossen — diese Konvention ist der natürliche Ort für gemeinsam genutzte Snippets. Muster, die du zu [`content.exclude`](/docs/configuration#content) hinzufügst, ergänzen diese Regel, statt sie zu ersetzen; um Dateien mit Unterstrich doch zu veröffentlichen, füge `"!**/_*"` zu `exclude` hinzu:
 
 ```text
 docs/
@@ -38,13 +38,15 @@ docs/
 
 Ein Partial ist eine ganz normale Markdown- oder MDX-Datei. Sein Frontmatter wird beim Einfügen entfernt (das Frontmatter der einbindenden Seite gewinnt), und alles andere — Hinweise, Code-Blöcke, Komponenten, Mathematik — wird genau so gerendert wie inline. Partials können andere Partials einbinden; ein zirkulärer Include wird als Fehler gemeldet.
 
-Relative Bildreferenzen innerhalb eines Partials funktionieren weiterhin: Sie werden auf die einbindende Seite umgerechnet, sodass ein neben dem Partial liegendes `![diagram](./diagram.png)` überall aufgelöst wird, wo das Partial eingefügt wird.
+Linkreferenz-Definitionen (`[pep 508]: https://peps.python.org/pep-0508/`) wirken ebenfalls über Includes hinweg, sodass ein Partial die gemeinsam genutzten Link-Definitionen einer Website enthalten kann: Die Seite und ihre anderen Partials können die Definitionen eines Partials referenzieren (`[PEP 508]`), und ein Partial kann die der Seite referenzieren. Wenn die Seite und ein Partial beide dasselbe Label definieren, verwendet jede Datei ihre eigene Definition.
+
+Relative Bildreferenzen innerhalb eines Partials funktionieren weiterhin: Sie werden auf die einbindende Seite umgerechnet, sodass ein neben dem Partial liegendes `![diagram](./diagram.png)` oder `<Card img="./cover.png">` überall aufgelöst wird, wo das Partial eingefügt wird. Der Pfad eines Bildes wird in jeder Schreibweise umgerechnet: in spitzen Klammern (`![diagram](<./my diagram.png>)`), mit maskierten Klammern oder gefolgt von einem Titel in beliebigen Anführungszeichen. Ein Link auf eine andere Datei neben dem Partial (`[spec](./spec.pdf)` oder ein `<img src>` bzw. `<a href>`, das auf eine solche Datei verweist) wandert ebenfalls mit. Ein Link auf eine Seite wird von der einbindenden Seite aus aufgelöst, so als wäre er dort geschrieben worden.
 
 Wenn du ein Partial bearbeitest, während `blume dev` läuft, wird jede Seite neu geladen, die es einbindet.
 
 ## Props
 
-Übergib Werte als Attribute an ein Partial und lies sie im Partial mit `{{name}}` aus — dieselbe Syntax wie bei [Variablen](/docs/content/variables). So bedient ein einziges Partial jede Seite, die eine Variante davon braucht:
+Übergib Werte als Attribute an ein Partial und lies sie im Partial mit `{{name}}` aus, also mit derselben Syntax wie bei [Variablen](/docs/content/variables). So bedient ein einziges Partial jede Seite, die eine Variante davon braucht:
 
 ```mdx docs/_snippets/upgrade.mdx
 Upgrade to the **{{plan}}** plan to use {{feature}}.
@@ -77,6 +79,8 @@ Include-Anweisungen müssen in einer eigenen Zeile stehen — sie sind block-lev
 Ziele müssen innerhalb deines Content-Roots liegen: Eine Datei außerhalb davon würde in Versions-Snapshots und ausgeworfenen Projekten stillschweigend fehlen, deshalb meldet `blume` `BLUME_INCLUDE_OUTSIDE_ROOT`, statt sie einzufügen. Ein nicht existierendes Ziel ergibt `BLUME_INCLUDE_NOT_FOUND`, und eine Schleife von Includes ergibt `BLUME_INCLUDE_CYCLE` — alle drei lassen `blume build` fehlschlagen (übergib `--no-strict`, um trotzdem zu bauen) und tauchen in `blume validate` auf.
 
 Defekte Links innerhalb eines Partials werden der Partial-Datei zugeordnet, nicht den Seiten, die sie einfügen — so behebst du sie dort, wo sie leben.
+
+Ein Partial wird im Format der einbindenden Seite gelesen, sodass ein `.md`-Partial, das von einer `.mdx`-Seite eingebunden wird, als MDX gelesen wird. MDX kennt keine HTML-Kommentare, deshalb werden die `<!-- … -->`-Kommentare des Partials als MDX-Kommentare (`{/* … */}`) eingefügt und bleiben verborgen. Anderes HTML darin muss gültiges JSX sein: Ein `<img …>` oder `<br>` ohne schließenden Schrägstrich verschluckt alles, was im Partial danach folgt, ohne Fehlermeldung. Blume warnt davor mit `BLUME_MDX_UNCLOSED_ELEMENT` in der Zeile des Partials; schließe das Tag als `<br />`. Alles andere im Partial, das MDX nach dem Einfügen nicht parsen kann, etwa eine verirrte `{`, ergibt eine [`BLUME_MDX_SYNTAX`](/docs/content#markdown-and-mdx)-Warnung in der Zeile des Partials, und wenn es den Build fehlschlagen lässt, meldet auch der Build es dort, nicht bei der Seite, die das Partial einbindet.
 
 :::note
 Partials werden über alle Sprachen hinweg gemeinsam genutzt und nicht von `blume translate` übersetzt — halte Partials sprachneutral (Code, Tabellen, Diagramme), oder erstelle Partials pro Sprache und binde sie aus den Seiten der jeweiligen Sprache ein.

@@ -54,6 +54,8 @@ reference: [
 ],
 ```
 
+Um id para o qual o Blume não gera exemplo fica de fora, com um aviso `BLUME_GRAPHQL_UNKNOWN_CODE_SAMPLE` que lista os ids que ele gera.
+
 ## Páginas de tipos [#type-pages]
 
 Os tipos nomeados ganham páginas próprias com deep link, agrupadas por categoria na barra lateral. Cada página mostra fields e input fields (com links para os tipos deles), valores de enum, membros de union, implementações de interface e uma seção **Usado por**, com as operações que retornam ou aceitam o tipo e os outros tipos que fazem referência a ele. Scalars definidos pela spec (`String`, `Int`, …) não ganham páginas. Já os scalars customizados ganham, incluindo a URL `specifiedBy` deles.

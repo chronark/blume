@@ -4,7 +4,7 @@ description: >-
   Blume erstellt die Seitenleiste aus deinen Dateien und lässt dich sie dann per Frontmatter, Ordner-Meta oder Konfiguration verfeinern – Breadcrumbs und Gliederungen folgen automatisch.
 ---
 
-Blume erstellt deine Seitenleiste aus dem Dateisystem und lässt dich sie dann so weit verfeinern, wie du möchtest – Seite für Seite, Ordner für Ordner oder mit einer einzigen expliziten Konfiguration. Breadcrumbs, Zurück-/Weiter-Links und die Gliederung auf der Seite ergeben sich alle aus demselben Modell, ganz ohne Verkabelung.
+Blume erstellt deine Seitenleiste aus dem Dateisystem und lässt dich sie dann so viel – oder so wenig – verfeinern, wie du möchtest: Seite für Seite, Ordner für Ordner oder mit einer einzigen expliziten Konfiguration. Breadcrumbs, Zurück-/Weiter-Links und die Gliederung auf der Seite ergeben sich alle aus demselben Modell, ganz ohne Verkabelung.
 
 ## Die generierte Seitenleiste [#the-generated-sidebar]
 
@@ -70,7 +70,7 @@ navigation: {
 ```
 
 - **`flat`** (Standard) – eine nicht einklappbare Überschrift mit den darunter aufgelisteten Seiten. Seiten, die zu keiner Gruppe gehören, stehen immer zuerst, oberhalb der Gruppenabschnitte, damit sie nicht für untergeordnete Einträge einer Gruppe gehalten werden.
-- **`group`** – ein einklappbares `<details>`-Element pro Gruppe. Gruppen sind standardmäßig zunächst eingeklappt; eine Gruppe, welche die aktuelle Seite enthält, ist immer aufgeklappt, sodass nur der Abschnitt geöffnet ist, in dem du dich befindest. Setze `collapsed: false` im [Ordner-Meta](/docs/content/meta), um eine Gruppe unabhängig davon offen zu erzwingen.
+- **`group`** – ein einklappbares `<details>`-Element pro Gruppe. Gruppen sind standardmäßig zunächst eingeklappt; eine Gruppe, welche die aktuelle Seite enthält, ist immer aufgeklappt, sodass nur der Abschnitt geöffnet ist, in dem du dich befindest. Eine Gruppe, die die einzige Zeile auf der obersten Ebene der Seitenleiste ist – etwa ein Ordner, der alle Seiten umschließt –, ist ebenfalls aufgeklappt, sodass die Seitenleiste nie nur eine einzelne eingeklappte Zeile zeigt. Setze `collapsed: false` im [Ordner-Meta](/docs/content/meta), um eine Gruppe unabhängig davon offen zu erzwingen, oder `collapsed: true`, um diese einzelne Gruppe eingeklappt zu halten.
 - **`page`** – jede Gruppe ist eine einzelne Zeile, deren Chevron die Seitenleiste in ein Unterpanel schiebt, das nur die Einträge dieser Gruppe zeigt, mit einem Zurück-Pfeil oben. Eine Gruppe mit Index-Seite verlinkt den Namen der Zeile auf diese Seite, und bei einer Gruppe ohne Index-Seite schiebt ein Klick an beliebiger Stelle der Zeile das Panel herein. Das Panel ist routen-bewusst, sodass beim direkten Aufruf einer Seite innerhalb der Gruppe sofort dorthin geöffnet wird. Nachdem du den Zurück-Pfeil benutzt hast, bleibt die Zeile des Abschnitts, in dem du dich befindest, hervorgehoben.
 
 :::tip
@@ -163,7 +163,7 @@ sidebar:
 
 Eine ausgeblendete Seite taucht außerdem weder in der Sitemap noch in `llms.txt` auf und auch nicht in der Website-Suche, es sei denn, [`search.indexing.includeHiddenPages`](/docs/configuration/search#excluding-pages) ist aktiviert.
 
-Die `index`-Seite eines Ordners erscheint sowohl als Link der Gruppenzeile als auch als erste Zeile innerhalb der Gruppe. Blende die Index-Seite aus, um nur die verlinkte Überschrift zu behalten: Die Gruppenzeile öffnet weiterhin die Landing-Page, und die Zurück-/Weiter-Links führen weiterhin durch sie hindurch. Da die Navigation weiterhin auf die Seite verlinkt, gilt sie nirgendwo sonst als ausgeblendete Seite: Sie bleibt in der Sitemap, in der Website-Suche und in `llms.txt`.
+Die `index`-Seite eines Ordners erscheint sowohl als Link der Gruppenzeile als auch als erste Zeile innerhalb der Gruppe. Blende die Index-Seite aus, um nur die verlinkte Überschrift zu behalten: Die Gruppenzeile öffnet weiterhin die Landing-Page, und die Zurück-/Weiter-Links führen weiterhin durch sie hindurch. Da die Navigation weiterhin auf die Seite verlinkt, gilt sie nirgendwo sonst als ausgeblendete Seite: Sie bleibt in der Sitemap, in der Website-Suche und in `llms.txt`. Dasselbe gilt für die Startseite der Website, die `index`-Seite im Root: Blendest du sie aus, entfällt ihre Zeile in der Seitenleiste, aber die Root-URL der Website liefert sie weiterhin aus, daher bleibt sie ebenfalls gelistet.
 
 ## Tabs
 
@@ -191,7 +191,7 @@ navigation: {
 }
 ```
 
-Der `path` eines Tabs ist sein Abschnittspräfix und dient zugleich als Linkziel. Ein Abschnitt, dessen `path` keine eigene Seite ist – ein Ordner ohne `index.mdx` –, würde auf einen 404 verweisen, daher greift der Tab stattdessen auf die erste Seite im Abschnitt zurück. Eine statische [benutzerdefinierte Seite](/docs/advanced/custom-pages) am `path` des Tabs zählt als eigene Seite des Abschnitts: Mit `pages/guides.astro` landet ein `/guides`-Tab auf dieser Seite, während der Ordner `guides/` seine Seitenleiste füllt. Dasselbe gilt für den generierten [Changelog](/docs/advanced/changelog)-Index, sodass ein `/changelog`-Tab die Zeitleiste öffnet statt des neuesten Eintrags.
+Der `path` eines Tabs ist sein Abschnittspräfix und dient zugleich als Linkziel. Ein Abschnitt, dessen `path` keine eigene Seite ist – ein Ordner ohne `index.mdx` –, würde auf einen 404 verweisen, daher greift der Tab stattdessen auf die erste Seite im Abschnitt zurück. Das gilt auch für einen Tab mit `path: "/"` auf einer Website ohne `index.mdx` im Root: Er verlinkt auf die erste Seite in der Seitenleiste. Eine statische [benutzerdefinierte Seite](/docs/advanced/custom-pages) am `path` des Tabs zählt als eigene Seite des Abschnitts: Mit `pages/guides.astro` landet ein `/guides`-Tab auf dieser Seite, während der Ordner `guides/` seine Seitenleiste füllt. Dasselbe gilt für den generierten [Changelog](/docs/advanced/changelog)-Index, sodass ein `/changelog`-Tab die Zeitleiste öffnet statt des neuesten Eintrags.
 
 Setze `href`, wenn ein Tab woanders landen soll – etwa auf einer bestimmten Seite im Abschnitt:
 
@@ -278,7 +278,7 @@ navigation: {
 }
 ```
 
-Jeder Link nimmt ein `label`, ein `href` und optional ein `icon` entgegen (ein Name eines [eingebauten Symbols](/docs/content/components#icon), ein Bildpfad bzw. eine Bild-URL oder ein Inline-SVG – wie überall sonst auch). Ein `href` kann überallhin verweisen: Eine externe URL öffnet sich in einem neuen Tab, während eine interne Route (`/contact`) zur Build-Zeit und von [`blume doctor`](/docs/cli/doctor) gegen deine Seiten geprüft wird und dich warnt, wenn nichts übereinstimmt.
+Jeder Link nimmt ein `label`, ein `href` und optional ein `icon` entgegen (ein Name eines [eingebauten Symbols](/docs/content/components#icon), ein Bildpfad bzw. eine Bild-URL oder ein Inline-SVG – wie überall sonst auch). Ein `href` kann überallhin verweisen: Eine externe URL öffnet sich in einem neuen Tab, während eine interne Route (`/contact`) zur Build-Zeit und von [`blume doctor`](/docs/cli/doctor) gegen deine Seiten geprüft wird und dich warnt, wenn nichts übereinstimmt. Ein Pfad zu einer Datei in `public/` (`/spec.pdf`) oder zu einer Datei, die Blume generiert (`/llms.txt`), gilt ebenfalls als Treffer.
 
 ## Explizite Seitenleiste [#explicit-sidebar]
 
@@ -358,7 +358,7 @@ Aus den Überschriften jeder Seite – standardmäßig `##` und `###` – wird a
 
 Unter dem Inhaltsverzeichnis zeigt jede Seite eine Reihe von Schnellaktionen. In Fenstern ab 1.280px Breite stehen sie in der rechten Spalte bei der Gliederung. In schmaleren Fenstern und auf Smartphones stehen sie am Ende des „Auf dieser Seite“-Dropdowns über dem Inhalt, das auch auf einer Seite ohne Überschriften erscheint:
 
-- **Auf GitHub bearbeiten** – verlinkt direkt auf die Quelldatei. Erscheint, sobald du [`github`](/docs/configuration) in deiner Konfiguration setzt.
+- **Auf GitHub bearbeiten** – verlinkt direkt auf die Quelldatei. Erscheint, sobald du [`github`](/docs/configuration) in deiner Konfiguration setzt, auf jeder Seite, deren Datei im Repository liegt: Eine Datei, die git ignoriert – etwa eine generierte API-Referenz, die in einen per gitignore ausgeschlossenen Ordner geschrieben wird –, bekommt keinen Bearbeiten-Link, da GitHub keine Datei zum Öffnen hat.
 - **Nach oben scrollen** – kehrt sanft an den Anfang langer Seiten zurück. Diese Aktion gibt es nur in der rechten Spalte, da das Dropdown ohnehin schon am Anfang der Seite sitzt.
 
 Andere übergeben die Seite an KI-Tools – **Als Markdown kopieren** und **Im Chat öffnen** – beschrieben unter [Markdown für Agenten](/docs/discoverability/markdown#copy-as-markdown).

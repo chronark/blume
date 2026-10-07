@@ -29,6 +29,8 @@ Der Dateiname ist der Komponentenname, er **muss also ein PascalCase-Bezeichner 
 Islands sind für **interaktive** UI gedacht. Für eine statische Komponente, die du seitenübergreifend wiederverwendest (ein gestalteter Hinweis, eine Preistabelle), nutze stattdessen ein [MDX-Override](/docs/configuration/customization) — es liefert kein JavaScript aus.
 :::
 
+Eine Island ist die einzige Möglichkeit, von einer Seite aus Code im Browser auszuführen. Ein JavaScript-Event-Handler an einem einfachen HTML-Element in MDX, etwa `<button onClick={() => open()}>`, wird nie ausgeführt: Die Seite ist statisches HTML, daher wird die Funktion als Text in das Attribut geschrieben. Blume warnt davor mit `BLUME_MDX_EVENT_HANDLER` an der betreffenden Zeile. Verschiebe dieses Markup in eine Island und verwende die Island in der Seite.
+
 ## Islands in `components.ts` registrieren [#registering-islands-in-componentsts]
 
 Wenn du Islands lieber bei deinen übrigen Komponenten aufbewahren möchtest — oder ihnen einen anderen Namen als der Datei geben willst — registriere sie mit `defineComponents` als `mdx`-Eintrag mit einem `client`-Modus. Mehr ist eine Island nicht: eine MDX-Komponente, die hydriert. Jeder Eintrag steht in jeder MDX-Seite zur Verfügung, und ein Eintrag mit demselben Namen wie eine Datei in `islands/` ersetzt diese.

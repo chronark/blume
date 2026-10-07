@@ -37,6 +37,8 @@ Predefinições nomeadas: `blue` (padrão), `green`, `orange`, `pink`, `purple`,
 
 Uma string se aplica a ambos os modos de cor; passe um objeto para [uma cor de destaque diferente por modo](#dark-mode-colors).
 
+Um valor que não é nem uma predefinição nem uma cor CSS, como `"deep purple"` ou um valor hex sem o `#`, gera o aviso `BLUME_THEME_COLOR_INVALID` na linha do `blume.config.ts` que o define, já que os navegadores ignoram os estilos que o usam. A mesma verificação cobre `action`, `background` e o `seo.og.palette` do [cartão Open Graph](/docs/discoverability/open-graph). Propriedades personalizadas (`var(--brand)`), `color-mix()` e as demais funções de cor passam como estão escritas.
+
 O texto sobre um preenchimento de destaque ou de ação, como o rótulo de um botão ou o número de uma etapa, é branco enquanto o branco atingir AA sobre essa cor, e escuro caso contrário. Uma cor de destaque clara recebe rótulos escuros sem nenhuma configuração extra. O [`blume audit`](/docs/cli/audit#theme-contrast-low) verifica uma cor de destaque, de ação ou de fundo personalizada com o mesmo critério.
 
 ### Raio [#radius]
@@ -232,6 +234,8 @@ O `theme.css` é embutido no ponto de entrada do Tailwind do site, então direti
 | `--blume-code-highlight`, `--blume-code-highlight-border` | Fundo e borda esquerda de uma linha de código realçada (`// [!code highlight]` ou um intervalo `{1,4-5}`) |
 | `--blume-code-add`, `--blume-code-add-border` | Fundo e borda esquerda de uma linha adicionada (`// [!code ++]`) |
 | `--blume-code-remove`, `--blume-code-remove-border` | Fundo e borda esquerda de uma linha removida (`// [!code --]`) |
+| `--blume-code-error`, `--blume-code-error-border` | Fundo e borda esquerda de uma linha de erro (`// [!code error]`) |
+| `--blume-code-warning`, `--blume-code-warning-border` | Fundo e borda esquerda de uma linha de aviso (`// [!code warning]`) |
 | `--blume-code-word`, `--blume-code-word-border` | Fundo e contorno de uma palavra realçada (`// [!code word:…]`) |
 | `--blume-content-width` | Largura máxima da coluna de prosa — artigo, trilha de navegação, sumário, feedback e paginação (padrão: `42rem`) |
 | `--blume-radius` | Raio dos cantos |
@@ -249,7 +253,7 @@ Defina um token `--blume-font-*` com qualquer pilha de fontes para usar uma font
 
 ## Utilitários do Tailwind [#tailwind-utilities]
 
-O tema do Blume é construído internamente com o Tailwind v4, e os arquivos `.astro`, `.tsx` e `.jsx` do seu projeto também são analisados — assim você pode estilizar componentes e páginas personalizados com classes utilitárias, sem precisar configurar o Tailwind. Cada token é exposto como um utilitário, então seus componentes acompanham o tema automaticamente:
+O tema do Blume é construído internamente com o Tailwind v4, e os arquivos `.astro`, `.jsx`, `.mdx`, `.ts` e `.tsx` do seu projeto também são analisados — assim você pode estilizar componentes e páginas personalizados com classes utilitárias, sem precisar configurar o Tailwind. Cada token é exposto como um utilitário, então seus componentes acompanham o tema automaticamente:
 
 | Token                       | Utilitários                |
 | --------------------------- | -------------------------- |

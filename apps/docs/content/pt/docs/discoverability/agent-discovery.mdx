@@ -236,7 +236,7 @@ Todo build escreve uma [agent skill](https://agentskills.io) para a sua document
 - o título e a descrição do site, e quando um agente deve usar a skill
 - como ler qualquer página como Markdown, além do `llms.txt`, do `llms-full.txt`, do [servidor MCP](/docs/discoverability/mcp), da API JSON e do changelog, quando o site os serve
 - suas referências de API
-- um mapa da documentação na ordem da barra lateral, com um link para o Markdown de cada página junto da sua descrição de uma linha
+- um mapa da documentação na ordem da barra lateral, com um link para o Markdown de cada página junto da sua descrição de uma linha (a meta description da página, como no `llms.txt`)
 
 A skill leva o nome do `title` do seu site (`Acme Docs` vira `acme-docs`). Ela cobre a versão atual no idioma padrão, deixa de fora as páginas de operações de API e as entradas do changelog (cada um desses tem uma linha própria acima do mapa), pula as mesmas páginas que o `llms.txt` pula (rascunhos, páginas ocultas e `noindex`, e páginas com [`ai.exclude`](/docs/discoverability/llms-txt#excluding-a-page)) e lista até 200 páginas, apontando para o `llms.txt` para o restante. Os links são absolutos, então a skill precisa de [`deployment.site`](/docs/deployment); um build sem ele a pula.
 

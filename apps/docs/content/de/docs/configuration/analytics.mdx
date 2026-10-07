@@ -394,6 +394,8 @@ analytics: [
 
 `attributes` ist eine Zuordnung zusätzlicher HTML-Attribute (`data-*`, `id`, …), die auf das Tag verteilt werden, und `strategy` fügt externen Skripten `async` oder `defer` hinzu.
 
+Ein wurzelrelativer `src`-Wert verweist auf eine Datei in `public/` (`src: "/js/redirects.js"` für `public/js/redirects.js`). Unter einer [`deployment.base`](/docs/deployment#subpath-deploys) wird ihm deshalb wie einem Link die Base vorangestellt: Mit `base: "/docs"` lädt das Tag `/docs/js/redirects.js`. Ein `src`-Wert, der bereits mit der Base beginnt, bleibt so, wie er geschrieben ist, und eine absolute oder protokollrelative URL wird unverändert durchgereicht. Für ein Skript, das außerhalb der Base der Website ausgeliefert wird, gibst du also seine vollständige URL an.
+
 ## Optionen [#options]
 
 | Adapter | Option | Standard | Beschreibung |

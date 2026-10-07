@@ -236,7 +236,7 @@ agents: {
 - サイトのタイトルと説明、そしてエージェントがそのスキルを使うべきタイミング
 - 任意のページを Markdown として読む方法に加え、サイトが配信している場合は `llms.txt`、`llms-full.txt`、[MCP サーバー](/docs/discoverability/mcp)、JSON API、変更履歴
 - API リファレンス
-- サイドバー順のドキュメントマップ。各ページの Markdown へのリンクと 1 行の説明付きです
+- サイドバー順のドキュメントマップ。各ページの Markdown へのリンクと 1 行の説明（`llms.txt` と同様に、ページのメタディスクリプション）付きです
 
 スキルの名前はサイトの `title` から付けられます（`Acme Docs` は `acme-docs` になります）。対象はデフォルト言語の現行バージョンで、API オペレーションページと変更履歴エントリは除外され（それぞれマップの上に専用の 1 行があります）、`llms.txt` が除外するページ（下書き、非表示ページと `noindex` ページ、そして [`ai.exclude`](/docs/discoverability/llms-txt#excluding-a-page) が指定されたページ）もスキップし、最大 200 ページまでを列挙し、残りについては `llms.txt` を案内します。リンクは絶対 URL のため、スキルには [`deployment.site`](/docs/deployment) が必要です。設定されていないビルドではスキップされます。
 

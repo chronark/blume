@@ -50,7 +50,7 @@ seo:
 ```
 
 :::note
-Jede Palettenfarbe akzeptiert beliebige CSS-Farben — Hex, `oklch(…)`, `rgb(…)` und so weiter. Der Accent akzeptiert außerdem ein benanntes Preset (`blue`, `teal`, …), passend zu [`theme.accent`](/docs/configuration/theming#accent). Eine Farbe, die der Renderer nicht parsen kann, lässt den Build fehlschlagen, statt stillschweigend eine Card in der Standardfarbe auszuliefern.
+Jede Palettenfarbe akzeptiert beliebige CSS-Farben — Hex, `oklch(…)`, `rgb(…)` und so weiter. Der Accent akzeptiert außerdem ein benanntes Preset (`blue`, `teal`, …), passend zu [`theme.accent`](/docs/configuration/theming#accent). Eine Farbe, die der Renderer nicht parsen kann, lässt den Build fehlschlagen, statt stillschweigend eine Card in der Standardfarbe auszuliefern, und eine, die überhaupt keine CSS-Farbe ist, löst zusätzlich noch vor dem Rendern der Card die Warnung `BLUME_THEME_COLOR_INVALID` mit der Zeile aus, in der sie gesetzt wird.
 :::
 
 Emojis in einem Seitentitel oder Site-Titel werden als [Twemoji](https://github.com/jdecked/twemoji)-Glyphen gerendert und während des Card-Renderings von einem CDN geladen — ein Build, dessen Titel Emojis enthalten, braucht also Netzwerkzugriff. Jede Glyphe wird pro Build nur einmal geladen, egal wie viele Seiten sie verwenden.

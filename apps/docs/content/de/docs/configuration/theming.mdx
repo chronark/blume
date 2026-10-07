@@ -37,6 +37,8 @@ Benannte Voreinstellungen: `blue` (Standard), `green`, `orange`, `pink`, `purple
 
 Ein String gilt für beide Farbmodi; übergib ein Objekt für [eine unterschiedliche Akzentfarbe je Modus](#dark-mode-colors).
 
+Ein Wert, der weder eine Voreinstellung noch eine CSS-Farbe ist, etwa `"deep purple"` oder ein Hex-Wert ohne sein `#`, erzeugt an der Zeile in `blume.config.ts`, die ihn setzt, die Warnung `BLUME_THEME_COLOR_INVALID`, da Browser die Styles ignorieren, die ihn verwenden. Dieselbe Prüfung gilt für `action`, `background` und `seo.og.palette` der [Open-Graph-Karte](/docs/discoverability/open-graph). Custom Properties (`var(--brand)`), `color-mix()` und die übrigen Farbfunktionen werden unverändert akzeptiert.
+
 Text auf einer Akzent- oder Aktionsfläche, etwa eine Button-Beschriftung oder eine Schrittnummer, ist weiß, solange Weiß auf dieser Farbe AA erfüllt, und andernfalls dunkel. Eine helle Akzentfarbe bekommt so ohne zusätzliche Konfiguration dunkle Beschriftungen. [`blume audit`](/docs/cli/audit#theme-contrast-low) prüft eine eigene Akzent-, Aktions- oder Hintergrundfarbe anhand desselben Maßstabs.
 
 ### Eckenradius [#radius]
@@ -232,6 +234,8 @@ Setze ein Token unter `:root` für den hellen Modus und unter `:root[data-theme=
 | `--blume-code-highlight`, `--blume-code-highlight-border` | Hintergrund und linke Randlinie einer hervorgehobenen Codezeile (`// [!code highlight]` oder ein `{1,4-5}`-Bereich) |
 | `--blume-code-add`, `--blume-code-add-border` | Hintergrund und linke Randlinie einer hinzugefügten Zeile (`// [!code ++]`) |
 | `--blume-code-remove`, `--blume-code-remove-border` | Hintergrund und linke Randlinie einer entfernten Zeile (`// [!code --]`) |
+| `--blume-code-error`, `--blume-code-error-border` | Hintergrund und linke Randlinie einer Fehlerzeile (`// [!code error]`) |
+| `--blume-code-warning`, `--blume-code-warning-border` | Hintergrund und linke Randlinie einer Warnzeile (`// [!code warning]`) |
 | `--blume-code-word`, `--blume-code-word-border` | Hintergrund und Umriss eines hervorgehobenen Worts (`// [!code word:…]`) |
 | `--blume-content-width` | Maximale Breite der Textspalte — Artikel, Breadcrumb, Inhaltsverzeichnis, Feedback und Paginierung (Standard: `42rem`) |
 | `--blume-radius` | Eckenradius |
@@ -249,7 +253,7 @@ Setze ein `--blume-font-*`-Token auf einen beliebigen Font-Stack, um eine Schrif
 
 ## Tailwind-Utilities
 
-Blumes Theme ist intern mit Tailwind v4 gebaut, und die `.astro`-, `.tsx`- und `.jsx`-Dateien deines Projekts werden ebenfalls gescannt — du kannst eigene Komponenten und Seiten also mit Utility-Klassen gestalten, ganz ohne Tailwind-Setup. Jedes Token ist als Utility verfügbar, sodass deine Komponenten dem Theme automatisch folgen:
+Blumes Theme ist intern mit Tailwind v4 gebaut, und die `.astro`-, `.jsx`-, `.mdx`-, `.ts`- und `.tsx`-Dateien deines Projekts werden ebenfalls gescannt — du kannst eigene Komponenten und Seiten also mit Utility-Klassen gestalten, ganz ohne Tailwind-Setup. Jedes Token ist als Utility verfügbar, sodass deine Komponenten dem Theme automatisch folgen:
 
 | Token                       | Utilities                  |
 | --------------------------- | -------------------------- |

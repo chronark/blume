@@ -239,7 +239,7 @@ content: {
 | --- | --- | --- |
 | `root` | `"docs"` | Pasta que o Blume analisa em busca de conteúdo. Forma abreviada para uma única fonte `filesystem()`; não é permitida junto com `sources`. |
 | `include` | `["**/*.{md,mdx}"]` | Globs que correspondem a arquivos de conteúdo. Forma abreviada, como `root`. |
-| `exclude` | `["**/_*", "**/.*"]` | Globs a ignorar (arquivos com underscore e com ponto). Forma abreviada, como `root`. |
+| `exclude` | `["**/_*", "**/.*"]` | Globs a ignorar. Os seus se somam aos padrões, que pulam arquivos com underscore e com ponto; uma entrada com `!` remove um padrão, então `"!**/_*"` publica os arquivos com prefixo `_`. Forma abreviada, como `root`. |
 | `sources` | uma `filesystem()` | Adaptadores de fontes de conteúdo de `blume/sources`, que substituem a forma abreviada. Consulte [Fontes de conteúdo](/docs/content/sources). |
 | `pages` | `"pages"` | Pasta para páginas `.astro` personalizadas. |
 | `defaultType` | `"doc"` | `type` de página usado quando o frontmatter o omite. |
@@ -366,7 +366,7 @@ lastModified: "git",
 | `"git"` | Lê a data do histórico do git (datas dos commits). |
 | `"frontmatter"` | Nunca executa o git — usa apenas o campo `lastModified` do frontmatter. |
 
-A fonte git lê o commit mais recente que tocou em cada arquivo, então funciona em qualquer repositório git — incluindo monorepos — e precisa do histórico do repositório no momento da build. As plataformas de CI costumam fazer checkout de um clone raso, o que descarta silenciosamente a maioria das datas (a build avisa com `BLUME_SHALLOW_GIT_HISTORY` quando isso acontece): na Vercel, defina a variável de ambiente `VERCEL_DEEP_CLONE=true`; com o `actions/checkout`, defina `fetch-depth: 0`. O `lastModified` do frontmatter da própria página sempre prevalece, o que é útil para fixar uma data ou para arquivos que ainda não foram commitados:
+A fonte git lê o commit mais recente que tocou em cada arquivo, então funciona em qualquer repositório git — incluindo monorepos — e precisa do histórico do repositório no momento da build. Ela acompanha renomeações, como o `git log --follow` faz: renomear `page.md` para `page.mdx`, ou mover um arquivo para outra pasta dentro da mesma raiz de conteúdo, mantém a data da página, desde que o commit não altere o conteúdo do arquivo. Uma renomeação que também edita o arquivo faz a página assumir a data desse commit, e o mesmo acontece ao mover para a raiz de conteúdo um arquivo que estava fora dela. As plataformas de CI costumam fazer checkout de um clone raso, o que descarta silenciosamente a maioria das datas (a build avisa com `BLUME_SHALLOW_GIT_HISTORY` quando isso acontece): na Vercel, defina a variável de ambiente `VERCEL_DEEP_CLONE=true`; com o `actions/checkout`, defina `fetch-depth: 0`. O `lastModified` do frontmatter da própria página sempre prevalece, o que é útil para fixar uma data ou para arquivos que ainda não foram commitados:
 
 ```mdx page.mdx
 ---

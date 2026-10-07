@@ -29,7 +29,7 @@ Os achados são agrupados por verificação em vez de listados por página, ent�
 - `--url <origin>`: também sonda um deploy ao vivo para verificar códigos de status, headers de resposta e redirecionamentos configurados.
 - `--external`: sonda os links externos pela rede.
 - `--ignore <glob>`: junto com `--external`, não sonda um link externo cuja URL corresponda ao glob, como `--ignore "https://api.acme.example/**"`. Repita a flag para adicionar mais padrões. A correspondência funciona do mesmo jeito que em [`blume validate --ignore`](/docs/cli/validate#flags), e os links internos são sempre verificados.
-- `--only <check|category>` / `--skip <check|category>`: restringe o relatório a essas verificações ou categorias, ou as exclui dele (separadas por vírgula). Um termo que não corresponde a nenhuma verificação ou categoria gera um erro que sugere a mais próxima, então um erro de digitação não esvazia o relatório sem você perceber.
+- `--only <check|category>` / `--skip <check|category>`: restringe o relatório a essas verificações ou categorias, ou as exclui dele (separadas por vírgula). A contagem da auditoria no resumo considera só as verificações que continuam incluídas. Um termo que não corresponde a nenhuma verificação ou categoria gera um erro que sugere a mais próxima, então um erro de digitação não esvazia o relatório sem você perceber.
 - `--list-checks`: imprime todas as verificações que a auditoria pode reportar e sai.
 - `--verbose`: lista cada página afetada com o detalhe completo de cada achado, em vez de só as primeiras.
 - `--json`: emite o relatório como JSON no stdout.

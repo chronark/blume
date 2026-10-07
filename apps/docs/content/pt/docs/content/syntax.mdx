@@ -8,7 +8,7 @@ O Blume renderiza Markdown e MDX padrão com um conjunto de recursos curado, no 
 
 ## Títulos [#headings]
 
-Estruture uma página com títulos. O Blume renderiza o `title` do frontmatter como o título da página, então comece seu conteúdo em `##` — `##` e `###` viram entradas no índice. Todo título de `##` a `######` também é envolvido em um link para sua própria âncora, para que os leitores possam clicar em um título para copiar, salvar nos favoritos ou compartilhar um link permanente direto para aquela seção (passe o cursor para revelar o `#`). Desative isso com `markdown: { headingAnchors: false }` no `blume.config.ts`.
+Estruture uma página com títulos. O Blume renderiza o `title` do frontmatter como o título da página, então comece seu conteúdo em `##` — `##` e `###` viram entradas no índice. Uma página sem `title` usa seu primeiro título `#` como título, e quando a página começa com esse título, ele aparece uma única vez, como o título da página, que mantém a âncora do título para que os links para ele continuem funcionando. O `llms-full.txt` também o lista uma única vez. Todo título de `##` a `######` também é envolvido em um link para sua própria âncora, para que os leitores possam clicar em um título para copiar, salvar nos favoritos ou compartilhar um link permanente direto para aquela seção (passe o cursor para revelar o `#`). Desative isso com `markdown: { headingAnchors: false }` no `blume.config.ts`.
 
 ```md
 ## Section
@@ -20,7 +20,7 @@ Estruture uma página com títulos. O Blume renderiza o `title` do frontmatter c
 
 ### Âncoras personalizadas [#custom-anchors]
 
-Os ids das âncoras são gerados a partir do texto do título, então um título reescrito ganha uma âncora nova. Acrescente `[#custom-id]` para fixar a âncora — o marcador nunca é renderizado, e os links continuam funcionando independentemente de como o título estiver escrito. Âncoras fixadas também permanecem idênticas entre [locales traduzidos](/docs/content/i18n), onde ids gerados automaticamente seriam diferentes em cada idioma.
+Os ids das âncoras são gerados a partir do texto do título, então um título reescrito ganha uma âncora nova. Um `<Badge>` em um título é um rótulo, não parte desse texto: `## Install <Badge>beta</Badge>` gera a âncora `#install` e aparece como "Install" no índice. Um id nunca termina em hífen, então `## Features ✨` gera a âncora `#features`, e um componente ou imagem em qualquer extremidade de um título não acrescenta hífen. Em vez disso, acrescente `[#custom-id]` para fixar a âncora — o marcador nunca é renderizado, e os links continuam funcionando independentemente de como o título estiver escrito. Âncoras fixadas também permanecem idênticas entre [locales traduzidos](/docs/content/i18n), onde ids gerados automaticamente seriam diferentes em cada idioma.
 
 ```md
 ## Getting started [#setup]
@@ -28,13 +28,19 @@ Os ids das âncoras são gerados a partir do texto do título, então um título
 
 Crie um link para ela como `/page#setup`. A sintaxe é igual à do Fumadocs, então conteúdo migrado funciona sem alterações.
 
-A forma `{#custom-id}`, usada pelo Pandoc, pelo kramdown e por toolchains de especificação baseadas em Markdown, é aceita como equivalente em arquivos `.md`. Somente essa grafia sem espaços fixa uma âncora: a forma com espaços `{ #custom-id }` e o `{: #custom-id }` do kramdown (ambos vindos do `attr_list` do MkDocs) permanecem no texto do título. No `.mdx`, um `{…}` solto é uma expressão JSX e a página não compila — o `blume check` reporta as três grafias como `BLUME_MDX_CURLY_ANCHOR` — então escreva `[#custom-id]` ali, ou escape as chaves. A forma escapada fixa a mesma âncora nos dois formatos, o que a torna a grafia certa para um partial que páginas `.mdx` [incluem](/docs/content/includes):
+A forma `{#custom-id}`, usada pelo Pandoc, pelo kramdown e por toolchains de especificação baseadas em Markdown, é aceita como equivalente em arquivos `.md`. Somente essa grafia sem espaços fixa uma âncora: a forma com espaços `{ #custom-id }` e o `{: #custom-id }` do kramdown (ambos vindos do `attr_list` do MkDocs), além de uma lista de atributos que define o id junto de classes ou atributos (`{ #custom-id .wide }`), permanecem no texto do título e na sua âncora, e o `blume check` alerta sobre eles no `.md` como `BLUME_MD_CURLY_ANCHOR`. No `.mdx`, um `{…}` solto é uma expressão JSX e a página não compila — o `blume check` reporta as três grafias como `BLUME_MDX_CURLY_ANCHOR` — então escreva `[#custom-id]` ali, ou escape as chaves. A forma escapada fixa a mesma âncora nos dois formatos, o que a torna a grafia certa para um partial que páginas `.mdx` [incluem](/docs/content/includes):
 
 ```md
 ## Getting started \{#setup\}
 ```
 
-Links de fragmento também podem apontar para um elemento HTML puro com um `id` (`<a id="setup"></a>`); o `blume validate` aceita esses casos junto com as âncoras de título.
+Links de fragmento também podem apontar para um elemento HTML puro com um `id` (`<a id="setup"></a>`), ou para um `<a name="setup">`; o `blume validate` aceita esses casos junto com as âncoras de título.
+
+Um `<a>` vazio dentro de um título é a própria âncora do título, do jeito que as exportações do GitBook (`<a href="#setup" id="setup"></a>`) e as wikis (`<a name="setup"></a>`) a escrevem. O Blume o remove do título e dá ao título o `id` dele, ou então o `name`, para que links `#setup` continuem chegando ali e o título mantenha seu próprio link para si mesmo. Um marcador `[#custom-id]` no mesmo título tem prioridade.
+
+```md
+## Getting started <a id="setup"></a>
+```
 
 ### Marcadores do índice [#table-of-contents-markers]
 
@@ -151,6 +157,10 @@ Crie links para outras páginas ou sites externos. As imagens aceitam um caminho
 
 Um link relativo para uma página (`./install`, `../guides/setup`) é resolvido a partir da pasta da própria página — em uma página de índice, a pasta que ela apresenta — e um link para um arquivo Markdown (`./setup.md`, `../intro.mdx`) leva à página que esse arquivo publica, incluindo o `slug` dela. Um nome de página com ponto (`./node.js` para uma página `node.js.mdx`) conta como link de página quando alguma página é publicada ali, e um `href` em string de um componente (`<Card href="./install">`) é resolvido da mesma forma. O Blume escreve cada um deles como a rota relativa à raiz na página compilada, então links escritos para o GitHub ou o Docusaurus continuam funcionando, e o [`blume validate`](/docs/cli/validate) os verifica da mesma forma.
 
+Um link relativo à raiz para um arquivo Markdown (`/guides/setup.md`, do jeito que o VitePress e o Docsify o escrevem) também leva à página desse arquivo, lido a partir da raiz do seu conteúdo; com um [`base` de publicação](/docs/deployment#subpath-deploys), um link que começa com o base é interpretado como já o incluindo. Um link que não nomeia nenhum arquivo do seu conteúdo mantém seu caminho, já que `/guides/setup.md` também é a URL da [cópia em Markdown](/docs/discoverability/markdown#raw-markdown) daquela página. Para criar um link para a cópia em Markdown de uma página, seja qual for o nome do arquivo dela, escreva um `<a href="/guides/setup.md">` puro, que mantém seu caminho, ou a URL completa da cópia.
+
+Um link para um arquivo Markdown que não existe tenta primeiro o mesmo arquivo com a outra extensão. Então, depois que você renomeia `setup.md` para `setup.mdx`, um link para `./setup.md` continua levando à página desse arquivo, incluindo o `slug` e o prefixo de ordenação dela, e o `blume validate` o aceita. Um link que não nomeia nenhum dos dois arquivos volta a ser um link relativo comum, sem a extensão. De qualquer forma, o link deixa de nomear um arquivo real, então ele quebra em qualquer lugar onde o Markdown é lido como arquivos, como no GitHub. Atualize a extensão nos seus links quando renomear um arquivo.
+
 Leia o [guia rápido](/docs/quickstart) para começar.
 
 ```md
@@ -166,6 +176,10 @@ Links externos abrem na mesma aba por padrão. Defina `markdown: { externalLinks
 ```md
 ![Build output](./images/build-output.png)
 ```
+
+Um SVG cujo tamanho o Astro não consegue ler é servido como está, em vez de quebrar o build. O Astro lê o tamanho de um SVG a partir da tag `<svg>` dele, que precisa ter largura e altura ou um viewBox e precisa terminar dentro dos primeiros 1.000 bytes do arquivo; uma exportação do draw.io coloca o diagrama inteiro em um atributo `content` nessa tag, o que a empurra para além desse limite. O Blume alerta sobre cada um deles como `BLUME_SVG_UNOPTIMIZED` na linha que o incorpora. A imagem continua aparecendo, sem o tamanho intrínseco que uma imagem otimizada carrega; exporte o diagrama sem a cópia do código-fonte dele, ou remova o atributo `content`, para que ele seja otimizado.
+
+Um link para um arquivo ao lado do seu conteúdo que não é uma página (`[the spec](./spec.pdf)`, `[data](../files/data.csv)` ou uma definição de referência como `[spec]: ./spec.pdf`) publica esse arquivo junto com a página, e o link compilado aponta para a cópia publicada, mantendo um sufixo como `#page=2`. O mesmo vale para um elemento HTML que nomeie um arquivo: o `src` de um `<img>`, `<video>`, `<source>` ou `<audio>`, e o `href` de um `<a>` ou de um componente como `<Card>`, seja como HTML puro no `.md` ou como elemento no `.mdx`. Essas cópias são servidas como estão, sem a otimização que uma imagem incorporada recebe. Um link relativo que não nomeia nenhum arquivo ao lado da página mantém seu caminho, então um link para um arquivo dentro de `public/` continua funcionando.
 
 Caminhos absolutos dentro de `public/` (`![Alt text](/screenshot.png)`) são servidos literalmente, sem otimização — use-os para arquivos que precisam manter exatamente seus bytes e URL, como um logotipo referenciado de fora da sua documentação. Imagens remotas também são repassadas intocadas, a menos que seu host esteja autorizado na [configuração de `image`](/docs/configuration#images).
 
@@ -202,6 +216,20 @@ export default defineConfig({
 });
 ```
 ````
+
+O título é formado por todas as palavras depois da linguagem, então ` ```js Install the client ` dá ao bloco o título "Install the client". Palavras-chave como `lineNumbers` e `wrap`, intervalos de linha como `{1,4-5}` e opções `key="value"` não fazem parte dele, e `title="..."` define o título explicitamente. Um título entre colchetes, como ` ```ts [blume.config.ts] `, aparece sem eles, e um intervalo de linhas escrito colado aos colchetes, como em ` ```ts [blume.config.ts]{2} `, continua realçando suas linhas.
+
+A linguagem é qualquer id ou alias de [linguagem do Shiki](https://shiki.style/languages), em maiúsculas ou minúsculas: ` ```JSON ` é realçado como ` ```json `. Um bloco em uma linguagem que o Shiki não conhece é renderizado como texto simples, e o Blume alerta sobre a cerca dele como `BLUME_UNKNOWN_CODE_LANGUAGE`; escreva `text` para um bloco que é texto simples de propósito.
+
+Opções que outras ferramentas de documentação leem não fazem nada aqui, e o Blume alerta sobre cada uma delas como `BLUME_CODE_FENCE_OPTION`, indicando a grafia a usar no lugar: `hl_lines="2 3"` do MkDocs (aqui, um intervalo `{2,3}`) e `linenums="1"` (`lineNumbers`), `showLineNumbers` (`lineNumbers`), `lines` do Mintlify (`lineNumbers`), `wordWrap` do Fern (`wrap`) e `filename="app.js"` (`title="app.js"`). Em um bloco Rust, `ignore`, `no_run`, `should_panic`, `compile_fail`, `edition2015` até `edition2024`, `noplayground` e `editable` do rustdoc e do mdBook também geram alertas: o Blume nunca compila, testa ou executa um bloco de código, então remova-os. Nenhuma delas passa a fazer parte do título.
+
+Um bloco `console` (ou `shellsession`) é uma sessão de terminal: comandos depois de um prompt como `$`, com a saída deles. O botão de copiar dele copia apenas os comandos, sem os prompts, para que o conteúdo copiado possa ser colado direto em um terminal. Um comando que termina em `\` mantém suas linhas de continuação.
+
+```console
+$ npm install blume
+added 1 package in 2s
+$ npx blume dev
+```
 
 O código inline também pode receber realce: adicione um marcador `{:lang}` dentro de um trecho entre crases e ele é colorido como um pequeno bloco de código — `useState(){:js}` ou `T extends object{:ts}`. Isso só entra em ação quando você adiciona o marcador, então o código inline comum permanece intocado — nada para ativar.
 
@@ -310,7 +338,7 @@ Os dois funcionam junto de um título e de `lineNumbers`. Para quebrar as linhas
 
 ### Realce [#highlighting]
 
-Anote o código com comentários no estilo GitHub para chamar atenção para linhas, palavras e alterações. Os comentários são removidos da saída renderizada, então o código continua limpo para copiar e colar. Todos os quatro estão ativos por padrão — sem configuração.
+Anote o código com comentários no estilo GitHub para chamar atenção para linhas, palavras e alterações. Os comentários são removidos da saída renderizada, então o código continua limpo para copiar e colar. Todos eles estão ativos por padrão — sem configuração.
 
 Marque uma linha com `// [!code highlight]` para dar a ela um fundo realçado:
 
@@ -337,6 +365,13 @@ import { createServer } from "node:http"; // [!code word:createServer]
 createServer().listen(3000);
 ```
 
+Sinalize uma linha como um problema com `// [!code error]` ou `// [!code warning]`, que ganham um tom vermelho e âmbar, respectivamente:
+
+```ts
+const port = process.env.PORT; // [!code warning]
+server.listen(port.trim()); // [!code error]
+```
+
 Escureça tudo, exceto as linhas que você marcar com `// [!code focus]` (o restante fica nítido ao passar o cursor):
 
 ```ts
@@ -346,7 +381,7 @@ export default defineConfig({
 });
 ```
 
-Ou realce linhas por **número** em vez de comentários — útil quando você não pode editar o código. Coloque um intervalo entre chaves depois da linguagem; linhas isoladas, listas separadas por vírgula e intervalos `start-end` funcionam:
+Ou realce linhas por **número** em vez de comentários — útil quando você não pode editar o código. Coloque um intervalo entre chaves depois da linguagem, com ou sem espaço entre eles (` ```ts{1,4-5} ` também funciona); linhas isoladas, listas separadas por vírgula e intervalos `start-end` funcionam:
 
 ```ts {1,4-5}
 import { defineConfig } from "blume";
@@ -581,7 +616,7 @@ timeline
 
 ## Avisos [#callouts]
 
-Os avisos chamam a atenção do leitor para contexto, conselhos ou riscos. Escreva-os como diretivas `:::type`; adicione um título entre colchetes, como `:::warning[Heads up]`. As diretivas são um recurso exclusivo do MDX — em um arquivo `.md` uma linha `:::note` permanece como texto literal.
+Os avisos chamam a atenção do leitor para contexto, conselhos ou riscos. Escreva-os como diretivas `:::type`; adicione um título entre colchetes, como `:::warning[Heads up]`. O título mantém sua formatação inline, então código, ênfase e links dentro dos colchetes são renderizados no título. As diretivas são um recurso exclusivo do MDX — em um arquivo `.md` uma linha `:::note` permanece como texto literal, e o `blume dev`, o `blume build` e o `blume check` alertam sobre isso como `BLUME_MD_DIRECTIVE`. Renomeie a página para `.mdx` para que a diretiva seja renderizada como um aviso.
 
 ### Nota [#note]
 
@@ -683,7 +718,27 @@ Commit `blume.config.ts`, not `.blume/`.
 ::::
 ```
 
-Escreva o nome logo depois dos dois-pontos. `::: tip`, com um espaço (a grafia que o VitePress, o VuePress e o Docusaurus v2 usam), não é uma diretiva, então a página mostra a linha como texto, e o Blume alerta sobre um nome de aviso escrito dessa forma como `BLUME_DIRECTIVE_SPACED_NAME`. Dentro de um contêiner, uma cerca de fechamento com texto depois dos dois-pontos ainda o fecha, e o texto é descartado: uma linha `::: card` dentro de um `:::warning` encerra o aviso ali, e `card` nunca aparece. O Blume alerta sobre essa linha como `BLUME_DIRECTIVE_CLOSING_TEXT`. Para mantê-la dentro do aviso como texto, dê ao aviso uma cerca mais longa, como acima, ou remova o texto depois dos dois-pontos.
+Escreva o nome logo depois dos dois-pontos. `::: tip`, com um espaço (a grafia que o VitePress, o VuePress e o Docusaurus v2 usam), não é uma diretiva, então a página mostra a linha como texto, e o Blume alerta sobre um nome de aviso escrito dessa forma como `BLUME_DIRECTIVE_SPACED_NAME`. O título vai entre colchetes: um texto depois do nome, como em `:::tip Some title`, abre o aviso, mas nunca aparece, e o Blume alerta sobre isso como `BLUME_DIRECTIVE_OPENING_TEXT`, indicando a grafia com colchetes, `:::tip[Some title]`. Dentro de um contêiner, uma cerca de fechamento com texto depois dos dois-pontos ainda o fecha, e o texto é descartado: uma linha `::: card` dentro de um `:::warning` encerra o aviso ali, e `card` nunca aparece. O Blume alerta sobre essa linha como `BLUME_DIRECTIVE_CLOSING_TEXT`. Para mantê-la dentro do aviso como texto, dê ao aviso uma cerca mais longa, como acima, ou remova o texto depois dos dois-pontos.
+
+### Alertas do GitHub [#github-alerts]
+
+A sintaxe de alertas do GitHub também é renderizada como um aviso: uma citação cuja primeira linha seja `[!NOTE]`, `[!TIP]`, `[!IMPORTANT]`, `[!WARNING]` ou `[!CAUTION]`, em maiúsculas ou minúsculas. O texto depois do marcador nessa linha vira o título.
+
+{/* prettier-ignore */}
+> [!TIP]
+> Defina `deployment.site` para que os sitemaps e as imagens do Open Graph usem URLs absolutas.
+
+{/* prettier-ignore */}
+```md
+> [!TIP]
+> Set `deployment.site` so sitemaps and Open Graph images use absolute URLs.
+```
+
+`[!NOTE]` e `[!TIP]` são renderizados como os avisos de mesmo nome, `[!IMPORTANT]` como Nota, `[!WARNING]` como Aviso e `[!CAUTION]` como Perigo, combinando com o vermelho do GitHub. Assim como no GitHub, um alerta citado dentro de outro continua sendo uma citação, e o mesmo vale para qualquer outro marcador, como `[!INFO]`.
+
+Um formatador que junta linhas, como o oxfmt com `proseWrap: "never"`, puxa a primeira linha do corpo para o lado do marcador, onde ela vira o título (ele [colapsa diretivas](/docs/faq#why-is-oxfmt--ultracite-collapsing-my-directives) da mesma forma). Deixe uma linha `>` em branco depois do marcador para mantê-los separados; o GitHub também renderiza essa forma.
+
+Os alertas são exclusivos do MDX, como as diretivas. Em um arquivo `.md` a citação continua sendo uma citação e mostra seu marcador como texto, e o `blume dev`, o `blume build` e o `blume check` alertam sobre isso como `BLUME_MD_GITHUB_ALERT`. Renomeie a página para `.mdx` para que o alerta seja renderizado como um aviso.
 
 ## Matemática [#math]
 
@@ -718,3 +773,14 @@ O Blume converte aspas retas e traços em equivalentes tipográficos enquanto vo
 ```md
 "Quotes" become curly, -- becomes an en dash, --- an em dash, and ... an ellipsis.
 ```
+
+## Sintaxe de outras ferramentas [#syntax-from-other-tools]
+
+O Blume lê a sintaxe desta página e nada além dela. Sintaxe que outra ferramenta de documentação lê aparece na página como foi escrita, ou quebra uma página `.mdx` quando ela é renderizada, então o `blume dev`, o `blume build` e o `blume check` alertam sobre ela na linha em que aparece. Blocos de código, código inline e comentários são ignorados, então coloque um exemplo em código inline para exibi-lo como texto.
+
+- `BLUME_TEMPLATE_TAG`: uma tag do Liquid ou do Markdoc (`{% include note.html %}`, `{% /callout %}`) ou uma saída do Liquid (`{{ site.title }}`) em uma página `.md`. O Blume não executa nenhuma linguagem de template, então substitua a tag pelo que ela produzia, e um valor usado no site inteiro por uma [variável](/docs/content/variables). Um `{{name}}` que poderia ser uma variável não é reportado aqui.
+- `BLUME_WIKILINK_UNSUPPORTED`: um wiki link (`[[Home]]`, `[[Text|Page]]`) que nomeia uma das páginas do site pelo nome do arquivo ou pelo título, ou qualquer wiki link com um `|`. Somente uma fonte de [vault do Obsidian](/docs/content/sources/obsidian) lê wiki links. O alerta indica o link Markdown que o substitui.
+- `BLUME_MDC_SYNTAX`: um componente de bloco (`::callout` … `::`) ou componente inline (`:badge[New]{color="primary"}`) do Nuxt Content (MDC). Use o [componente](/docs/content/components) correspondente ou um aviso `:::` no lugar.
+- `BLUME_MDX_ATTRIBUTE_LIST`: uma lista de atributos (`{ width="300" }`, `{: .note }`) em uma página `.mdx`. O MDX lê as chaves como JavaScript, então o build da página falha. Defina os atributos em um elemento JSX (`<img src="…" width="300" />`) e fixe a âncora de um título com `[#id]`.
+- `BLUME_MD_ATTRIBUTE_LIST`: uma lista de atributos em uma página `.md`, como o `{: .note }` ou `{: #intro }` do kramdown em uma linha própria ou depois de um bloco, ou `{ width="300" }` depois de uma imagem. A página a exibe como foi escrita. Defina os atributos em um elemento HTML (`<img src="…" width="300">`) e fixe a âncora de um título com `[#id]`. O marcador `{#id}` de um título é coberto pelo [`BLUME_MD_CURLY_ANCHOR`](#custom-anchors).
+- `BLUME_MDX_UNCLOSED_ELEMENT`: um elemento HTML vazio (void) sem a barra de fechamento (`<img …>`, `<br>`) em uma página `.mdx`, ou em um partial que uma página `.mdx` [inclui](/docs/content/includes). O MDX o interpreta como um elemento JSX não fechado, então feche-o: `<br />`.

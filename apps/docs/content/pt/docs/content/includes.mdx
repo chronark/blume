@@ -24,7 +24,7 @@ Veja funcionando na prática — este próximo destaque vem de um trecho compart
 
 ## Parciais [#partials]
 
-Qualquer arquivo cujo nome (ou pasta) comece com underscore fica excluído do roteamento, da navegação, da busca e dos sitemaps por padrão — essa convenção é o lar natural dos trechos compartilhados:
+Qualquer arquivo cujo nome (ou pasta) comece com underscore fica excluído do roteamento, da navegação, da busca e dos sitemaps — essa convenção é o lar natural dos trechos compartilhados. Os padrões que você adicionar em [`content.exclude`](/docs/configuration#content) se somam a essa regra em vez de substituí-la; para publicar arquivos com underscore mesmo assim, adicione `"!**/_*"` ao `exclude`:
 
 ```text
 docs/
@@ -38,7 +38,9 @@ docs/
 
 Uma parcial é um arquivo Markdown ou MDX normal. O front matter dela é removido na inserção (o front matter da página que faz o include prevalece), e todo o resto — destaques, blocos de código, componentes, fórmulas matemáticas — é renderizado exatamente como seria inline. Parciais podem incluir outras parciais; um include circular é reportado como erro.
 
-Referências relativas a imagens dentro de uma parcial continuam funcionando: elas são rebaseadas para a página que faz o include, então um `![diagrama](./diagram.png)` colocado ao lado da parcial é resolvido onde quer que a parcial seja inserida.
+Definições de referência de links (`[pep 508]: https://peps.python.org/pep-0508/`) também atravessam includes, então uma parcial pode guardar as definições de links compartilhadas de um site: a página e as demais parciais dela podem citar as definições de uma parcial (`[PEP 508]`), e uma parcial pode citar as da página. Quando a página e uma parcial definem o mesmo rótulo, cada uma usa a sua.
+
+Referências relativas a imagens dentro de uma parcial continuam funcionando: elas são rebaseadas para a página que faz o include, então um `![diagram](./diagram.png)` ou `<Card img="./cover.png">` colocado ao lado da parcial é resolvido onde quer que a parcial seja inserida. O caminho de uma imagem é rebaseado em qualquer forma em que esteja escrito: entre colchetes angulares (`![diagram](<./my diagram.png>)`), com parênteses escapados ou seguido de um título com qualquer um dos tipos de aspas. Um link para outro arquivo ao lado da parcial (`[spec](./spec.pdf)`, ou um `<img src>` ou `<a href>` que aponte para um) também acompanha a parcial. Um link para uma página é resolvido a partir da página que faz o include, como se tivesse sido escrito ali.
 
 Editar uma parcial enquanto o `blume dev` está rodando recarrega todas as páginas que a incluem.
 
@@ -77,6 +79,8 @@ Instruções de include precisam ocupar a própria linha — elas são de nível
 Os alvos precisam estar dentro da raiz do seu conteúdo: um arquivo fora dela ficaria silenciosamente ausente dos snapshots de versão e de projetos ejetados, então o `blume` reporta `BLUME_INCLUDE_OUTSIDE_ROOT` em vez de inseri-lo. Um alvo que não existe gera `BLUME_INCLUDE_NOT_FOUND`, e um laço de includes gera `BLUME_INCLUDE_CYCLE` — os três fazem o `blume build` falhar (passe `--no-strict` para buildar mesmo assim) e aparecem no `blume validate`.
 
 Links quebrados dentro de uma parcial são reportados no arquivo da parcial, não nas páginas que a inserem, então você corrige onde eles realmente vivem.
+
+Uma parcial é lida no formato da página que faz o include, então uma parcial `.md` incluída por uma página `.mdx` é lida como MDX. O MDX não tem comentários HTML, então os comentários `<!-- … -->` da parcial são inseridos como comentários MDX (`{/* … */}`) e continuam ocultos. O restante do HTML ali precisa ser JSX válido: um `<img …>` ou `<br>` sem a barra de fechamento engole tudo o que vem depois dele na parcial, sem nenhum erro. O Blume avisa sobre isso com `BLUME_MDX_UNCLOSED_ELEMENT` na linha da parcial; feche a tag como `<br />`. Qualquer outra coisa na parcial que o MDX não consiga interpretar depois de inserida, como um `{` solto, gera um aviso [`BLUME_MDX_SYNTAX`](/docs/content#markdown-and-mdx) na linha da parcial, e quando isso faz o build falhar, o build também reporta o erro ali, e não na página que faz o include.
 
 :::note
 Parciais são compartilhadas entre os idiomas e não são traduzidas pelo `blume translate` — mantenha as parciais neutras em relação ao idioma (código, tabelas, diagramas), ou crie parciais por idioma e inclua elas a partir das páginas de cada idioma.

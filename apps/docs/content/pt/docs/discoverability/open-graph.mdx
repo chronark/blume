@@ -50,7 +50,7 @@ seo:
 ```
 
 :::note
-Toda cor da paleta aceita qualquer cor CSS — hex, `oklch(…)`, `rgb(…)` e assim por diante. O accent também aceita um preset nomeado (`blue`, `teal`, …), correspondendo a [`theme.accent`](/docs/configuration/theming#accent). Uma cor que o renderizador não consegue interpretar quebra o build em vez de entregar silenciosamente um card com a cor padrão.
+Toda cor da paleta aceita qualquer cor CSS — hex, `oklch(…)`, `rgb(…)` e assim por diante. O accent também aceita um preset nomeado (`blue`, `teal`, …), correspondendo a [`theme.accent`](/docs/configuration/theming#accent). Uma cor que o renderizador não consegue interpretar quebra o build em vez de entregar silenciosamente um card com a cor padrão, e uma que nem sequer é uma cor CSS também emite o aviso `BLUME_THEME_COLOR_INVALID` com a linha que a define, antes de o card ser renderizado.
 :::
 
 Emojis no título de uma página ou no título do site são renderizados como glifos do [Twemoji](https://github.com/jdecked/twemoji), buscados em uma CDN enquanto o card é renderizado — então um build cujos títulos contenham emojis precisa de acesso à rede. Cada glifo é buscado uma vez por build, não importa quantas páginas o usem.

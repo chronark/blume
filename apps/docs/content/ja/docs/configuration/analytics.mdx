@@ -394,6 +394,8 @@ analytics: [
 
 `attributes` はタグに展開される追加の HTML 属性（`data-*`、`id` など）のマップで、`strategy` は外部スクリプトに `async` または `defer` を追加します。
 
+ルート相対の `src` は `public/` 内のファイルを指します（`public/js/redirects.js` なら `src: "/js/redirects.js"`）。そのため、[`deployment.base`](/docs/deployment#subpath-deploys) を設定している場合は、リンクと同様にベースが付加されます。たとえば `base: "/docs"` の場合、タグは `/docs/js/redirects.js` を読み込みます。すでにベースで始まっている `src` は記述どおりのまま残り、絶対 URL やプロトコル相対 URL はそのまま渡されます。そのため、サイトのベースの外から配信されるスクリプトは完全な URL で指定してください。
+
 ## オプション [#options]
 
 | アダプター | オプション | デフォルト | 説明 |

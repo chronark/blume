@@ -74,7 +74,33 @@ changelog: {
 
 Cada um também aceita um mapa de código de idioma para texto, como um [rótulo de aba do cabeçalho](/docs/content/i18n#per-locale-navigation). O índice é renderizado no idioma padrão, então mostra a entrada desse idioma. Se você deixar algum deles sem definir, ele mantém o texto integrado, que pode ser substituído por uma [sobrescrita de strings da interface](/docs/content/i18n#translated-ui) (`changelog.title` e `changelog.description` em `i18n.ui`).
 
-A página só aparece quando nada já ocupa a rota `/changelog`. Para substituí-la pelo seu próprio design, adicione uma [página personalizada](/docs/advanced/custom-pages) em `pages/changelog.astro` — ela assume o controle e o Blume para de gerar o índice padrão. O componente `<Update>`, com o qual a cronologia anterior era construída, continua disponível para uma página escrita à mão que queira as notas de lançamento embutidas. Ele não faz parte dos componentes MDX, então importe-o na própria página `.astro`: `import Update from "blume/components/content/Update.astro";`.
+A página só aparece quando nada já ocupa a rota `/changelog`.
+
+### Escrever seu próprio índice [#writing-your-own-index]
+
+Para colocar algo acima da lista — uma introdução, um link para o feed, uma nota sobre a frequência dos seus lançamentos — escreva a página você mesmo e coloque `<Changelog />` onde a lista deve ficar. O Blume continua cuidando da lista, então você só escreve as partes para as quais ele não tem espaço:
+
+```mdx changelog/index.mdx
+---
+title: Changelog
+description: Every Acme SDK release, newest first.
+mode: center
+---
+
+Every release, newest first. Subscribe to the [RSS feed](/changelog/rss.xml) to follow along.
+
+<Changelog />
+```
+
+Uma página de conteúdo em `/changelog` assume a rota, então a página gerada sai de cena e a sua é renderizada no lugar. Coloque-a em `changelog/index.mdx`, ao lado das suas entradas, para que o grupo Changelog da barra lateral leve até ela — um `changelog.mdx` ao lado da pasta adiciona um segundo item Changelog à barra lateral. O [`mode: center`](/docs/content/frontmatter#layout) dá a ela o layout da página gerada — sem barra lateral, sem sumário, com uma coluna centralizada mais larga — e a página gerada renderiza o mesmo componente, então as duas não têm como ficar diferentes. A lista é convertida para Markdown nas superfícies para agentes (`/changelog.md`, llms-full.txt, `get_page` do MCP, busca) exatamente como a da página gerada.
+
+A lista sempre mostra as entradas do idioma padrão, onde quer que a tag esteja — a regra que todas as superfícies que a publicam já seguem, para que uma página traduzida liste as mesmas versões em vez de divergir sobre quais existem. As datas dela aparecem no idioma da própria página.
+
+### Substituir a página por completo [#replacing-the-page-entirely]
+
+Para um design que o componente não consegue expressar, adicione uma [página personalizada](/docs/advanced/custom-pages) em `pages/changelog.astro` — ela assume o controle e o Blume para de gerar o índice padrão. O componente `<Update>`, com o qual a cronologia anterior era construída, continua disponível para uma página personalizada que queira as notas de lançamento embutidas. Ele não faz parte dos componentes MDX, então importe-o na própria página `.astro`: `import Update from "blume/components/content/Update.astro";`.
+
+Construir a lista você mesmo significa reproduzir o que o `<Changelog />` faz, inclusive uma coisa que falha em silêncio: as entradas de uma fonte que não é o sistema de arquivos (como o [GitHub Releases](#from-github-releases)) são renderizadas por uma coleção `staged` paralela, então uma página que lê apenas `getCollection("docs")` não lista nenhuma delas, sem nenhum aviso. Prefira o `<Changelog />` em uma página de conteúdo, a menos que você realmente precise de uma marcação diferente.
 
 ## A partir do GitHub Releases [#from-github-releases]
 

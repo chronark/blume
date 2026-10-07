@@ -236,7 +236,7 @@ Jeder Build schreibt einen [Agent Skill](https://agentskills.io) für deine Docs
 - den Titel und die Beschreibung der Site sowie wann ein Agent den Skill verwenden sollte
 - wie man jede Seite als Markdown liest, dazu `llms.txt`, `llms-full.txt`, den [MCP-Server](/docs/discoverability/mcp), die JSON-API und das Changelog, sofern die Site sie ausliefert
 - deine API-Referenzen
-- eine Übersicht der Docs in Sidebar-Reihenfolge, die das Markdown jeder Seite mit ihrer einzeiligen Beschreibung verlinkt
+- eine Übersicht der Docs in Sidebar-Reihenfolge, die das Markdown jeder Seite mit ihrer einzeiligen Beschreibung verlinkt (ihrer Meta-Beschreibung, wie in `llms.txt`)
 
 Der Skill ist nach dem `title` deiner Site benannt (aus `Acme Docs` wird `acme-docs`). Er deckt die aktuelle Version in der Standardsprache ab, lässt API-Operationsseiten und Changelog-Einträge aus (beide haben jeweils eine eigene Zeile oberhalb der Übersicht), überspringt dieselben Seiten wie `llms.txt` (Entwürfe, versteckte und `noindex`-Seiten sowie Seiten mit [`ai.exclude`](/docs/discoverability/llms-txt#excluding-a-page)) und listet bis zu 200 Seiten auf, wobei er für den Rest auf `llms.txt` verweist. Die Links sind absolut, daher braucht der Skill [`deployment.site`](/docs/deployment); ein Build ohne sie überspringt ihn.
 
