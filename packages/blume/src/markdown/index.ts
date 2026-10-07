@@ -32,6 +32,7 @@ import { relativeLinksPlugin } from "./relative-links.ts";
 import { tableWrapPlugin } from "./table-wrap.ts";
 import { DEFAULT_CODE_THEMES } from "./themes.ts";
 import type { CodeThemes } from "./themes.ts";
+import { titleHeadingPlugin } from "./title-heading.ts";
 import { ts2jsPlugin } from "./ts2js.ts";
 import { variablesPlugin } from "./variables.ts";
 import { viewsPlugin } from "./views.ts";
@@ -98,13 +99,16 @@ const asShikiTransformer = (transformer: { name: string }): ShikiTransformer =>
  * (`[#custom-id]`, `[!toc]`, `[toc]`), which must parse regardless of config —
  * while `markdown.headingAnchors: false` only turns off the self-linking
  * anchor wrap on `<h2>`–`<h6>`. Inline code runs first so the anchor wrap
- * re-refs already-highlighted code. The external-link plugin is added only
- * when `markdown.externalLinks` is on, so off stays today's exact output.
+ * re-refs already-highlighted code. The title-heading plugin runs after the
+ * heading plugin has slugged every heading, so dropping an untitled page's
+ * title `<h1>` moves no other heading's id. The external-link plugin is added
+ * only when `markdown.externalLinks` is on, so off stays today's exact output.
  */
 const blumeHastPlugins = (options: BlumeMarkdownOptions): HastPlugin[] => [
   asHastPlugin(inlineCodeHighlightPlugin(options.codeThemes)),
   asHastPlugin(tableWrapPlugin()),
   asHastPlugin(headingAnchorPlugin({ wrap: options.headingAnchors !== false })),
+  asHastPlugin(titleHeadingPlugin()),
   ...(options.externalLinks ? [asHastPlugin(externalLinksPlugin())] : []),
 ];
 

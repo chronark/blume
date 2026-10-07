@@ -16,14 +16,17 @@ import {
 /**
  * The slugs the renderer gives a document's headings, in order. The heading of
  * the footnotes section GFM appends (`footnote-label`) is the renderer's own,
- * not one the author wrote, so it is left out.
+ * not one the author wrote, so it is left out. The page has a `title`, so an
+ * opening `#` heading stays in the body (see `markdown/title-heading.ts`).
  */
 const renderedSlugs = async (
   processor: ReturnType<typeof blumeMarkdownProcessor>,
   source: string
 ): Promise<string[]> => {
   const renderer = await processor.createRenderer({});
-  const { metadata } = await renderer.render(source);
+  const { metadata } = await renderer.render(source, {
+    frontmatter: { title: "Page" },
+  });
   return metadata.headings
     .map((heading: { slug: string }) => heading.slug)
     .filter((slug: string) => slug !== "footnote-label");
