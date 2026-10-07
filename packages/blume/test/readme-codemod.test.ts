@@ -269,6 +269,9 @@ describe("readme-codemod", () => {
         '  <Card title="Start" icon="fa-rocket" href="doc:other" iconColor="#ff0066">',
         "    Go.",
         "  </Card>",
+        '  <Card title="Source" icon="fab fa-github" href="https://github.com/acme/sdk">',
+        "    Code.",
+        "  </Card>",
         "</Cards>",
         "",
         '<Accordion title="One" icon="fa-info-circle">',
@@ -370,6 +373,10 @@ describe("readme-codemod", () => {
     expect(text).toContain("<CardGroup cols={3}>");
     expect(text).toContain(
       '<Card title="Start" icon="rocket" href="/docs/other" color="#ff0066">'
+    );
+    // Lucide still ships a GitHub mark, so the brand icon survives.
+    expect(text).toContain(
+      '<Card title="Source" icon="github" href="https://github.com/acme/sdk">'
     );
     expect(text).toContain(
       '<Accordion>\n  <AccordionItem title="One" icon="info">'

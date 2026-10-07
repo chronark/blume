@@ -69,7 +69,7 @@ A minimal result is often just `defineConfig({ title, logo, theme: { accent } })
 
 Mintlify defaults to **FontAwesome**; Blume is **Lucide-only**. Convert every icon reference — frontmatter `icon`, nav-group `icon`, `<Icon>`, `<Card icon>` — to the closest Lucide name. Discard Mintlify's `iconType` (solid/regular/brands) entirely.
 
-**Automate the frontmatter pass — don't hand-edit it.** `scripts/mintlify-codemod.mjs` (in this skill, zero-dependency) remaps every **frontmatter** `icon:` using the table below, drops brand/no-equivalent icons, and — in the same pass — drops/renames unsupported frontmatter keys (see [Frontmatter](#frontmatter)). It's deterministic and idempotent, and reports what it changed per file plus what it couldn't (unknown icons, OpenAPI-stub flags):
+**Automate the frontmatter pass — don't hand-edit it.** `scripts/mintlify-codemod.mjs` (in this skill, zero-dependency) remaps every **frontmatter** `icon:` using the table below, drops icons with no Lucide equivalent, and — in the same pass — drops/renames unsupported frontmatter keys (see [Frontmatter](#frontmatter)). It's deterministic and idempotent, and reports what it changed per file plus what it couldn't (unknown icons, OpenAPI-stub flags):
 
 ```bash
 # <skill> = this skill's directory (the one containing SKILL.md); dry run first (report only), then apply:
@@ -99,7 +99,7 @@ The codemod touches **only frontmatter**. Icons in MDX **body** (`<Icon icon="�
 | `life-ring` | `life-buoy` |  | `shield-halved` | `shield` |
 | `rocket`/`book`/`book-open`/`code`/`terminal`/`key`/`lock`/`user`/`users`/`database`/`server`/`cloud`/`bell`/`calendar`/`star`/`heart`/`tag`/`folder`/`globe`/`link`/`download`/`upload`/`check`/`copy`/`play`/`filter` | _(same name — verify)_ |
 
-**Rules:** verify each Lucide name exists at [lucide.dev/icons](https://lucide.dev/icons) before writing it. **Brand icons** (`fa6-brands:*` — github, discord, x, slack, linkedin…) mostly have **no** Lucide equivalent: for GitHub use the `github` config (renders the footer's repo link); for other socials, use `footer.socials`. Where no Lucide counterpart exists, **drop the icon and report it**. The build won't catch a wrong name for you: an unknown icon renders nothing, and it's only a warning (`BLUME_UNKNOWN_ICON`) for navigation icons — an icon prop on a component like `<Card>` fails silently — so check every name.
+**Rules:** verify each Lucide name exists at [lucide.dev/icons](https://lucide.dev/icons) before writing it. **Brand icons** (`fa6-brands:*`): Lucide still ships a few brand marks, and Blume renders them under the same name — `facebook`, `github`, `gitlab`, `instagram`, `linkedin`, `slack`, `twitter`, `youtube`. Keep those. The rest (`discord`, `x-twitter`, `docker`, `npm`, `python`, `react`…) have **no** Lucide equivalent, and FontAwesome's `apple` is the Apple logo while Lucide's `apple` is the fruit. Where no Lucide counterpart exists, **drop the icon and report it**. An icon that only marks a link to the repository or a social profile usually has a better home: the `github` config (renders the footer's repo link) or `footer.socials`. The build won't catch a wrong name for you: an unknown icon renders nothing, and it's only a warning (`BLUME_UNKNOWN_ICON`) for navigation icons — an icon prop on a component like `<Card>` fails silently — so check every name.
 
 ## Navigation: `docs.json` `navigation` → filesystem + tabs
 

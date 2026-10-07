@@ -1,12 +1,13 @@
 import { afterAll, describe, expect, it } from "bun:test";
 import { spawnSync } from "node:child_process";
 import { mkdtempSync } from "node:fs";
-import { readFile, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { join } from "pathe";
 
 import matter from "../src/core/frontmatter.ts";
+import { hasIcon } from "../src/theme/icons.ts";
 
 // The blume-migrate skill's zero-dependency frontmatter codemod, run the way
 // the skill runs it: a bare `node` over the repo-root copy (the package's
@@ -166,5 +167,53 @@ describe("mintlify-codemod", () => {
     );
     expect(report).toContain("rename needs manual edit: mode");
     expect(await readFile(file, "utf-8")).toBe(source);
+  });
+
+  it("keeps the brand icons Blume renders and drops the rest", async () => {
+    const kept = [
+      "facebook",
+      "github",
+      "gitlab",
+      "instagram",
+      "linkedin",
+      "slack",
+      "twitter",
+      "youtube",
+    ];
+    // Lucide's `apple` is the fruit, not FontAwesome's Apple logo.
+    const dropped = ["apple", "discord", "x-twitter"];
+    // Every kept brand resolves in Blume's bundled Lucide set, so it renders.
+    expect(kept.filter((brand) => !hasIcon(brand))).toEqual([]);
+
+    const dir = join(root, "brands");
+    await mkdir(dir);
+    const page = (name: string): string => join(dir, `${name}.mdx`);
+    const write = (name: string, icon: string): Promise<void> =>
+      writeFile(
+        page(name),
+        ["---", "title: Brand", `icon: ${icon}`, "---", ""].join("\n")
+      );
+    const data = async (name: string) =>
+      matter(await readFile(page(name), "utf-8")).data;
+    await Promise.all([
+      ...[...kept, ...dropped].map((name) => write(name, name)),
+      write("cased", "GitHub"),
+    ]);
+
+    const report = runCodemod("--write", dir);
+    for (const name of dropped) {
+      expect(report).toContain(`icon dropped (no Lucide equivalent): ${name}`);
+    }
+    expect(report).toContain("GitHub → github");
+    expect(report).toContain(`${dropped.length + 1} file(s) with findings`);
+
+    expect(await Promise.all(kept.map(data))).toEqual(
+      kept.map((icon) => ({ icon, title: "Brand" }))
+    );
+    expect(await Promise.all(dropped.map(data))).toEqual(
+      dropped.map(() => ({ title: "Brand" }))
+    );
+    expect(await data("cased")).toEqual({ icon: "github", title: "Brand" });
+    expect(runCodemod(dir)).toContain("0 file(s) with findings");
   });
 });

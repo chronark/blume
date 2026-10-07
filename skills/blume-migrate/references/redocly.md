@@ -184,7 +184,7 @@ Realm versions a folder through `@<version>/` subfolders and an optional `versio
 
 ## Icons
 
-Realm icons are Font Awesome names (`book`, `solid check-circle`, `brands github`) or image paths. Strip the pack prefix and map to Lucide with the table in `references/mintlify.md`; image paths work as written; brand icons usually have no Lucide match (report).
+Realm icons are Font Awesome names (`book`, `solid check-circle`, `brands github`) or image paths. Strip the pack prefix and map to Lucide with the table in `references/mintlify.md`; image paths work as written; brand icons other than the few Lucide ships (listed there, `github` among them) have no Lucide match (report).
 
 ## Teardown — keep lint and bundle working
 
