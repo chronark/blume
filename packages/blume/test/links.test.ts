@@ -1116,6 +1116,38 @@ describe("validateLinks — relative file links", () => {
     expect(diagnostics).toHaveLength(0);
   });
 
+  it("finds a file renamed between .md and .mdx under its other extension", async () => {
+    // The link predates the rename; the route fallback alone would miss the
+    // file's own slug and ordering prefix.
+    const diagnostics = await validate([
+      makePage({
+        id: "guides/index.mdx",
+        links: [link("./renamed.md"), link("./02-prefixed.md#run")],
+        route: "/guides",
+      }),
+      makePage({ id: "guides/renamed.mdx", route: "/guides/new-name" }),
+      makePage({
+        headings: [heading("Run", "run")],
+        id: "guides/02-prefixed.mdx",
+        route: "/guides/prefixed",
+      }),
+    ]);
+    expect(diagnostics).toHaveLength(0);
+    const routes = new Map([
+      ["/abs/guides/old.md", "/guides/kept"],
+      ["/abs/guides/renamed.mdx", "/guides/new-name"],
+    ]);
+    const from = { isIndex: true, route: "/guides" };
+    const resolveFile = (path: string): string | undefined =>
+      routes.get(`/abs/guides/${path.slice(2)}`);
+    expect(resolveRelativeHref("./renamed.md#x", from, resolveFile)).toBe(
+      "/guides/new-name#x"
+    );
+    expect(resolveRelativeHref("./old.mdx", from, resolveFile)).toBe(
+      "/guides/kept"
+    );
+  });
+
   it("falls back to the route-relative reading for a file it doesn't know", async () => {
     const diagnostics = await validate([
       makePage({

@@ -188,6 +188,10 @@ export interface RelativeLinkBase {
 /** A root-relative path, a bare `#fragment` or `?query`, or any scheme. */
 const NOT_RELATIVE = /^(?:[#?/]|[a-z][a-z0-9+.-]*:)/iu;
 
+/** The same file under the other Markdown extension: `x.md` ↔ `x.mdx`. */
+const otherDocExtension = (path: string): string =>
+  /x$/iu.test(path) ? path.slice(0, -1) : `${path}x`;
+
 /**
  * Where a relative page link written on `from` lands: a root-relative route
  * with the authored `?query#hash` kept — or `undefined` when `href` isn't a
@@ -203,7 +207,9 @@ const NOT_RELATIVE = /^(?:[#?/]|[a-z][a-z0-9+.-]*:)/iu;
  * `/install`. A `.md`/`.mdx` target is a file link: `resolveFile` maps its
  * decoded path, relative to the linking file, to the route that file
  * publishes at, so a target with its own `slug` or an ordering prefix still
- * lands on its page instead of on its raw Markdown source. Without
+ * lands on its page instead of on its raw Markdown source. A file renamed
+ * from `.md` to `.mdx`, or back, is found under its other extension first,
+ * so a link written before the rename keeps that slug or prefix. Without
  * `resolveFile`, or for a file it doesn't know, the target resolves
  * route-relative with the extension dropped.
  *
@@ -227,8 +233,9 @@ export const resolveRelativeHref = (
     const route = toRoute(resolveRelative(from.route, path, from.isIndex));
     return hasRoute?.(decodePercent(route)) ? `${route}${suffix}` : undefined;
   }
+  const file = decodePercent(path);
   const fileRoute = DOC_EXT.test(path)
-    ? resolveFile?.(decodePercent(path))
+    ? (resolveFile?.(file) ?? resolveFile?.(otherDocExtension(file)))
     : undefined;
   return `${fileRoute ?? toRoute(resolveRelative(from.route, path, from.isIndex))}${suffix}`;
 };
