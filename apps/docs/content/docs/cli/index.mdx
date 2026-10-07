@@ -108,4 +108,4 @@ Add a `tsconfig.json` extending Astro's config to your project root so authored 
 
 Without a project `tsconfig.json`, only the generated runtime is checked.
 
-The build reads this file too, to resolve imports, so an `extends` that doesn't resolve (a package that isn't installed, a file that was moved) stops `blume build`, `blume dev`, and `blume check` with `BLUME_TSCONFIG_EXTENDS`, at the line that names it. Install the package, or remove the entry from `extends`.
+The build reads this file too, to resolve imports, so an `extends` or `references` entry that doesn't resolve (a package that isn't installed, a file that was moved, a framework's generated tsconfig that doesn't exist yet) stops `blume build`, `blume dev`, and `blume check` with `BLUME_TSCONFIG_EXTENDS`, at the line that names it. Install, restore, or generate the file, or remove the entry.

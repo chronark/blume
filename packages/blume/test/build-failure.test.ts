@@ -284,8 +284,47 @@ describe("astroBuildDiagnostics", () => {
     });
   });
 
+  it("says which tsconfig references a file that can't be found", async () => {
+    // Nuxt's root tsconfig only references the ones `nuxi prepare` generates,
+    // and the resolver names a reference by its resolved path.
+    const root = await makeFiles({
+      "tsconfig.json":
+        '{\n  "files": [],\n  "references": [\n    { "path": "./.nuxt/tsconfig.app.json" },\n    { "path": "./server" }\n  ]\n}\n',
+    });
+    const [file] = await astroBuildDiagnostics(
+      errorWith(
+        `Tsconfig not found ${join(root, ".nuxt/tsconfig.app.json")}`,
+        {}
+      ),
+      { root }
+    );
+    expect(file).toEqual({
+      code: "BLUME_TSCONFIG_EXTENDS",
+      file: join(root, "tsconfig.json"),
+      line: 4,
+      message:
+        "tsconfig.json references `./.nuxt/tsconfig.app.json`, which can't be found. The build reads the project's tsconfig.json to resolve imports, so it stops here.",
+      severity: "error",
+      suggestion:
+        "Create `./.nuxt/tsconfig.app.json` (a framework's generated tsconfig appears once its prepare or build step runs), or remove it from `references` in tsconfig.json.",
+    });
+    // A reference to a folder means the tsconfig.json inside it.
+    const [folder] = await astroBuildDiagnostics(
+      errorWith(`Tsconfig not found ${join(root, "server/tsconfig.json")}`, {}),
+      { root }
+    );
+    expect(folder).toMatchObject({
+      line: 5,
+      message: expect.stringContaining("references `./server`"),
+    });
+  });
+
   it("names no file when the project's tsconfig doesn't extend the target", async () => {
-    const root = await makeFiles({ "tsconfig.json": "{}\n" });
+    const root = await makeFiles({
+      // A malformed jsconfig names nothing either.
+      "jsconfig.json": '{ "extends": 1 }\n',
+      "tsconfig.json": "{}\n",
+    });
     const error = errorWith("Tsconfig not found shared-config", {});
     for (const context of [{ root }, {}]) {
       // oxlint-disable-next-line no-await-in-loop -- two cheap, ordered reads

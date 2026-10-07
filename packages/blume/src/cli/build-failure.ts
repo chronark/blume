@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 
-import { basename, isAbsolute, join, relative } from "pathe";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "pathe";
 import ts from "typescript";
 import { z } from "zod";
 
@@ -99,55 +99,100 @@ const undefinedNameDiagnostic = (
   };
 };
 
-// Vite's message for an `extends` it can't resolve.
+// Vite's message for an `extends` or `references` entry it can't resolve. It
+// names an `extends` package as written, and a path resolved.
 const TSCONFIG_NOT_FOUND = /Tsconfig not found (?<target>\S+?)\.?$/mu;
 
-const tsconfigExtendsSchema = z.object({
-  extends: z.union([z.string(), z.array(z.string())]),
+const tsconfigLinksSchema = z.object({
+  extends: z.union([z.string(), z.array(z.string())]).optional(),
+  references: z.array(z.object({ path: z.string() })).optional(),
 });
 
-/** The `extends` entries a tsconfig names (one, a list, or none). */
-const extendsOf = (path: string): string[] => {
-  const { config } = ts.readConfigFile(path, ts.sys.readFile);
-  const parsed = tsconfigExtendsSchema.safeParse(config);
-  return parsed.success ? [parsed.data.extends].flat() : [];
+/** An entry in a tsconfig's `extends` or `references`, as written. */
+interface TsconfigLink {
+  key: "extends" | "references";
+  written: string;
+}
+
+/**
+ * The `extends` or `references` entry in the tsconfig at `path` that names
+ * `target`: written as is, or resolved from the tsconfig's folder (a
+ * reference can name a folder, which means its `tsconfig.json`).
+ */
+const linkTo = (path: string, target: string): TsconfigLink | undefined => {
+  const parsed = tsconfigLinksSchema.safeParse(
+    ts.readConfigFile(path, ts.sys.readFile).config
+  );
+  if (!parsed.success) {
+    return undefined;
+  }
+  const names = (written: string): boolean => {
+    const resolved = resolve(dirname(path), written);
+    return (
+      written === target ||
+      resolved === target ||
+      join(resolved, "tsconfig.json") === target
+    );
+  };
+  const extended = [parsed.data.extends ?? []].flat().find(names);
+  if (extended !== undefined) {
+    return { key: "extends", written: extended };
+  }
+  const referenced = (parsed.data.references ?? [])
+    .map((reference) => reference.path)
+    .find(names);
+  return referenced === undefined
+    ? undefined
+    : { key: "references", written: referenced };
+};
+
+/** How to fix a tsconfig entry that doesn't resolve. */
+const tsconfigFix = ({ key, written }: TsconfigLink, name: string): string => {
+  if (key === "references") {
+    return `Create \`${written}\` (a framework's generated tsconfig appears once its prepare or build step runs), or remove it from \`references\` in ${name}.`;
+  }
+  if (written.startsWith(".") || isAbsolute(written)) {
+    return `Restore \`${written}\`, or remove it from \`extends\` in ${name}.`;
+  }
+  const packageName = written
+    .split("/")
+    .slice(0, written.startsWith("@") ? 2 : 1)
+    .join("/");
+  return `Install the package that provides it (\`${packageName}\`), or remove it from \`extends\` in ${name}.`;
 };
 
 /**
- * An `extends` in the project's `tsconfig.json` that doesn't resolve: Vite
- * reads that file while it builds the site, so the build fails in `astro
- * sync` before any page compiles. Placed at the `extends` line when the
- * project's own tsconfig names the target.
+ * An `extends` or `references` entry in the project's `tsconfig.json` that
+ * doesn't resolve: Vite reads that file while it builds the site, so the
+ * build fails in `astro sync` before any page compiles. Placed at the entry's
+ * line when the project's own tsconfig names the target.
  */
 const tsconfigExtendsDiagnostic = (
   target: string,
   root: string | undefined
 ): Diagnostic => {
-  const file = root
+  const found = root
     ? ["tsconfig.json", "jsconfig.json"]
         .map((name) => join(root, name))
-        .find((path) => existsSync(path) && extendsOf(path).includes(target))
+        .filter((path) => existsSync(path))
+        .map((path) => ({ link: linkTo(path, target), path }))
+        .find(({ link }) => link !== undefined)
     : undefined;
+  const file = found?.path;
+  const { key, written } = found?.link ?? { key: "extends", written: target };
   const line = file
     ? readFileSync(file, "utf-8")
         .split("\n")
-        .findIndex((text) => text.includes(JSON.stringify(target))) + 1
+        .findIndex((text) => text.includes(JSON.stringify(written))) + 1
     : 0;
-  const local = target.startsWith(".") || isAbsolute(target);
   const name = file ? basename(file) : "tsconfig.json";
-  const packageName = target
-    .split("/")
-    .slice(0, target.startsWith("@") ? 2 : 1)
-    .join("/");
   return {
     code: "BLUME_TSCONFIG_EXTENDS",
     file,
     line: line > 0 ? line : undefined,
-    message: `${file ? name : "A tsconfig.json in the project"} extends \`${target}\`, which can't be found. The build reads the project's ${name} to resolve imports, so it stops here.`,
+    message: `${file ? name : "A tsconfig.json in the project"} ${key} \`${written}\`, which can't be found. The build reads the project's ${name} to resolve imports, so it stops here.`,
     severity: "error",
-    suggestion: local
-      ? `Restore \`${target}\`, or remove it from \`extends\` in ${name}.`
-      : `Install the package that provides it (\`${packageName}\`), or remove it from \`extends\` in ${name}.`,
+    suggestion: tsconfigFix({ key, written }, name),
   };
 };
 
