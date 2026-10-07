@@ -51,6 +51,11 @@
 // source; the agent was pointed at the skill), pushing stubs to any wiki,
 // disabling a wiki, a deploy, or a lockfile regeneration. What a disabled
 // wiki's old URLs return is unverified, so this page doesn't say.
+// Later Blume fixes changed what the run saw, and the text was updated to
+// match without a rerun: `blume validate` reads a fence inside a blockquote
+// as code, Blume warns about a wiki link that names a page
+// (BLUME_WIKILINK_UNSUPPORTED), and git dates follow a rename that leaves
+// the file unchanged.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -209,16 +214,6 @@ const checkTable = [
   "ok  Release-Process → /release-process",
   "",
   "0 problem(s).",
-].join("\n");
-
-const quotedFence = [
-  "> Why is this an error?",
-  ">",
-  "> ```ts",
-  "> interface StringMap {",
-  ">   [key: string]: string;",
-  "> }",
-  "> ```",
 ].join("\n");
 ---
 
@@ -534,7 +529,9 @@ const quotedFence = [
     </li>
     <li>
       <strong>Leftover wiki links.</strong> Blume shows <code>[[Page]]</code>{" "}
-      as text and doesn't warn about it. <code>grep -rn '\[\[' docs</code>{" "}
+      as text. It warns about one that names a page on the site, or has a{" "}
+      <code>|</code>, as <code>BLUME_WIKILINK_UNSUPPORTED</code>, but not about
+      a link to a page that doesn't exist. <code>grep -rn '\[\[' docs</code>{" "}
       should print only code samples.
     </li>
     <li>
@@ -602,8 +599,8 @@ const quotedFence = [
       views stay on the wiki. If you bring the wiki's history into your
       repository with <code>git subtree add</code>, <code>git log --follow</code>{" "}
       still finds it. If you turn on <code>lastModified: "git"</code>, though,
-      every page's date starts at the migration, since every page was renamed
-      and Blume's dates don't follow renames.
+      every page's date starts at the migration: Blume's dates follow a rename
+      only when the file didn't change, and every page was edited too.
     </li>
     <li>
       <strong>Redirects.</strong> Old wiki URLs never redirect, as above. The
@@ -629,13 +626,6 @@ const quotedFence = [
     reads Markdown inside HTML only with blank lines around it. Add them, or
     turn the block into Markdown.
   </p>
-  <h3>validate reports a broken link to string;</h3>
-  <p>
-    A code block inside a quote, like this one, is misread as a link
-    definition:
-  </p>
-  <CodeBlock code={quotedFence} lang="md" />
-  <p>Move the code block out of the quote; the rest of the quote can stay.</p>
   <h3>validate reports an anchor that exists</h3>
   <p>
     Anchors are case-sensitive in Blume and weren't on GitHub. Match the case

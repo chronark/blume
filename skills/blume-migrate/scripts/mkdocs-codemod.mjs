@@ -1008,10 +1008,10 @@ const bracketsBalanced = (text) => {
 };
 
 /**
- * A callout's `[label]`. Blume renders the label as plain text, and balanced
- * brackets (code spans included) parse as written; an unbalanced title is
- * flattened and every bracket escaped, since an escape inside a code span
- * would end the label early and drop the title.
+ * A callout's `[label]`. Blume renders the label's inline Markdown, and
+ * balanced brackets (code spans included) parse as written; an unbalanced
+ * title is flattened and every bracket escaped, since an escape inside a code
+ * span would end the label early and drop the title.
  */
 const directiveLabel = (title) => {
   if (!title) {
@@ -1048,8 +1048,10 @@ const renderAdmonition = (adm, body, ctx) => {
   }
   if (adm.kind.startsWith("???")) {
     const open = adm.kind === "???+" ? " defaultOpen" : "";
-    // Expandable titles render as written, so backticks would show.
-    const label = adm.title ? plainTitle(adm.title) : capitalize(type);
+    // Expandable titles render their inline Markdown, but raw HTML as text.
+    const label = adm.title
+      ? removeAll(adm.title, /<[^>]+>/gu).trim()
+      : capitalize(type);
     ctx.change("details", `${adm.kind} ${type} → <Expandable>`);
     return [
       `<Expandable ${jsxAttr("title", label)}${open}>`,
@@ -1514,7 +1516,11 @@ const rewriteLines = (lines, ctx) => {
   return out;
 };
 
-/** Angle-bracket link destinations confuse `blume validate`: percent-encode instead. */
+/**
+ * Percent-encode angle-bracket link destinations. A page reads them, but an
+ * `<…>` path in a partial isn't rebased when the partial is spliced into the
+ * including page, which then fails to build; the encoded form works in both.
+ */
 const unwrapAngleDestinations = (lines, ctx) =>
   mapFenced(lines, (line) =>
     mapProse(line, (p) =>
@@ -2297,7 +2303,7 @@ const configFindings = (config, missingNav) => {
     ],
     [
       config.extraJs,
-      "extra_javascript — delete math/mermaid loaders; script() the rest (put deployment.base in its src)",
+      "extra_javascript — delete math/mermaid loaders; script() the rest (a root-relative src loads under deployment.base)",
     ],
     [
       config.autoAppend.length > 0,

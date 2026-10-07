@@ -38,6 +38,12 @@
 // passed `validate --strict`, and kept `/guides/webhooks`. pin-heading-ids.mjs
 // paired the Acme headings through MkDocs' `toc.permalink` ¶ links and
 // pinned a test heading (`Keys & tokens`, `#keys-tokens`).
+// Later Blume fixes changed what the run saw, and the text was updated to
+// match without a rerun: `blume validate` reads angle-bracket link
+// destinations, `blume dev` and `blume preview` redirect slashed URLs, a
+// `console` block's copy button skips prompts and output, and `blume check`
+// warns about attribute lists in `.mdx`. The note on hiding a folder's index
+// page was corrected too: the page stays in the sitemap.
 // Not run: `npx blume migrate mkdocs` itself (detection landed after the run),
 // a deploy, or the lockfile regeneration. The reference was revised after the
 // run (codemod, `slug` pins, group folders, `display: "group"`, Prettier);
@@ -505,6 +511,13 @@ const prettierrc = `{
           in <code>analytics</code>
         </td>
       </tr>
+      <tr>
+        <td>A custom script that keeps <code>$</code> prompts out of copied code</td>
+        <td>
+          Not needed: the copy button on a <code>console</code> block copies
+          only the commands
+        </td>
+      </tr>
     </tbody>
   </table>
   <h3>No equivalent</h3>
@@ -531,10 +544,6 @@ const prettierrc = `{
       <tr>
         <td>Snippet line ranges and sections</td>
         <td>Move the excerpt into its own file</td>
-      </tr>
-      <tr>
-        <td>A custom script that keeps <code>$</code> prompts out of copied code</td>
-        <td>Blume's copy button copies the whole block</td>
       </tr>
       <tr>
         <td><code>copyright</code></td>
@@ -731,8 +740,9 @@ const prettierrc = `{
   <ul>
     <li>
       A folder's <code>index</code> page links its group's header and also
-      lists as the group's first row. Leave it visible: hiding it drops the
-      page from <code>sitemap.xml</code>.
+      lists as the group's first row. To show it once, as Material does, set{" "}
+      <code>sidebar: {"{ hidden: true }"}</code> on the index: only the row
+      goes, and the page stays in <code>sitemap.xml</code> and search.
     </li>
     <li>
       MkDocs keeps a numeric prefix like <code>01-</code> in the URL. Blume
@@ -879,11 +889,10 @@ const prettierrc = `{
     <a href="/guides/documentation-url-migration-redirects">Move documentation URLs while preserving old links</a>.
   </p>
   <p>
-    <code>blume dev</code> and <code>blume preview</code> answer a slashed URL
-    with a 404, which is why the list has no trailing slashes. Links around
-    the web still carry MkDocs' slash, so check a few on the deployed site: the{" "}
-    <code>vercel()</code> adapter redirects them to the page, and a static
-    build serves them from the page's folder.
+    Links around the web still carry MkDocs' slash. <code>blume dev</code> and{" "}
+    <code>blume preview</code> redirect a slashed URL to the page, as the{" "}
+    <code>vercel()</code> adapter does, and a static build serves it from the
+    page's folder on other hosts, so the list doesn't need both spellings.
   </p>
 
   <h2>Update the rest of the repository</h2>
@@ -957,7 +966,9 @@ const prettierrc = `{
     literal <code>{"{name}"}</code> text. MDX reads braces as JavaScript.
     Remove it, or escape the brace as <code>\{"{"}</code>. Some, like{" "}
     <code>{"{ width=\"300\" }"}</code>, compile and then fail while the page
-    renders, with a <code>ReferenceError</code>.
+    renders, with a <code>ReferenceError</code>. <code>blume check</code> warns
+    about attribute lists ahead of the build, as{" "}
+    <code>BLUME_MDX_ATTRIBUTE_LIST</code> with the file and line.
   </p>
   <h3>A page fails with "Expected a closing tag"</h3>
   <p>
@@ -969,13 +980,6 @@ const prettierrc = `{
     Prettier rewrites a multi-line <code>{"{/* … */}"}</code> comment into{" "}
     <code>{"{/_ … _/}"}</code>. Keep MDX comments on one line, as the codemod
     writes them.
-  </p>
-  <h3>validate rejects a link that works</h3>
-  <p>
-    <code>blume validate</code> misreads a link destination in angle brackets,
-    like <code>[x](&lt;https://example.com/a_(b)&gt;)</code>, which Prettier
-    writes for URLs with parentheses. Percent-encode the parentheses instead:{" "}
-    <code>a_%28b%29</code>.
   </p>
   <h3>The build fails on a page's frontmatter</h3>
   <p>

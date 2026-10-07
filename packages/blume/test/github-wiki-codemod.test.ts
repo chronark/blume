@@ -517,7 +517,34 @@ describe("github-wiki-codemod convert", () => {
       "Get-Item",
       "```",
     ]);
-    expect(report).toContain("an indented or nested GitHub alert");
+    expect(report).toContain(
+      "indented or lazy GitHub alert kept: a callout in .mdx"
+    );
+  });
+
+  it("keeps the alerts it can't rewrite as alerts, which make the page MDX", async () => {
+    const root = await wiki({
+      "Home.md": "Hi.\n",
+      "Lazy.md": ["> [!NOTE]", "lazy line", ""].join("\n"),
+      "Odd.md": ["> [!TIP] Title", "> Body.", "", "> [!WARNING]", ">", ""].join(
+        "\n"
+      ),
+    });
+    runCodemod(root, "routes", ...REPO, "--write");
+    const report = runCodemod(root, "convert", ...REPO, "--write");
+    expect(matter(await read(root, "docs/lazy.mdx")).content.trim()).toBe(
+      "> [!NOTE]\nlazy line"
+    );
+    // Text after the marker, or no body: left for a hand, so the page stays .md.
+    expect(matter(await read(root, "docs/odd.md")).content.trim()).toBe(
+      "> [!TIP] Title\n> Body.\n\n> [!WARNING]\n>"
+    );
+    expect(report).toContain(
+      "a GitHub alert with text after its marker: convert it by hand"
+    );
+    expect(report).toContain(
+      "a GitHub alert with no body lines: convert it by hand"
+    );
   });
 
   it("builds folders and meta.ts from _Sidebar.md", async () => {
