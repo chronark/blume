@@ -2,6 +2,7 @@ import { z } from "zod";
 
 import type { AdapterDescriptor } from "../core/adapter.ts";
 import { adapterDescriptorSchema } from "../core/adapter.ts";
+import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
 import type { HeadScript } from "./head.ts";
 
 /** Options for {@link script}; set exactly one of `src` or `content`. */
@@ -46,8 +47,17 @@ export const script = (options: ScriptOptions): ScriptAdapter => ({
   runtimeDeps: [],
 });
 
-/** The tag. Explicit `src`/`strategy` win over a same-named spread attribute. */
-export const scriptHead = (options: ScriptOptions): HeadScript[] => {
+/**
+ * The tag. Explicit `src`/`strategy` win over a same-named spread attribute.
+ * A root-relative `src` (`/js/x.js`, a file in `public/`) is served under the
+ * deployment `base`, so it gets the base the way a link does; one already
+ * under it is left alone, and absolute and protocol-relative URLs pass
+ * through.
+ */
+export const scriptHead = (
+  options: ScriptOptions,
+  base: string
+): HeadScript[] => {
   const attributes: HeadScript["attributes"] = { ...options.attributes };
   if (!options.src) {
     return [{ attributes, content: options.content ?? "" }];
@@ -55,6 +65,6 @@ export const scriptHead = (options: ScriptOptions): HeadScript[] => {
   if (options.strategy) {
     attributes[options.strategy] = true;
   }
-  attributes.src = options.src;
+  attributes.src = withBasePath(normalizeBasePath(base), options.src);
   return [{ attributes, content: null }];
 };

@@ -50,7 +50,8 @@ export type HeadNode =
  */
 // oxlint-disable-next-line complexity -- each adapter has one exhaustive, type-narrowed dispatch case
 const adapterScripts = (
-  adapter: Exclude<AnalyticsAdapter, { kind: "vercel" }>
+  adapter: Exclude<AnalyticsAdapter, { kind: "vercel" }>,
+  base: string
 ): HeadScript[] => {
   switch (adapter.kind) {
     case "adobe": {
@@ -114,7 +115,7 @@ const adapterScripts = (
       return segmentHead(adapter.options);
     }
     default: {
-      return scriptHead(adapter.options);
+      return scriptHead(adapter.options, base);
     }
   }
 };
@@ -122,9 +123,14 @@ const adapterScripts = (
 /**
  * Map the configured adapters to what `Analytics.astro` renders, in declared
  * order. A second `vercel()` is dropped — two copies of the component would
- * count every pageview twice — so the first one keeps its position.
+ * count every pageview twice — so the first one keeps its position. `base` is
+ * the deployment base a `script()` adapter's root-relative `src` is served
+ * under.
  */
-export const analyticsHead = (adapters: AnalyticsAdapter[]): HeadNode[] => {
+export const analyticsHead = (
+  adapters: AnalyticsAdapter[],
+  base = "/"
+): HeadNode[] => {
   const nodes: HeadNode[] = [];
   let hasVercel = false;
   for (const adapter of adapters) {
@@ -134,7 +140,7 @@ export const analyticsHead = (adapters: AnalyticsAdapter[]): HeadNode[] => {
         nodes.push({ props: adapter.options, type: "vercel" });
       }
     } else {
-      for (const tag of adapterScripts(adapter)) {
+      for (const tag of adapterScripts(adapter, base)) {
         nodes.push({ ...tag, type: "script" });
       }
     }

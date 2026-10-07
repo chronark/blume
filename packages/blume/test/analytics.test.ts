@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { readFile } from "node:fs/promises";
 
 import { CLOUDFLARE_BEACON_SRC } from "../src/analytics/cloudflare.ts";
 import { analyticsHead } from "../src/analytics/head.ts";
@@ -154,6 +155,19 @@ describe("analyticsConfigSchema", () => {
   });
 });
 
+/** The `src` each `script()` tag gets under `base`, in declared order. */
+const srcs = (base: string) =>
+  analyticsHead(
+    [
+      script({ src: "/js/redirects.js" }),
+      // Written with the base already, as a site had to before.
+      script({ src: "/uv/js/written.js" }),
+      script({ src: "https://x.test/a.js" }),
+      script({ src: "//cdn.x.test/b.js" }),
+    ],
+    base
+  ).map((node) => (node.type === "script" ? node.attributes.src : null));
+
 describe("analyticsHead", () => {
   it("emits nothing for an empty list", () => {
     expect(analyticsHead([])).toEqual([]);
@@ -285,6 +299,26 @@ describe("analyticsHead", () => {
         type: "script",
       },
     ]);
+  });
+
+  it("serves a root-relative src under the deployment base", () => {
+    expect(srcs("/uv")).toEqual([
+      "/uv/js/redirects.js",
+      "/uv/js/written.js",
+      "https://x.test/a.js",
+      "//cdn.x.test/b.js",
+    ]);
+    // `BASE_URL` may carry a trailing slash; the root base adds nothing.
+    expect(srcs("/uv/")[0]).toBe("/uv/js/redirects.js");
+    expect(srcs("/")[0]).toBe("/js/redirects.js");
+  });
+
+  it("hands the component's deployment base to the tags", async () => {
+    const component = await readFile(
+      new URL("../src/components/layout/Analytics.astro", import.meta.url),
+      "utf-8"
+    );
+    expect(component).toContain("import.meta.env.BASE_URL");
   });
 
   it("lets an explicit src win over a same-named attribute", () => {

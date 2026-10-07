@@ -393,6 +393,8 @@ analytics: [
 
 `attributes` is a map of extra HTML attributes (`data-*`, `id`, …) spread onto the tag, and `strategy` adds `async` or `defer` to external scripts.
 
+A root-relative `src` points at a file in `public/` (`src: "/js/redirects.js"` for `public/js/redirects.js`), so under a [`deployment.base`](/docs/deployment#subpath-deploys) it gets the base, like a link does: with `base: "/docs"`, the tag loads `/docs/js/redirects.js`. A `src` that already starts with the base is left as written, and an absolute or protocol-relative URL passes through, so a script served outside the site's base takes its full URL.
+
 ## Options
 
 | Adapter | Option | Default | Description |
