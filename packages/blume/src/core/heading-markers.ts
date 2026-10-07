@@ -16,6 +16,7 @@
  * anchor index `blume validate` checks against always agree.
  */
 
+import { slug } from "github-slugger";
 import type GithubSlugger from "github-slugger";
 
 /**
@@ -24,6 +25,154 @@ import type GithubSlugger from "github-slugger";
  * `remarkPluginFrontmatter` to filter the TOC.
  */
 export const TOC_HIDDEN_KEY = "__blumeTocHidden";
+
+/**
+ * Frontmatter key carrying TOC text out of a render, keyed by slug, for the
+ * headings whose TOC entry must read differently from the heading's text
+ * content: a heading holding a `<Badge>` lists without the badge's text. The
+ * page template reads it back the way it reads {@link TOC_HIDDEN_KEY}.
+ */
+export const TOC_TEXT_KEY = "__blumeTocText";
+
+const TRAILING_DASHES = /-+$/u;
+
+/**
+ * A heading's auto-generated anchor id, registered with the document slugger.
+ * The text is trimmed first: a heading that opens or ends with something that
+ * has no text (an inline component, an image, raw HTML) would otherwise slug
+ * that edge whitespace into a leading or trailing dash. A slug can still end
+ * in dashes when the slugger drops a symbol after a space (`Features ✨`);
+ * those go too, so no id ends in a dash.
+ */
+export const headingSlug = (slugger: GithubSlugger, text: string): string => {
+  const trimmed = text.trim();
+  const base = slug(trimmed);
+  // A slug is stable under re-slugging, so the stripped one registers as is.
+  return slugger.slug(
+    base.endsWith("-") ? base.replace(TRAILING_DASHES, "") : trimmed
+  );
+};
+
+/**
+ * A heading's text with its badges taken out. `pieces` is the heading's text
+ * in order, with `null` where a badge stood; a badge between two words
+ * leaves one space, not the two around it (`Install <Badge>beta</Badge> now`
+ * reads `Install now`).
+ */
+export const joinHeadingText = (pieces: readonly (string | null)[]): string => {
+  let text = "";
+  let gap = false;
+  for (const piece of pieces) {
+    if (piece === null) {
+      gap = true;
+      continue;
+    }
+    text += gap && /\s$/u.test(text) ? piece.replace(/^[\t ]+/u, "") : piece;
+    gap = false;
+  }
+  return text;
+};
+
+/** One raw HTML tag, as an inline `.md` (or scanned) heading holds it. */
+interface RawTag {
+  /** The attribute source after the name, a self-closing `/` included. */
+  attributes: string;
+  closing: boolean;
+  name: string;
+}
+
+const RAW_TAG =
+  /^<(?<closing>\/)?(?<name>[A-Za-z][\w.-]*)(?<attributes>[^>]*)>$/u;
+
+/** A raw inline HTML node's tag, or null when it holds something else. */
+const rawTag = (value: string): RawTag | null => {
+  const groups = RAW_TAG.exec(value.trim())?.groups;
+  return groups?.name === undefined
+    ? null
+    : {
+        attributes: groups.attributes ?? "",
+        closing: groups.closing !== undefined,
+        name: groups.name,
+      };
+};
+
+const isSelfClosing = (tag: RawTag): boolean =>
+  tag.attributes.trimEnd().endsWith("/");
+
+/**
+ * How a raw HTML node in a heading reads for its anchor: a `<Badge>` tag that
+ * opens or closes a run of badge text (a self-closing one is a badge with no
+ * text), the opening tag of an `<a>` (`target` its `id`, else its `name`),
+ * the `</a>` that closes one, or none of these.
+ */
+export type RawHeadingTag =
+  | { kind: "anchor-close" }
+  | { kind: "anchor-open"; selfClosing: boolean; target?: string }
+  | { kind: "badge"; selfClosing: boolean; closing: boolean }
+  | { kind: "other" };
+
+const ANCHOR_TARGET =
+  /(?:^|\s)(?<key>id|name)\s*=\s*(?:"(?<double>[^"]*)"|'(?<single>[^']*)'|(?<bare>[^\s"'=<>`/]+))/giu;
+
+/** An anchor's own fragment target: its `id`, else its `name`. */
+const anchorTarget = (attributes: string): string | undefined => {
+  const values = new Map<string, string>();
+  for (const match of attributes.matchAll(ANCHOR_TARGET)) {
+    const groups = match.groups ?? {};
+    const value = groups.double ?? groups.single ?? groups.bare;
+    const key = groups.key?.toLowerCase();
+    if (key && value && !values.has(key)) {
+      values.set(key, value);
+    }
+  }
+  return values.get("id") ?? values.get("name");
+};
+
+/** Classify a raw HTML node in a heading — see {@link RawHeadingTag}. */
+export const rawHeadingTag = (value: string): RawHeadingTag => {
+  const tag = rawTag(value);
+  if (tag?.name === "Badge") {
+    return {
+      closing: tag.closing,
+      kind: "badge",
+      selfClosing: isSelfClosing(tag),
+    };
+  }
+  if (tag?.name.toLowerCase() !== "a") {
+    return { kind: "other" };
+  }
+  return tag.closing
+    ? { kind: "anchor-close" }
+    : {
+        kind: "anchor-open",
+        selfClosing: isSelfClosing(tag),
+        target: anchorTarget(tag.attributes),
+      };
+};
+
+/**
+ * A JSX attribute: a name with a string value or an `{expression}` one, or a
+ * `{...spread}` (no name).
+ */
+export interface JsxAttribute {
+  name?: string;
+  type: string;
+  value?: string | { type: string; value?: string } | null;
+}
+
+const isStringValue = (value: JsxAttribute["value"]): value is string =>
+  typeof value === "string";
+
+/** A JSX `<a>`'s own fragment target: its string `id`, else its `name`. */
+export const jsxAnchorTarget = (
+  attributes: readonly JsxAttribute[]
+): string | undefined => {
+  const value = (key: string): string | undefined => {
+    const found = attributes.find((attribute) => attribute.name === key)?.value;
+    return isStringValue(found) && found !== "" ? found : undefined;
+  };
+  return value("id") ?? value("name");
+};
 
 /**
  * Register a pinned `[#id]` with the document slugger, the way

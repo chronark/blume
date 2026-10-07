@@ -11,7 +11,13 @@ import { mountBasePath } from "../base-path.ts";
 import { nextFenceState } from "../code-fences.ts";
 import type { FenceState } from "../code-fences.ts";
 import { diagnosticsFromIssues, diagnosticsFromZod } from "../diagnostics.ts";
-import { occupySlug, parseHeadingMarkers } from "../heading-markers.ts";
+import {
+  headingSlug,
+  joinHeadingText,
+  occupySlug,
+  parseHeadingMarkers,
+  rawHeadingTag,
+} from "../heading-markers.ts";
 import { localePlacement, localizeRoute } from "../i18n.ts";
 import { titleWord } from "../navigation.ts";
 import { stripOrderingPrefix } from "../ordering-prefix.ts";
@@ -550,9 +556,72 @@ const inlineText = (nodes: readonly Nodes[], context: HeadingContext): string =>
     })
     .join("");
 
+/** A heading's text, with what its own empty anchor pins. */
+interface HeadingContent {
+  /** The `id` (else `name`) of an empty `<a>` in the heading. */
+  target?: string;
+  text: string;
+}
+
+/** True for a raw `</a>`. */
+const isAnchorClose = (node: Nodes | undefined): boolean =>
+  node?.type === "html" && rawHeadingTag(node.value).kind === "anchor-close";
+
+/**
+ * A heading's text and own anchor, read the way `markdown/heading-anchors`
+ * reads them: an empty `<a>` (`<a id="x"></a>`, `<a name="x" />`) is the
+ * heading's own anchor, whose `id` (else `name`) pins the heading's id unless
+ * it is all the heading holds, and a `<Badge>`'s text is no part of the
+ * heading's text. In `.mdx` both are JSX, which this `.md` parse reads as the
+ * raw tags around their content, as the renderer does for `.md`.
+ */
+const headingContent = (
+  children: readonly Nodes[],
+  context: HeadingContext
+): HeadingContent => {
+  const pieces: (string | null)[] = [];
+  let target: string | undefined;
+  let kept = 0;
+  let badges = false;
+  let badgeDepth = 0;
+  let closesAnchor = false;
+  for (const [index, child] of children.entries()) {
+    if (closesAnchor) {
+      closesAnchor = false;
+      continue;
+    }
+    const tag = child.type === "html" ? rawHeadingTag(child.value) : null;
+    if (
+      tag?.kind === "anchor-open" &&
+      (tag.selfClosing || isAnchorClose(children[index + 1]))
+    ) {
+      target ??= tag.target;
+      closesAnchor = !tag.selfClosing;
+      continue;
+    }
+    kept += 1;
+    if (tag?.kind === "badge") {
+      badges = true;
+      pieces.push(null);
+      if (!tag.selfClosing) {
+        badgeDepth = Math.max(0, badgeDepth + (tag.closing ? -1 : 1));
+      }
+    } else if (badgeDepth === 0) {
+      pieces.push(inlineText([child], context));
+    }
+  }
+  return {
+    target: kept === 0 ? undefined : target,
+    text: badges ? joinHeadingText(pieces) : pieces.join(""),
+  };
+};
+
 /** A heading's rendered text plus the trailing markers the renderer strips. */
 interface RenderedHeading {
-  /** Author-pinned anchor id from `[#id]`/`{#id}`, used verbatim. */
+  /**
+   * Author-pinned anchor id from `[#id]`/`{#id}`, else from the heading's own
+   * empty `<a>`, used verbatim.
+   */
   id?: string;
   /** The text content the renderer slugs, markers stripped, untrimmed. */
   text: string;
@@ -600,18 +669,18 @@ const renderHeading = (
     return plainHeading(raw);
   }
   const { children } = heading;
-  const text = inlineText(children, context);
+  const { target, text } = headingContent(children, context);
   const last = children.at(-1);
   if (last?.type !== "text") {
-    return { text };
+    return { id: target, text };
   }
   const markers = parseHeadingMarkers(last.value);
   const stripped = last.value.length - markers.text.length;
   if (stripped === 0 || (markers.text === "" && children.length === 1)) {
-    return { text };
+    return { id: target, text };
   }
   return {
-    id: markers.id,
+    id: markers.id ?? target,
     text: text.slice(0, text.length - stripped),
     toc: markers.toc,
   };
@@ -656,7 +725,7 @@ const toHeading = (
     return { heading: { depth, slug: rendered.id, text }, pinned: true };
   }
   return {
-    heading: { depth, slug: slugger.slug(rendered.text), text },
+    heading: { depth, slug: headingSlug(slugger, rendered.text), text },
     pinned: false,
   };
 };
@@ -1426,7 +1495,8 @@ const entryLinks = <T extends Located>(
  * at render time. An included `.md` partial is spliced into the including
  * page and parsed in *its* format (see `markdown/include.ts`), so a partial's
  * markers count too and are reported against the partial via the expansion's
- * origins. `.md` pages render the marker as text and get no diagnostic.
+ * origins. `.md` pages pin the unspaced `{#id}` and are warned about the
+ * other spellings instead (see {@link mdCurlyMarkerDiagnostics}).
  */
 const curlyMarkerDiagnostics = (
   entry: SourceEntry,
@@ -1448,6 +1518,32 @@ const curlyMarkerDiagnostics = (
       suggestion: `Write \`[#${id}]\` or escape it as \`\\{#${id}\\}\` — both pin the same anchor in .md and .mdx.`,
     };
   });
+
+/**
+ * Warnings for the spaced `{ #id }` and kramdown `{: #id }` heading markers
+ * (MkDocs' `attr_list` writes both) in an `.md` page. Only the unspaced
+ * `{#id}` pins an anchor there; the other spellings stay in the heading's
+ * text, so the page shows them and the heading's id is slugged from them
+ * (`## Setup { #setup }` anchors as `setup--setup`).
+ */
+const mdCurlyMarkerDiagnostics = (
+  entry: SourceEntry,
+  markers: CurlyMarker[],
+  sourceName: string
+): Diagnostic[] =>
+  markers
+    .filter(({ id, marker }) => marker !== `{#${id}}`)
+    .map(({ id, line, marker }) => {
+      const origin = entry.expanded?.origins[line - 1];
+      return {
+        code: "BLUME_MD_CURLY_ANCHOR",
+        file: origin?.file ?? entry.sourcePath ?? `${sourceName}:${entry.ref}`,
+        line: origin?.line ?? line + entryLineOffset(entry),
+        message: `\`${marker}\` doesn't pin an anchor: only the unspaced \`{#${id}}\` does, so this one shows in the heading and its id is slugged from it.`,
+        severity: "warning",
+        suggestion: `Write \`{#${id}}\` or \`[#${id}]\` to pin the anchor \`#${id}\`.`,
+      };
+    });
 
 const deriveTitle = (
   meta: PageMeta,
@@ -1880,7 +1976,7 @@ export const normalizeEntry = (
     diagnostics:
       format === "mdx"
         ? curlyMarkerDiagnostics(entry, curlyMarkers, ctx.source.name)
-        : [],
+        : mdCurlyMarkerDiagnostics(entry, curlyMarkers, ctx.source.name),
     pages,
   };
 };

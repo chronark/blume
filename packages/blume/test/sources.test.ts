@@ -410,10 +410,6 @@ describe("normalizeEntry", () => {
       },
       { defaultType: "doc", source: { name: "s", staged: false } }
     );
-    const md = normalizeEntry(
-      { body: { format: "md", text: "## A { #a }\n" }, data: {}, ref: "a.md" },
-      { defaultType: "doc", source: { name: "s", staged: false } }
-    );
     expect(mdx.diagnostics.map((d) => [d.message, d.suggestion])).toStrictEqual(
       [
         [
@@ -426,9 +422,58 @@ describe("normalizeEntry", () => {
         ],
       ]
     );
-    // Only the unspaced `{#id}` is an anchor in .md; these stay heading text.
-    expect(md.diagnostics).toStrictEqual([]);
-    expect(md.pages[0]?.headings[0]?.text).toBe("A { #a }");
+  });
+
+  it("warns about the spaced and kramdown {#id} spellings in .md", () => {
+    const md = normalizeEntry(
+      {
+        body: {
+          format: "md",
+          text: "## A { #a }\n\n## B {: #b }\n\n## C {#c}\n",
+        },
+        data: {},
+        raw: "---\ntitle: X\n---\n## A { #a }\n\n## B {: #b }\n\n## C {#c}\n",
+        ref: "a.md",
+        sourcePath: "/abs/a.md",
+      },
+      { defaultType: "doc", source: { name: "s", staged: false } }
+    );
+    // Only the unspaced `{#id}` is an anchor in .md; the others stay heading
+    // text, slugged into the id, and are reported where they're written.
+    expect(md.pages[0]?.headings).toStrictEqual([
+      { depth: 2, slug: "a--a", text: "A { #a }" },
+      { depth: 2, slug: "b--b", text: "B {: #b }" },
+      { depth: 2, slug: "c", text: "C" },
+    ]);
+    expect(md.diagnostics).toStrictEqual([
+      {
+        code: "BLUME_MD_CURLY_ANCHOR",
+        file: "/abs/a.md",
+        line: 4,
+        message:
+          "`{ #a }` doesn't pin an anchor: only the unspaced `{#a}` does, so this one shows in the heading and its id is slugged from it.",
+        severity: "warning",
+        suggestion: "Write `{#a}` or `[#a]` to pin the anchor `#a`.",
+      },
+      {
+        code: "BLUME_MD_CURLY_ANCHOR",
+        file: "/abs/a.md",
+        line: 6,
+        message:
+          "`{: #b }` doesn't pin an anchor: only the unspaced `{#b}` does, so this one shows in the heading and its id is slugged from it.",
+        severity: "warning",
+        suggestion: "Write `{#b}` or `[#b]` to pin the anchor `#b`.",
+      },
+    ]);
+  });
+
+  it("names a path-less remote .md entry by source and ref in the {#id} warning", () => {
+    const { diagnostics } = normalizeEntry(
+      { body: { format: "md", text: "## A { #a }\n" }, data: {}, ref: "a.md" },
+      { defaultType: "doc", source: { name: "cms", staged: false } }
+    );
+    expect(diagnostics[0]?.file).toBe("cms:a.md");
+    expect(diagnostics[0]?.line).toBe(1);
   });
 
   it("names a path-less remote .mdx entry by source and ref in the {#id} diagnostic", () => {

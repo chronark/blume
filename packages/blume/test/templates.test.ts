@@ -60,7 +60,7 @@ import {
 import { hcaptcha, turnstile } from "../src/captcha/index.ts";
 import { mountBasePath, stripBasePath } from "../src/core/base-path.ts";
 import type { BlumeConfig } from "../src/core/config-input.ts";
-import { TOC_HIDDEN_KEY } from "../src/core/heading-markers.ts";
+import { TOC_HIDDEN_KEY, TOC_TEXT_KEY } from "../src/core/heading-markers.ts";
 import { routeSetFor, servesRoute } from "../src/core/locale-links.ts";
 import { blumeConfigSchema } from "../src/core/schema.ts";
 import type { ProjectContext } from "../src/core/types.ts";
@@ -379,6 +379,14 @@ return localeSwitch.map((option) => [option.code, option.href, option.untranslat
     // keeps a `frontmatter.extend`-declared value from crashing the render.
     expect(out).toContain(`remarkPluginFrontmatter?.${TOC_HIDDEN_KEY}`);
     expect(out).toContain("Array.isArray(tocHiddenRaw)");
+  });
+
+  it("lists badge-holding headings by the heading plugin's TOC text", () => {
+    const out = catchAllPageTemplate({ ...exportOpts, mathEnabled: false });
+    // Same contract as the hidden list: the key comes from the shared
+    // constant, and only a string under a heading's slug replaces its text.
+    expect(out).toContain(`remarkPluginFrontmatter?.${TOC_TEXT_KEY}`);
+    expect(out).toContain('typeof tocText[heading.slug] === "string"');
   });
 
   it("serializes the island-hooks snapshot only when React is enabled", () => {

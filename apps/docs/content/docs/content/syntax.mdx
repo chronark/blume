@@ -19,7 +19,7 @@ Structure a page with headings. Blume renders your frontmatter `title` as the pa
 
 ### Custom anchors
 
-Anchor ids are generated from the heading text, so a reworded heading gets a new anchor. Append `[#custom-id]` to pin the anchor instead — the marker never renders, and links keep working no matter how the heading reads. Pinned anchors also stay identical across [translated locales](/docs/content/i18n), where auto-generated ids would otherwise differ per language.
+Anchor ids are generated from the heading text, so a reworded heading gets a new anchor. A `<Badge>` in a heading is a label, not part of that text: `## Install <Badge>beta</Badge>` anchors as `#install` and reads "Install" in the table of contents. An id never ends in a dash, so `## Features ✨` anchors as `#features`, and a component or image at either end of a heading adds no dash. Append `[#custom-id]` to pin the anchor instead — the marker never renders, and links keep working no matter how the heading reads. Pinned anchors also stay identical across [translated locales](/docs/content/i18n), where auto-generated ids would otherwise differ per language.
 
 ```md
 ## Getting started [#setup]
@@ -27,13 +27,19 @@ Anchor ids are generated from the heading text, so a reworded heading gets a new
 
 Link to it as `/page#setup`. The syntax matches Fumadocs, so migrated content works verbatim.
 
-The `{#custom-id}` form used by Pandoc, kramdown, and Markdown-based specification toolchains is accepted as an equivalent in `.md` files. Only that unspaced spelling pins an anchor: the spaced `{ #custom-id }` and kramdown's `{: #custom-id }` (both from MkDocs' `attr_list`) stay in the heading text. In `.mdx`, a bare `{…}` is a JSX expression and the page fails to compile — `blume check` reports all three spellings as `BLUME_MDX_CURLY_ANCHOR` — so write `[#custom-id]` there, or escape the braces. The escaped form pins the same anchor in both formats, which makes it the right spelling for a partial that `.mdx` pages [include](/docs/content/includes):
+The `{#custom-id}` form used by Pandoc, kramdown, and Markdown-based specification toolchains is accepted as an equivalent in `.md` files. Only that unspaced spelling pins an anchor: the spaced `{ #custom-id }` and kramdown's `{: #custom-id }` (both from MkDocs' `attr_list`) stay in the heading's text and its anchor, and `blume check` warns about them in `.md` as `BLUME_MD_CURLY_ANCHOR`. In `.mdx`, a bare `{…}` is a JSX expression and the page fails to compile — `blume check` reports all three spellings as `BLUME_MDX_CURLY_ANCHOR` — so write `[#custom-id]` there, or escape the braces. The escaped form pins the same anchor in both formats, which makes it the right spelling for a partial that `.mdx` pages [include](/docs/content/includes):
 
 ```md
 ## Getting started \{#setup\}
 ```
 
 Fragment links can also target a raw HTML element with an `id` (`<a id="setup"></a>`), or an `<a name="setup">`; `blume validate` accepts those alongside heading anchors.
+
+An empty `<a>` inside a heading is the heading's own anchor, the way GitBook exports (`<a href="#setup" id="setup"></a>`) and wikis (`<a name="setup"></a>`) write one. Blume takes it out of the heading and gives the heading its `id`, or else its `name`, so `#setup` links keep landing there and the heading keeps its own self-link. A `[#custom-id]` marker on the same heading wins.
+
+```md
+## Getting started <a id="setup"></a>
+```
 
 ### Table of contents markers
 

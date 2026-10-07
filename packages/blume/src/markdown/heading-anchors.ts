@@ -5,8 +5,12 @@
  * - parses trailing markers (`[#custom-id]`, `{#custom-id}`, `[!toc]`, `[toc]`
  *   — see `core/heading-markers.ts`) and strips them from the rendered text;
 
- * - assigns the anchor `id` (the `[#custom-id]` pin, else a `github-slugger`
- *   slug of the marker-free text);
+ * - takes out an empty `<a>` the heading holds as its own anchor (GitBook's
+ *   `<a href="#x" id="x"></a>`, a wiki's `<a name="x"></a>`), whose `id` or
+ *   `name` then pins the heading's id — see {@link readContent};
+ * - assigns the anchor `id` (the `[#custom-id]` pin, else that anchor's id,
+ *   else a `github-slugger` slug of the marker-free text, `<Badge>` text left
+ *   out — see `headingSlug`);
  * - wraps `<h2>`–`<h6>` content in an `<a href="#slug">` so a reader can click
  *   the heading to copy, bookmark, or share a link straight to that section
  *   (`<h1>` — the page title — is slugged for parity but left unwrapped, and
@@ -28,23 +32,33 @@
  * surfaces as `remarkPluginFrontmatter` so the page template can filter them
  * out of the headings list. `[toc]` headings render with the
  * `blume-toc-only` class (visually hidden, still a live anchor target) so the
- * TOC entry has somewhere to scroll to.
+ * TOC entry has somewhere to scroll to. `heading-ids` reads a heading's TOC
+ * text from its whole text content, badge included, so a heading holding a
+ * `<Badge>` reports its badge-free text under `frontmatter[TOC_TEXT_KEY]`.
  */
 
 import { satteriCollectHastText } from "@astrojs/markdown-satteri";
 import GithubSlugger from "github-slugger";
 
 import {
+  headingSlug,
+  joinHeadingText,
+  jsxAnchorTarget,
   occupySlug,
   parseHeadingMarkers,
+  rawHeadingTag,
   TOC_HIDDEN_KEY,
+  TOC_TEXT_KEY,
 } from "../core/heading-markers.ts";
+import type { JsxAttribute } from "../core/heading-markers.ts";
 
 /** A hast property value: an attribute primitive or a token list. */
 type HastPropertyValue = string | number | boolean | (string | number)[];
 
 /** A minimal hast node (avoids a hast type dependency). */
 interface HastNode {
+  /** An MDX JSX element's attributes. */
+  attributes?: JsxAttribute[];
   children?: HastNode[];
   name?: string;
   properties?: Record<string, HastPropertyValue>;
@@ -83,15 +97,18 @@ const WRAPPED = new Set(["h2", "h3", "h4", "h5", "h6"]);
 /** The class that renders a `[toc]`-only heading as an invisible anchor. */
 const TOC_ONLY_CLASS = "blume-toc-only";
 
-/** True if the subtree already contains an `<a>`, so wrapping would nest links. */
-const containsAnchor = (node: HastNode): boolean => {
-  for (const child of node.children ?? []) {
-    if ((child.tagName ?? child.name) === "a" || containsAnchor(child)) {
-      return true;
-    }
-  }
-  return false;
-};
+/**
+ * True for an `<a>`: an element, a JSX element, or (in `.md`, where inline
+ * HTML stays raw) a raw opening `<a>` tag.
+ */
+const isAnchor = (node: HastNode): boolean =>
+  (node.tagName ?? node.name) === "a" ||
+  (node.type === "raw" &&
+    rawHeadingTag(node.value ?? "").kind === "anchor-open");
+
+/** True if the nodes already contain an `<a>`, so wrapping would nest links. */
+const containsAnchor = (nodes: readonly HastNode[]): boolean =>
+  nodes.some((node) => isAnchor(node) || containsAnchor(node.children ?? []));
 
 // One state record per document render. The plugin instance is shared across
 // every page, but slug disambiguation (and the hidden-heading list) must reset
@@ -102,6 +119,11 @@ interface RenderState {
   /** Slugs of `[!toc]` headings, shared by reference with the frontmatter. */
   hidden: string[];
   slugger: GithubSlugger;
+  /**
+   * TOC text by slug for badge-holding headings, shared by reference with the
+   * frontmatter once the first one is recorded.
+   */
+  tocText?: Record<string, string>;
 }
 
 const FALLBACK_SCOPE = {};
@@ -122,8 +144,28 @@ const stateFor = (ctx: HastContext): RenderState => {
   const frontmatter = ctx.data?.astro?.frontmatter;
   if (frontmatter) {
     frontmatter[TOC_HIDDEN_KEY] = state.hidden;
+    // The TOC text map is added only by a page with a badge in a heading, so
+    // a stale one is dropped rather than replaced.
+    Reflect.deleteProperty(frontmatter, TOC_TEXT_KEY);
   }
   return state;
+};
+
+/** Record a badge-holding heading's TOC text (see {@link TOC_TEXT_KEY}). */
+const recordTocText = (
+  state: RenderState,
+  ctx: HastContext,
+  slug: string,
+  text: string
+): void => {
+  if (!state.tocText) {
+    state.tocText = {};
+    const frontmatter = ctx.data?.astro?.frontmatter;
+    if (frontmatter) {
+      frontmatter[TOC_TEXT_KEY] = state.tocText;
+    }
+  }
+  state.tocText[slug] = text;
 };
 
 /** Whether a heading already carries a usable string `id`. */
@@ -176,23 +218,147 @@ const stripMarkers = (node: HastNode): StrippedHeading => {
   };
 };
 
-/** The slug for a heading, mirroring Satteri's `heading-ids` exactly. */
-const slugFor = (
+/** A heading's content read for its anchor, past its trailing markers. */
+interface HeadingContent {
+  /** The children the heading renders: its own empty anchors taken out. */
+  children: HastNode[];
+  /** The `id` (else `name`) of an anchor taken out: the heading's id. */
+  target?: string;
+  /** The heading's text with its badges left out, when it holds one. */
+  text?: string;
+}
+
+/** An empty JSX `<a>` (an `.mdx` heading's own anchor). */
+const isEmptyJsxAnchor = (node: HastNode): boolean =>
+  node.type === "mdxJsxTextElement" &&
+  node.name === "a" &&
+  (node.children ?? []).length === 0;
+
+/** True for a raw `</a>`. */
+const isRawAnchorClose = (node: HastNode | undefined): boolean =>
+  node?.type === "raw" &&
+  rawHeadingTag(node.value ?? "").kind === "anchor-close";
+
+/** A heading child's text content; raw HTML has none. */
+const textPiece = (node: HastNode, ctx: HastContext): string => {
+  if (node.type === "text") {
+    return node.value ?? "";
+  }
+  return node.type === "raw" ? "" : ctx.textContent(node);
+};
+
+/** An empty anchor in a heading: how many nodes it spans, and its target. */
+interface OwnAnchor {
+  span: number;
+  target?: string;
+}
+
+/**
+ * The empty `<a>` that starts at `children[index]`, if one does: a JSX
+ * element with no children, a self-closing raw tag, or a raw tag closed by
+ * the next node.
+ */
+const ownAnchorAt = (
+  children: readonly HastNode[],
+  index: number
+): OwnAnchor | undefined => {
+  const child = children[index];
+  if (child && isEmptyJsxAnchor(child)) {
+    return { span: 1, target: jsxAnchorTarget(child.attributes ?? []) };
+  }
+  const tag =
+    child?.type === "raw" ? rawHeadingTag(child.value ?? "") : undefined;
+  if (tag?.kind !== "anchor-open") {
+    return undefined;
+  }
+  if (tag.selfClosing) {
+    return { span: 1, target: tag.target };
+  }
+  return isRawAnchorClose(children[index + 1])
+    ? { span: 2, target: tag.target }
+    : undefined;
+};
+
+/**
+ * How a heading child moves through a badge: undefined for no badge, else
+ * the change it makes to the depth of raw `<Badge>` tags its text sits in
+ * (a JSX badge holds its text, so it changes nothing).
+ */
+const badgeStep = (child: HastNode): number | undefined => {
+  if (child.type === "mdxJsxTextElement" && child.name === "Badge") {
+    return 0;
+  }
+  const tag =
+    child.type === "raw" ? rawHeadingTag(child.value ?? "") : undefined;
+  if (tag?.kind !== "badge") {
+    return undefined;
+  }
+  if (tag.selfClosing) {
+    return 0;
+  }
+  return tag.closing ? -1 : 1;
+};
+
+/**
+ * Read a heading's children for its anchor:
+ *
+ * - An empty `<a>` is the heading's own anchor — an export's
+ *   `<a href="#x" id="x"></a>`, a wiki's `<a name="x"></a>` — kept beside
+ *   the heading's text so links to `#x` land there. Left in, it would nest
+ *   inside the self-link (invalid HTML), or stop the self-link from
+ *   rendering. It comes out, and its `id` (else `name`) becomes the
+ *   heading's id, so `#x` keeps working. A heading with no other content
+ *   keeps it.
+ * - A `<Badge>` is a label beside the heading, not part of its name: its text
+ *   stays out of the heading's id and TOC entry. In `.mdx` it is a JSX
+ *   element; in `.md`, raw tags around its text.
+ */
+const readContent = (
+  children: readonly HastNode[],
+  ctx: HastContext
+): HeadingContent => {
+  const kept: HastNode[] = [];
+  const pieces: (string | null)[] = [];
+  let target: string | undefined;
+  let badges = false;
+  let badgeDepth = 0;
+  // Nodes still to skip: the `</a>` of a raw anchor taken out.
+  let skip = 0;
+  for (const [index, child] of children.entries()) {
+    const anchor = skip > 0 ? undefined : ownAnchorAt(children, index);
+    if (skip > 0 || anchor) {
+      target ??= anchor?.target;
+      skip = anchor ? anchor.span - 1 : skip - 1;
+      continue;
+    }
+    kept.push(child);
+    const step = badgeStep(child);
+    if (step === undefined) {
+      if (badgeDepth === 0) {
+        pieces.push(textPiece(child, ctx));
+      }
+    } else {
+      badges = true;
+      pieces.push(null);
+      badgeDepth = Math.max(0, badgeDepth + step);
+    }
+  }
+  if (kept.length === 0) {
+    return { children: [...children] };
+  }
+  return {
+    children: kept,
+    target,
+    text: badges ? joinHeadingText(pieces) : undefined,
+  };
+};
+
+/** The heading's marker-free text content, as `heading-ids` reads it. */
+const headingText = (
   node: HastNode,
   ctx: HastContext,
-  slugger: GithubSlugger,
   stripped: StrippedHeading
 ): string => {
-  if (stripped.id !== undefined) {
-    // Pinning occupies the id, so a later heading whose auto-slug collides
-    // disambiguates (`setup` → `setup-1`) instead of duplicating the anchor.
-    occupySlug(slugger, stripped.id);
-    return stripped.id;
-  }
-  const existingId = node.properties?.id;
-  if (isStringId(existingId)) {
-    return existingId;
-  }
   // The marker suffix is a trailing slice of the text content, so the
   // marker-free text is the content minus exactly what the strip removed.
   const fullText = ctx.textContent(node);
@@ -203,7 +369,7 @@ const slugFor = (
   // resolved value; the helper is the same one `heading-ids` defers to.
   // SAFETY: HastNode is a structural subset of the hast element shape the
   // helper walks (children/type/value), so the node always fits.
-  const text = rawText.includes("frontmatter")
+  return rawText.includes("frontmatter")
     ? satteriCollectHastText(
         {
           ...node,
@@ -212,7 +378,28 @@ const slugFor = (
         ctx.data?.astro?.frontmatter ?? {}
       )
     : rawText;
-  return slugger.slug(text);
+};
+
+/** The slug for a heading, mirroring Satteri's `heading-ids` exactly. */
+const slugFor = (
+  node: HastNode,
+  ctx: HastContext,
+  slugger: GithubSlugger,
+  stripped: StrippedHeading,
+  content: HeadingContent
+): string => {
+  const pinned = stripped.id ?? content.target;
+  if (pinned !== undefined) {
+    // Pinning occupies the id, so a later heading whose auto-slug collides
+    // disambiguates (`setup` → `setup-1`) instead of duplicating the anchor.
+    occupySlug(slugger, pinned);
+    return pinned;
+  }
+  const existingId = node.properties?.id;
+  if (isStringId(existingId)) {
+    return existingId;
+  }
+  return headingSlug(slugger, content.text ?? headingText(node, ctx, stripped));
 };
 
 /** The heading's class list with `blume-toc-only` appended. */
@@ -236,6 +423,47 @@ const hasTocOnlyClass = (node: HastNode): boolean => {
 };
 
 /**
+ * A heading left without its self-link. Marker-free headings mutate in place;
+ * a stripped one, one that lost its own anchor, or a `[toc]`-only one needs
+ * its children (and class) replaced, so it re-emits as a new element carrying
+ * the original children as refs.
+ */
+const unwrappedHeading = (
+  node: HastNode,
+  ctx: HastContext,
+  slug: string,
+  stripped: StrippedHeading,
+  content: HeadingContent
+): HastNode | undefined => {
+  const tocOnly = stripped.toc === "only" || hasTocOnlyClass(node);
+  if (
+    stripped.strippedLength ||
+    content.children.length !== stripped.children.length ||
+    (tocOnly && !hasTocOnlyClass(node))
+  ) {
+    const properties = tocOnly
+      ? {
+          ...node.properties,
+          className: withTocOnlyClass(node.properties?.className),
+          id: slug,
+        }
+      : { ...node.properties, id: slug };
+    return {
+      children: content.children,
+      properties,
+      tagName: node.tagName,
+      type: "element",
+    };
+  }
+  // Unwrapped headings (h1, an empty slug, or one that already links) still
+  // need the id so `heading-ids` adopts it instead of re-slugging.
+  if (!isStringId(node.properties?.id)) {
+    ctx.setProperty(node, "id", slug);
+  }
+  return undefined;
+};
+
+/**
  * Build the plugin. Always parses markers and assigns ids; `wrap: false` only
  * disables the self-linking anchor wrap on `<h2>`–`<h6>`.
  */
@@ -247,50 +475,31 @@ export const headingAnchorPlugin = (
     visit(node, ctx) {
       const state = stateFor(ctx);
       const stripped = stripMarkers(node);
-      const slug = slugFor(node, ctx, state.slugger, stripped);
+      const content = readContent(stripped.children, ctx);
+      const slug = slugFor(node, ctx, state.slugger, stripped, content);
       if (stripped.toc === "hide") {
         state.hidden.push(slug);
       }
-      const tocOnly = stripped.toc === "only" || hasTocOnlyClass(node);
+      if (content.text !== undefined) {
+        recordTocText(state, ctx, slug, content.text.trim());
+      }
       const wrap =
         options.wrap !== false &&
         node.tagName !== undefined &&
         WRAPPED.has(node.tagName) &&
         slug !== "" &&
-        !tocOnly &&
-        !containsAnchor(node);
+        stripped.toc !== "only" &&
+        !hasTocOnlyClass(node) &&
+        !containsAnchor(content.children);
       if (!wrap) {
-        // Marker-free headings mutate in place; a stripped or `[toc]`-only one
-        // needs its children (and class) replaced, so it re-emits as a new
-        // element carrying the original children as refs.
-        if (stripped.strippedLength || (tocOnly && !hasTocOnlyClass(node))) {
-          const properties = tocOnly
-            ? {
-                ...node.properties,
-                className: withTocOnlyClass(node.properties?.className),
-                id: slug,
-              }
-            : { ...node.properties, id: slug };
-          return {
-            children: stripped.children,
-            properties,
-            tagName: node.tagName,
-            type: "element",
-          };
-        }
-        // Unwrapped headings (h1, an empty slug, or one that already links)
-        // still need the id so `heading-ids` adopts it instead of re-slugging.
-        if (!isStringId(node.properties?.id)) {
-          ctx.setProperty(node, "id", slug);
-        }
-        return;
+        return unwrappedHeading(node, ctx, slug, stripped, content);
       }
       // Replacing the heading re-emits its original children as refs inside the
       // new anchor (Satteri passes reused nodes through untouched).
       return {
         children: [
           {
-            children: stripped.children,
+            children: content.children,
             properties: {
               className: ["blume-heading-anchor"],
               href: `#${slug}`,

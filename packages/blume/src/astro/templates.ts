@@ -10,7 +10,7 @@ import { buildHomeLinkHeader } from "../ai/link-headers.ts";
 import type { CaptchaAdapter } from "../captcha/schema.ts";
 import { CONSENT_CLIENT_MODULES } from "../consent/clients.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
-import { TOC_HIDDEN_KEY } from "../core/heading-markers.ts";
+import { TOC_HIDDEN_KEY, TOC_TEXT_KEY } from "../core/heading-markers.ts";
 import {
   compileEveryRedirect,
   isPatternPath,
@@ -2529,10 +2529,19 @@ const views = Array.isArray(viewsRaw)
   : [];
 const tocHiddenRaw = remarkPluginFrontmatter?.${TOC_HIDDEN_KEY};
 const tocHidden = new Set(Array.isArray(tocHiddenRaw) ? tocHiddenRaw : []);
-const headings =
+// A heading holding a \`<Badge>\` lists without the badge's text, which the
+// heading plugin reports by slug the same way.
+const tocTextRaw = remarkPluginFrontmatter?.${TOC_TEXT_KEY};
+const tocText = tocTextRaw && typeof tocTextRaw === "object" ? tocTextRaw : {};
+const headings = (
   tocHidden.size > 0
     ? allHeadings.filter((heading) => !tocHidden.has(heading.slug))
-    : allHeadings;
+    : allHeadings
+).map((heading) =>
+  typeof tocText[heading.slug] === "string"
+    ? { ...heading, text: tocText[heading.slug] }
+    : heading
+);
 const frontmatter = entry.data;
 
 const seo = frontmatter.seo;
