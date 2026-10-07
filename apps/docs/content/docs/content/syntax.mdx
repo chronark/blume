@@ -311,7 +311,7 @@ Both work alongside a title and `lineNumbers`. To wrap every block, set `markdow
 
 ### Highlighting
 
-Annotate code with GitHub-style comments to draw attention to lines, words, and changes. The comments are stripped from the rendered output, so the code stays copy-paste clean. All four are on by default — no configuration.
+Annotate code with GitHub-style comments to draw attention to lines, words, and changes. The comments are stripped from the rendered output, so the code stays copy-paste clean. All of them are on by default — no configuration.
 
 Mark a line with `// [!code highlight]` to give it a highlighted background:
 
@@ -336,6 +336,13 @@ Highlight every occurrence of a term on a line with `// [!code word:createServer
 import { createServer } from "node:http"; // [!code word:createServer]
 
 createServer().listen(3000);
+```
+
+Flag a line as a problem with `// [!code error]` or `// [!code warning]`, tinted red and amber:
+
+```ts
+const port = process.env.PORT; // [!code warning]
+server.listen(port.trim()); // [!code error]
 ```
 
 Dim everything except the lines you mark with `// [!code focus]` (the rest sharpens on hover):

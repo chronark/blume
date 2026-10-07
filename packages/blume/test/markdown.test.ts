@@ -355,12 +355,13 @@ describe(blumeShikiTransformers, () => {
     const names = blumeShikiTransformers().map(
       (transformer) => transformer.name ?? ""
     );
-    expect(names).toHaveLength(7);
+    expect(names).toHaveLength(8);
     // Upstream Shiki transformers (notation + meta-highlight range) run first.
     expect(names).toContain("@shikijs/transformers:notation-highlight");
     expect(names).toContain("@shikijs/transformers:notation-diff");
     expect(names).toContain("@shikijs/transformers:notation-highlight-word");
     expect(names).toContain("@shikijs/transformers:notation-focus");
+    expect(names).toContain("@shikijs/transformers:notation-error-level");
     expect(names).toContain("@shikijs/transformers:meta-highlight");
     // Blume's own transformers: the icon, then the fence-meta reader last.
     expect(names).toContain("blume:language-icon");
@@ -371,7 +372,7 @@ describe(blumeShikiTransformers, () => {
     const names = blumeShikiTransformers({ icons: false }).map(
       (transformer) => transformer.name ?? ""
     );
-    expect(names).toHaveLength(6);
+    expect(names).toHaveLength(7);
     expect(names).not.toContain("blume:language-icon");
     expect(names.at(-1)).toBe("blume:code-meta");
   });
@@ -1738,6 +1739,40 @@ const renderExpandable = (code: string) =>
     themes: { dark: "github-dark", light: "github-light" },
     transformers: blumeShikiTransformers({ icons: false }),
   });
+
+/** A `ts` block highlighted by Shiki with Blume's transformers. */
+const renderTs = (code: string) =>
+  codeToHtml(code, {
+    defaultColor: false,
+    lang: "ts",
+    themes: { dark: "github-dark", light: "github-light" },
+    transformers: blumeShikiTransformers({ icons: false }),
+  });
+
+describe("error and warning notations", () => {
+  it("marks error and warning lines and strips their comments", async () => {
+    const html = await renderTs(
+      [
+        "const port = process.env.PORT; // [!code warning]",
+        "server.listen(port.trim()); // [!code error]",
+        "done();",
+      ].join("\n")
+    );
+    expect(html).toContain('class="line highlighted warning"');
+    expect(html).toContain('class="line highlighted error"');
+    expect(html).not.toContain("[!code");
+    // The plain line stays a plain line.
+    expect(html.match(/class="line"/gu)).toHaveLength(1);
+  });
+
+  it("leaves an info notation as written", async () => {
+    // Only error and warning are styled; `[!code info]` stays a comment
+    // rather than turning into an unstyled highlight.
+    const html = await renderTs("run(); // [!code info]");
+    expect(html).toContain("[!code info]");
+    expect(html).not.toContain("highlighted");
+  });
+});
 
 describe("fence keywords through Shiki", () => {
   it("counts an expandable block's lines from the source Shiki passes", async () => {

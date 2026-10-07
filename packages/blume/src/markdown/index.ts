@@ -2,6 +2,7 @@ import { satteri } from "@astrojs/markdown-satteri";
 import {
   transformerMetaHighlight,
   transformerNotationDiff,
+  transformerNotationErrorLevel,
   transformerNotationFocus,
   transformerNotationHighlight,
   transformerNotationWordHighlight,
@@ -105,18 +106,19 @@ const blumeHastPlugins = (options: BlumeMarkdownOptions): HastPlugin[] => [
 ];
 
 /**
- * Shiki transformers enabled by default for every code block. The four upstream
+ * Shiki transformers enabled by default for every code block. The upstream
  * notation transformers read GitHub-style comments and strip them from the
  * output: `// [!code highlight]`, `// [!code ++]` / `// [!code --]`,
- * `// [!code word:x]`, and `// [!code focus]`. The v3 match algorithm scopes a
+ * `// [!code word:x]`, `// [!code focus]`, and `// [!code error]` /
+ * `// [!code warning]`. The v3 match algorithm scopes a
  * notation to the line it sits on (or the next, for a trailing comment).
  * `transformerMetaHighlight` adds numeric range highlighting from the fence meta
  * (` ```ts {1,3-5} `), reusing the same `highlighted` class. Blume's own
  * {@link languageIconTransformer} prepends a brand icon, and
  * {@link codeTitleTransformer} runs last to promote fence-meta (title / line
  * numbers) to `<pre>` attributes. The theme styles the classes these emit
- * (`highlighted`, `diff add/remove`, `highlighted-word`, `focused`,
- * `blume-lang-icon`).
+ * (`highlighted`, `highlighted error/warning`, `diff add/remove`,
+ * `highlighted-word`, `focused`, `blume-lang-icon`).
  */
 export interface BlumeShikiOptions {
   /** Prepend a brand language icon to the header (`markdown.code.icons`). */
@@ -131,6 +133,15 @@ export const blumeShikiTransformers = (
     transformerNotationDiff({ matchAlgorithm: "v3" }),
     transformerNotationWordHighlight({ matchAlgorithm: "v3" }),
     transformerNotationFocus({ matchAlgorithm: "v3" }),
+    // Only the two levels the theme styles: upstream also maps `[!code info]`,
+    // which would otherwise strip the comment and leave a plain highlight.
+    transformerNotationErrorLevel({
+      classMap: {
+        error: ["highlighted", "error"],
+        warning: ["highlighted", "warning"],
+      },
+      matchAlgorithm: "v3",
+    }),
     transformerMetaHighlight(),
   ];
   if (options.icons !== false) {
