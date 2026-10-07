@@ -71,6 +71,10 @@ export interface PageLink {
    * the Markdown pipeline neither resolves its relative path file-style nor
    * mounts the base path on it, so it's checked the way a browser reads it. */
   raw?: boolean;
+  /** The element, when the target is a media element's `src` (`img`,
+   * `source`, `video`, `audio`). It's `raw` too: it ships as written, and
+   * nothing copies a file beside the page for it, unlike an image embed. */
+  src?: string;
   /** 1-based line number in the source file. */
   line: number;
   /** 1-based column of the target within the line. */

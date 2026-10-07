@@ -37,6 +37,12 @@ const raw = (target: string, line: number): PageLink => ({
   target,
 });
 
+// A media element's `src` (`<img src>`), raw like an `<a href>`.
+const src = (target: string, line: number, tag = "img"): PageLink => ({
+  ...raw(target, line),
+  src: tag,
+});
+
 const heading = (text: string, slug: string): Heading => ({
   depth: 2,
   slug,
@@ -128,6 +134,25 @@ describe(extractLinks, () => {
     expect(extractLinks(body)).toStrictEqual([
       { column: 13, line: 1, raw: true, target: "./raw" },
       { column: 9, line: 3, raw: true, target: "/wrapped#top" },
+    ]);
+  });
+
+  it("reads a media element's string src as a raw link", () => {
+    const body = [
+      '<img alt="x" src="./diagram.png"> and <source src=\'/clip.webm\'>',
+      "<video",
+      '  controls src="./demo.mp4"',
+      "/>",
+      '<audio src={track} /> <img data-src="./lazy.png"> <img src="">',
+      String.raw`\<img src="./escaped.png"> \`<img src="./code.png">\``,
+      "```html",
+      '<img src="./fenced.png">',
+      "```",
+    ].join("\n");
+    expect(extractLinks(body)).toStrictEqual([
+      { column: 19, line: 1, raw: true, src: "img", target: "./diagram.png" },
+      { column: 52, line: 1, raw: true, src: "source", target: "/clip.webm" },
+      { column: 17, line: 3, raw: true, src: "video", target: "./demo.mp4" },
     ]);
   });
 
@@ -963,6 +988,63 @@ describe("validateLinks — assets against a public dir", () => {
     );
     expect(diagnostics.map((d) => d.message)).toStrictEqual([
       "Image ./missing.png was not found next to a.mdx.",
+    ]);
+  });
+
+  it("checks a media src where the browser requests it, as written", async () => {
+    const partial = join(contentDir, "_snippets", "media.mdx");
+    const diagnostics = await validateWithPublic([
+      guidePage([
+        // `/guides/a` requests `../logo.png` at `/logo.png`, in public/.
+        src("../logo.png", 1),
+        src("/logo.png?v=2", 2),
+        src("./screenshot.png", 3),
+        src("./screenshot.png#t=1", 4, "video"),
+        src("./nothing.png", 5),
+        src("/missing.png", 6),
+        { ...src("../images/diagram.png", 7), file: partial },
+      ]),
+      makePage({
+        id: "remote.mdx",
+        links: [src("./remote.png", 1)],
+        route: "/remote",
+        sourcePath: undefined,
+      }),
+    ]);
+    expect(
+      diagnostics.map((d) => [d.line, d.message, d.suggestion])
+    ).toStrictEqual([
+      [
+        3,
+        '<img src="./screenshot.png"> names a file next to a.mdx, but a src in HTML ships as written and the file isn\'t published, so the browser requests /guides/screenshot.png and gets a 404.',
+        "Embed the image with Markdown syntax (![alt](./screenshot.png)), which publishes it, or move it into public/ and use its root path.",
+      ],
+      [
+        4,
+        '<video src="./screenshot.png#t=1"> names a file next to a.mdx, but a src in HTML ships as written and the file isn\'t published, so the browser requests /guides/screenshot.png and gets a 404.',
+        "Move the file into public/ and use its root path.",
+      ],
+      [
+        5,
+        "<img src=\"./nothing.png\"> points at /guides/nothing.png, which isn't in the public directory, and there's no ./nothing.png next to a.mdx either.",
+        "Fix the path, or add the file.",
+      ],
+      [
+        6,
+        '<img src="/missing.png"> points at /missing.png, which isn\'t in the public directory.',
+        "Add the file at public/missing.png or fix the src.",
+      ],
+      [
+        7,
+        // Beside the partial it's written in, not the including page.
+        '<img src="../images/diagram.png"> (included by a.mdx) names a file next to media.mdx, but a src in HTML ships as written and the file isn\'t published, so the browser requests /images/diagram.png and gets a 404.',
+        "Embed the image with Markdown syntax (![alt](../images/diagram.png)), which publishes it, or move it into public/ and use its root path.",
+      ],
+      [
+        1,
+        '<img src="./remote.png"> points at /remote.png, which isn\'t in the public directory.',
+        "Add the file at public/remote.png or fix the src.",
+      ],
     ]);
   });
 

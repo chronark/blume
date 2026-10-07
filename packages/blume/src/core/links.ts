@@ -485,6 +485,61 @@ const checkPathLink = (
   };
 };
 
+/**
+ * Validate a media element's `src` (`<img src>`, `<video src>`), which
+ * `resolved` reads the way the browser does. Nothing rewrites or copies it,
+ * so it must be a file the site serves at that URL: in `public/`, or one
+ * Blume generates. A file beside the page source isn't enough, since only a
+ * Markdown image embed (`![](./diagram.png)`) publishes one; that case gets
+ * its own message, as the file exists but the built page still 404s on it.
+ */
+const checkSourceLink = (
+  rawPath: string,
+  resolved: string,
+  page: PageRecord,
+  link: PageLink,
+  site: LinkSite,
+  ctx: LinkContext,
+  via: string
+): LinkResult => {
+  if (ctx.servesFile(resolved)) {
+    return null;
+  }
+  const sourceFile = link.file ?? page.sourcePath;
+  if (rawPath.startsWith("/") || sourceFile === undefined) {
+    return {
+      ...site,
+      code: "BLUME_BROKEN_ASSET",
+      message: `<${link.src} src="${link.target}">${via} points at ${resolved}, which isn't in the public directory.`,
+      severity: "warning",
+      suggestion: `Add the file at public${resolved} or fix the src.`,
+    };
+  }
+  const name = basename(sourceFile);
+  const beside = statSync(resolve(dirname(sourceFile), rawPath), {
+    throwIfNoEntry: false,
+  })?.isFile();
+  if (!beside) {
+    return {
+      ...site,
+      code: "BLUME_BROKEN_ASSET",
+      message: `<${link.src} src="${link.target}">${via} points at ${resolved}, which isn't in the public directory, and there's no ${rawPath} next to ${name} either.`,
+      severity: "warning",
+      suggestion: "Fix the path, or add the file.",
+    };
+  }
+  return {
+    ...site,
+    code: "BLUME_BROKEN_ASSET",
+    message: `<${link.src} src="${link.target}">${via} names a file next to ${name}, but a src in HTML ships as written and the file isn't published, so the browser requests ${resolved} and gets a 404.`,
+    severity: "warning",
+    suggestion:
+      link.src === "img"
+        ? `Embed the image with Markdown syntax (![alt](${link.target})), which publishes it, or move it into public/ and use its root path.`
+        : "Move the file into public/ and use its root path.",
+  };
+};
+
 /** Probe queued external links with bounded concurrency. */
 const checkExternalLinks = async (
   refs: ExternalRef[]
@@ -680,6 +735,9 @@ const classifyLink = (
     resolved = link.raw
       ? resolveRelative(page.route, rawPath, false)
       : relativeTarget(page, rawPath, ctx);
+  }
+  if (link.src) {
+    return checkSourceLink(rawPath, resolved, page, link, site, ctx, via);
   }
   return checkPathLink(resolved, fragment, page, link, site, ctx, via);
 };

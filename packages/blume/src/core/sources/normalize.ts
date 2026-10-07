@@ -1207,6 +1207,16 @@ const ELEMENT_HREF =
   /(?<=(?:^|[^\\])(?:\\\\)*)<(?:[A-Z][\w.]*|(?<anchor>a))(?=[\s/>])[^<>]*?\shref=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
 
 /**
+ * A media element's string `src` (`<img src="./diagram.png">`, `<source>`,
+ * `<video>`, `<audio>`): raw HTML in a `.md` page, a plain element in an
+ * `.mdx` one, with the attribute on the tag's line or a later one. An
+ * expression-valued `src={…}` isn't a literal path, so it isn't matched, and
+ * an escaped `\<img src>` is text (see `HTML_ID`).
+ */
+const ELEMENT_SRC =
+  /(?<=(?:^|[^\\])(?:\\\\)*)<(?<tag>img|source|video|audio)(?=[\s/>])[^<>]*?\ssrc=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
+
+/**
  * An inline link whose label wraps onto later lines of its paragraph
  * (`[a long⏎label](/x)`), as a formatter leaves one: the line scan can't see
  * it. The label holds a line break but no blank line (which would end the
@@ -1284,9 +1294,38 @@ const positionIn = (
 };
 
 /**
+ * Every media element's string `src` in the masked `text` (see
+ * `ELEMENT_SRC`), with its 1-based position. It ships as written, like a raw
+ * `<a href>`: nothing rewrites it or copies a file beside the page for it.
+ */
+const mediaSourceLinks = (
+  text: string,
+  lineStarts: readonly number[],
+  lineOffset: number
+): PageLink[] =>
+  [...text.matchAll(ELEMENT_SRC)].flatMap((match): PageLink[] => {
+    const target = match.groups?.double ?? match.groups?.single ?? "";
+    const tag = match.groups?.tag;
+    if (target === "" || tag === undefined) {
+      return [];
+    }
+    // The value ends one character (its closing quote) before the match does.
+    const at = match.index + match[0].length - target.length - 1;
+    return [
+      {
+        ...positionIn(lineStarts, at, lineOffset),
+        raw: true,
+        src: tag,
+        target,
+      },
+    ];
+  });
+
+/**
  * Every link in the masked `text` (see `maskCode`) of `lines` that can span
- * lines, with its 1-based position: an element's `href` (see `ELEMENT_HREF`)
- * and a link whose label wraps (see `WRAPPED_LINK`). A lowercase `<a>` is raw
+ * lines, with its 1-based position: an element's `href` (see `ELEMENT_HREF`),
+ * a media element's `src` (see `ELEMENT_SRC`), and a link whose label wraps
+ * (see `WRAPPED_LINK`). A lowercase `<a>` is raw
  * HTML in `.md` and a plain element in `.mdx`; the Markdown pipeline passes
  * either through as written, so its target is marked `raw`.
  */
@@ -1310,6 +1349,7 @@ const multilineLinks = (
     }
     links.push(link);
   }
+  links.push(...mediaSourceLinks(text, lineStarts, lineOffset));
   for (const match of text.matchAll(WRAPPED_LINK)) {
     const written = match.groups?.target ?? "";
     const at =
