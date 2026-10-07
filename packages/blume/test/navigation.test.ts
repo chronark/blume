@@ -354,6 +354,26 @@ describe("buildNavigation — filesystem sidebar", () => {
     expect(nav.tabs[0]?.href).toBe("/welcome");
   });
 
+  it("links an archived tree's root tab back to the current docs under a basePath", () => {
+    // The archived pages all sit under the based root tab path (`/docs`), but
+    // none of them is in the current docs the root tab stands for.
+    const nav = buildNavigation(
+      [
+        page("v1.0/index.md", "/docs/v1.0", "Home v1"),
+        page("v1.0/guides/a.md", "/docs/v1.0/guides/a", "A"),
+      ],
+      {
+        basePath: "/docs",
+        folderMeta: empty,
+        localizedRoot: "/v1.0",
+        tabRoot: "/",
+        tabs: [{ label: "Docs", path: "/" }],
+      }
+    );
+    expect(nav.tabs[0]?.path).toBe("/docs");
+    expect(nav.tabs[0]?.href).toBeUndefined();
+  });
+
   it("links a based tab to an outside route served without the basePath", () => {
     // Outside routes (the generated changelog index, custom pages) are served
     // at their own path, while the tab path is rebased under `/docs`.

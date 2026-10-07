@@ -1102,6 +1102,11 @@ const resolveTabHref = (
     return path;
   }
   const rest = pathUnder(path, roots.tabs);
+  // An archived tree's root tab links back to the current docs: its section
+  // is the whole current tree, no page of which this tree holds.
+  if (rest === "/" && roots.tree !== roots.tabs) {
+    return path;
+  }
   const section =
     rest === undefined || rest === "/" ? path : joinRoute(roots.tree, rest);
   let first: string | undefined;
