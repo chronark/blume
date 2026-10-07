@@ -15,7 +15,8 @@
 // migrate/migrate.ts), the dot parser's default-locale suffix
 // (core/i18n.ts), inline `$$` math, and the vercel() deploy against the
 // deployment docs. `blume migrate`, `blume build`, and the Vercel deploy were
-// not run. Not yet run end to end.
+// not run. Not yet run end to end. Rechecked for the fence keywords Blume
+// now keeps out of a code block's title (`showLineNumbers`).
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -808,12 +809,13 @@ export default defineConfig({
     to <code>sidebar.label</code>, and delete <code>asIndexPage</code>: the
     name <code>index.mdx</code> already makes a file the folder's page.
   </p>
-  <h3>A code block's title reads showLineNumbers, copy, or npm2yarn</h3>
+  <h3>A code block's title reads copy or npm2yarn</h3>
   <p>
     Blume titles a code block with every plain word after the language and
-    skips <code>key="value"</code> options, so leftover Nextra options join
-    the title and <code>filename="…"</code> is lost. Blume warns about{" "}
-    <code>showLineNumbers</code> and <code>filename</code> as{" "}
+    skips <code>key="value"</code> options, so leftover Nextra options like{" "}
+    <code>copy</code> and <code>npm2yarn</code> join the title.{" "}
+    <code>showLineNumbers</code> and <code>filename="…"</code> stay out of
+    it but do nothing, and Blume warns about both as{" "}
     <code>BLUME_CODE_FENCE_OPTION</code>. Rewrite the fence as the table above
     shows.
   </p>

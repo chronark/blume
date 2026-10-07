@@ -65,7 +65,7 @@ Starlight's `sidebar` array → prefer letting Blume generate from the filesyste
 
 ## Asides → directives (and the `.md` trap)
 
-Starlight's primary callout syntax is the `:::note`/`:::tip`/`:::caution`/`:::danger` directive **in plain `.md` files**. The directive names map perfectly (Blume aliases `caution`→warning; `error`→danger) and `[Title]` syntax carries over — **but Blume only parses directives in `.mdx`**. In a `.md` file, `:::note` renders as literal text and the build stays green. So: **rename every `.md` file that contains asides (or math, or mermaid/package-install fences) to `.mdx`** — for a typical Starlight repo that's most of the content; renaming everything to `.mdx` is usually simpler and safe.
+Starlight's primary callout syntax is the `:::note`/`:::tip`/`:::caution`/`:::danger` directive **in plain `.md` files**. The directive names map perfectly (Blume aliases `caution`→warning; `error`→danger) and `[Title]` syntax carries over — **but Blume only parses directives in `.mdx`**. In a `.md` file, `:::note` renders as literal text and the build stays green, with only a `BLUME_MD_DIRECTIVE` warning at its line. So: **rename every `.md` file that contains asides (or math, or mermaid/package-install fences) to `.mdx`** — for a typical Starlight repo that's most of the content; renaming everything to `.mdx` is usually simpler and safe.
 
 - `<Aside type="…" title="…">` (the component form) → the same directives; bare `<Aside>` → `:::note`.
 - An aside custom icon (`:::tip{icon="heart"}`) → drop the attr (report).

@@ -47,7 +47,10 @@
 // deployed), a live assistant answer, or the lockfile regeneration. The
 // reference was revised after the run (codemod, live-site component check,
 // escaping, `vercel()` deploy notes); those revisions weren't rerun end to
-// end. Examples are invented (Acme).
+// end. Blume changed after the run: an unresolvable tsconfig `extends` is
+// `BLUME_TSCONFIG_EXTENDS`, and `blume check` reports `.mdx` that doesn't
+// parse as `BLUME_MDX_SYNTAX`; the troubleshooting below says so. Examples
+// are invented (Acme).
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -669,10 +672,11 @@ const vercelJson = `{
   <h3>The build fails with "Could not parse expression"</h3>
   <p>
     The page has a <code>{"{"}</code> or a <code>[text]{"{.class}"}</code>{" "}
-    span in its prose. Escape the brace as <code>\{"{"}</code>, or drop the
-    span's attributes.
+    span in its prose. <code>blume check</code> reports it as{" "}
+    <code>BLUME_MDX_SYNTAX</code> at its line. Escape the brace as{" "}
+    <code>\{"{"}</code>, or drop the span's attributes.
   </p>
-  <h3>The build fails with "Tsconfig not found"</h3>
+  <h3>The build fails with BLUME_TSCONFIG_EXTENDS</h3>
   <p>
     Nuxt's <code>tsconfig.json</code> points into <code>.nuxt/</code>, which
     no longer exists. Delete the file, or replace it.

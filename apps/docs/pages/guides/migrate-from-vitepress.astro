@@ -42,7 +42,11 @@
 // regeneration. How GitHub Pages serves the `.html` redirect pages is
 // unverified. The reference was revised after the run (codemod, `(group)`
 // folders, anchor script); those revisions weren't rerun on Ts.ED end to end.
-// Examples are invented (Acme).
+// Blume changed after the run: a draw.io SVG is served unoptimized with a
+// `BLUME_SVG_UNOPTIMIZED` warning instead of failing with `NoImageMetadata`,
+// an unresolvable tsconfig `extends` is `BLUME_TSCONFIG_EXTENDS`, and a raw
+// `<img src="./…">` publishes its file beside the page; the troubleshooting
+// below says so. Examples are invented (Acme).
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -604,22 +608,17 @@ node check-urls.mjs ../old-urls.txt`}
     page is <code>.mdx</code>. A title goes in brackets:{" "}
     <code>:::tip[Before you start]</code>.
   </p>
-  <h3>The build fails with NoImageMetadata on an SVG</h3>
+  <h3>An SVG warns BLUME_SVG_UNOPTIMIZED</h3>
   <p>
     The SVG is usually a draw.io (diagrams.net) export, whose{" "}
-    <code>content</code> attribute the image optimizer can't read. Remove that attribute from the{" "}
-    <code>&lt;svg&gt;</code> tag, or move the file to <code>public/</code> and
-    link it with an absolute path.
+    <code>content</code> attribute hides the size the image optimizer reads,
+    so Blume serves the file as it is. It still shows. To have it optimized,
+    remove that attribute from the <code>&lt;svg&gt;</code> tag.
   </p>
-  <h3>The build fails with "Tsconfig not found"</h3>
+  <h3>The build fails with BLUME_TSCONFIG_EXTENDS</h3>
   <p>
     The <code>tsconfig.json</code> beside <code>blume.config.ts</code> extends a
     package that isn't installed there, often a workspace package. Install the
     workspace from its root, or delete the file if only VitePress used it.
-  </p>
-  <h3>An image built but doesn't show</h3>
-  <p>
-    Look for a raw <code>&lt;img src="./…"&gt;</code> tag. Blume only copies
-    images written as Markdown, so rewrite it as <code>![alt](./…)</code>.
   </p>
 </GuidePage>

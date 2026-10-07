@@ -438,7 +438,10 @@ describe("github-wiki-codemod convert", () => {
     expect(report).toContain(
       "pointed at nothing on GitHub (above the wiki root)"
     );
-    expect(report).toContain('raw <img src="images/logo.png"> shows a file');
+    // A raw `src` reads from the wiki root, not the page's new folder.
+    expect(report).toContain(
+      'raw <img src="images/logo.png"> shows a file stored in the wiki: copy it to docs/images/logo.png and point src at ../../images/logo.png'
+    );
     expect(report).toContain("uploaded attachment https://user-images");
     expect(report).toContain("images/unused.png");
   });
@@ -628,6 +631,7 @@ const EDGE_WIKI = {
     "<div>",
     "# Not a heading",
     "[[Topic]] and https://github.com/acme/widget/wiki/Topic in HTML",
+    "[[images/logo.png|alt=Logo]] in HTML",
     "</div>",
     "",
     "After the block, [[Topic]] is Markdown.",
@@ -684,13 +688,16 @@ describe("github-wiki-codemod convert edge cases", () => {
         "<div>",
         "# Not a heading",
         '<a href="/topic">Topic</a> and <a href="/topic">Topic</a> in HTML',
+        "![Logo](../images/logo.png) in HTML",
         "</div>",
         "",
         "After the block, [Topic](/topic) is Markdown.",
       ].join("\n")
     );
+    // Blume adds deployment.base to a raw root path too, so nothing to do.
+    expect(report).not.toContain("deployment.base");
     expect(report).toContain(
-      "links inside HTML blocks are now raw <a href>: Blume adds deployment.base to Markdown links only"
+      '[[images/logo.png]] sits in an HTML block, where a Markdown image shows as text: write it as <img src="../images/logo.png" />'
     );
     expect(body).toContain(
       "Images ![Root](../images/logo.png) ![Framed](../images/logo.png) ![](../images/logo.png)."

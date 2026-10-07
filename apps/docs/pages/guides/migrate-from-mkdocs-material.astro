@@ -43,7 +43,10 @@
 // destinations, `blume dev` and `blume preview` redirect slashed URLs, a
 // `console` block's copy button skips prompts and output, and `blume check`
 // warns about attribute lists in `.mdx`. The note on hiding a folder's index
-// page was corrected too: the page stays in the sitemap.
+// page was corrected too: the page stays in the sitemap. Since then, `blume
+// check` reports `.mdx` that doesn't parse as `BLUME_MDX_SYNTAX`, and the
+// build reports a render-time ReferenceError as `BLUME_MDX_UNDEFINED_NAME`,
+// each at its line; the troubleshooting below says so.
 // Not run: `npx blume migrate mkdocs` itself (detection landed after the run),
 // a deploy, or the lockfile regeneration. The reference was revised after the
 // run (codemod, `slug` pins, group folders, `display: "group"`, Prettier);
@@ -966,14 +969,16 @@ const prettierrc = `{
     literal <code>{"{name}"}</code> text. MDX reads braces as JavaScript.
     Remove it, or escape the brace as <code>\{"{"}</code>. Some, like{" "}
     <code>{"{ width=\"300\" }"}</code>, compile and then fail while the page
-    renders, with a <code>ReferenceError</code>. <code>blume check</code> warns
-    about attribute lists ahead of the build, as{" "}
-    <code>BLUME_MDX_ATTRIBUTE_LIST</code> with the file and line.
+    renders, which the build reports as <code>BLUME_MDX_UNDEFINED_NAME</code>{" "}
+    at the line. <code>blume check</code> reports the others ahead of the
+    build, with the file and line: <code>BLUME_MDX_SYNTAX</code>, and{" "}
+    <code>BLUME_MDX_ATTRIBUTE_LIST</code> for an attribute list.
   </p>
   <h3>A page fails with "Expected a closing tag"</h3>
   <p>
     A placeholder in prose, like <code>uv run &lt;command&gt;</code>, reads as
-    an HTML tag in MDX. Put it in backticks.
+    an HTML tag in MDX, and <code>blume check</code> reports it as{" "}
+    <code>BLUME_MDX_SYNTAX</code> at its line. Put it in backticks.
   </p>
   <h3>Prettier turned a comment into a broken one</h3>
   <p>

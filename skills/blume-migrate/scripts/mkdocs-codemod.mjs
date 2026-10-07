@@ -1465,7 +1465,7 @@ const filterLine = (line, ctx) => {
   ) {
     ctx.report(
       "raw-img",
-      "a raw <img> with a relative src is emitted unchanged and 404s — make it a Markdown image"
+      "a raw <img> with a relative src — Blume reads it from the page's folder (MkDocs read it from the page's URL, a level deeper) and doesn't optimize it: make it a Markdown image"
     );
   }
   return line;
@@ -1517,9 +1517,8 @@ const rewriteLines = (lines, ctx) => {
 };
 
 /**
- * Percent-encode angle-bracket link destinations. A page reads them, but an
- * `<…>` path in a partial isn't rebased when the partial is spliced into the
- * including page, which then fails to build; the encoded form works in both.
+ * Percent-encode angle-bracket link destinations. Blume reads both forms, in
+ * a page and in a partial it splices into one, so this only tidies.
  */
 const unwrapAngleDestinations = (lines, ctx) =>
   mapFenced(lines, (line) =>
@@ -2307,7 +2306,7 @@ const configFindings = (config, missingNav) => {
     ],
     [
       config.autoAppend.length > 0,
-      `snippets auto_append ${config.autoAppend.join(", ")} — abbreviations: delete; link definitions: paste into each page that uses them`,
+      `snippets auto_append ${config.autoAppend.join(", ")} — abbreviations: delete; link definitions: <include> the file at the end of each page that uses them (an included file's definitions resolve in the page)`,
     ],
     [
       !config.useDirectoryUrls,

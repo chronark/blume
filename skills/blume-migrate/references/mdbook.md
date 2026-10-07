@@ -123,7 +123,7 @@ Keep each chapter's path, so its route is the old URL minus `.html`, and keep a 
 
 ### `.md` or `.mdx`
 
-Rename a page to `.mdx` when it ends up with a callout, mermaid, math, tabs, or another component. Those are MDX-only: in `.md` they don't render, and the build stays green. Tables, footnotes, strikethrough, task lists, `[#id]` heading ids, `<include>`, `{{variables}}`, and raw HTML work in both (`{#id}` only in `.md`). Fix what fails `.mdx` in each renamed page: HTML comments → `{/* … */}` on one line, unclosed `<br>`/`<img>`, `<https://…>` autolinks, and `{`, `<` in prose (`Vec<T>` outside backticks).
+Rename a page to `.mdx` when it ends up with a callout, mermaid, math, tabs, or another component. Those are MDX-only: in `.md` they don't render, and the build stays green (a `:::` callout only warns `BLUME_MD_DIRECTIVE`). Tables, footnotes, strikethrough, task lists, `[#id]` heading ids, `<include>`, `{{variables}}`, and raw HTML work in both (`{#id}` only in `.md`). Fix what fails `.mdx` in each renamed page: HTML comments → `{/* … */}` on one line, unclosed `<br>`/`<img>`, `<https://…>` autolinks, and `{`, `<` in prose (`Vec<T>` outside backticks).
 
 ### Includes and the other `{{#…}}` helpers
 
@@ -161,7 +161,7 @@ Report each one and what you chose. Code that now fills a formerly empty block m
 
 | mdBook | Blume |
 | --- | --- |
-| ` ```rust,ignore `, `rust,no_run,noplayground`, `rust,should_panic`, `rust,compile_fail`, `rust,edition2021`, `rust,editable`, `rust,mdbook-runnable`, `rust,hidelines=…` | ` ```rust ` (a comma-glued language doesn't highlight, and warns `BLUME_UNKNOWN_CODE_LANGUAGE`) |
+| ` ```rust,ignore `, `rust,no_run,noplayground`, `rust,should_panic`, `rust,compile_fail`, `rust,edition2021`, `rust,editable`, `rust,mdbook-runnable`, `rust,hidelines=…` | ` ```rust ` (a comma-glued language doesn't highlight, and warns `BLUME_UNKNOWN_CODE_LANGUAGE`; written with a space, ` ```rust ignore `, the keyword does nothing and warns `BLUME_CODE_FENCE_OPTION`) |
 | ` ```ignore `, or no language: rustdoc tests an unlabeled block as Rust, so books label diagrams and shell lines `ignore` | ` ```text `, or the real language |
 | **hidden lines** in a Rust block: first non-space character `#`, then a space or the end of the line | delete the line, and a blank line it leaves at the top of the block: readers saw it only through the eye toggle, which has no equivalent. `##x` shows as `#x`; `#[derive]` and `#!` lines are code. Lines with a `[output.html.code.hidelines]` prefix (`python = "~"`), or a fence's `hidelines=<prefix>`, go the same way |
 | the play button, `editable` | static code (report) |
@@ -204,10 +204,10 @@ Report each one and what you chose. Code that now fills a formerly empty block m
 ### Links and images
 
 - mdBook only rewrote `x.md` links to `x.html`. Blume resolves a relative `.md` link to the page that file publishes: keep them, and fix the ones into or out of every moved file.
-- Rewrite `.html` links (`installation.html#cargo`) to their `.md` files: Blume doesn't check relative `.html` links, so they'd silently depend on the redirects.
+- Rewrite `.html` links (`installation.html#cargo`) to their `.md` files: Blume serves no `.html` URLs, so they'd depend on the redirects. `blume validate` reports each one left (`BLUME_BROKEN_ASSET`, with the page's route).
 - **A link to `README.md` was already dead:** mdBook wrote `README.html`, a page it never creates. Point it at the renamed `index.md`.
-- Root-relative links (`/guide/x.md`) aren't resolved to pages (they serve the raw Markdown twin): make them relative.
-- Images relative to the page work as written. A linked download (a PDF, an archive) that mdBook copied from `src/` goes to `public/` at the same path.
+- Root-relative links (`/guide/x.md`) land on the page that file publishes, read from the content root, like relative ones.
+- Images relative to the page work as written. So does a linked download (a PDF, an archive) that mdBook copied from `src/`: Blume publishes a file a relative link names with the page, at a new URL. Move it to `public/` at the same path only if its old URL is linked from elsewhere.
 
 ## URLs and redirects
 

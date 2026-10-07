@@ -21,7 +21,8 @@
 //       and `:u-color-mode-image`. `div` and `u-container` wrappers are removed.
 //   - `[text]{.class}` spans and `{…}` attributes on Markdown are stripped;
 //     `` `code`{lang="ts"} `` → `` `code{:ts}` ``.
-//   - Fence labels: ` ```ts [file.ts]{2} ` → ` ```ts file.ts {2} `.
+//   - Fence labels: ` ```ts [file.ts]{2} ` → ` ```ts file.ts {2} `. Blume
+//     reads the bracketed form too, range included, so this only tidies.
 //   - Frontmatter: `navigation` → `sidebar`, `seo.ogImage` → `seo.image`,
 //     `links` → `related`, `layout: docs` and `sitemap` removed, a body H1
 //     → `title` when there's none.

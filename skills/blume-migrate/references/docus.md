@@ -146,7 +146,7 @@ The codemod applies these rules; you need them for what it leaves. They're remar
   - An unclosed block runs to the end of its parent, and a closer inside a code fence is code.
   - Check the old HTML for a literal `::` to see what the live site already showed broken.
 - **MDX safety:** in a `.mdx` page, prose must escape `{` and `}` as `\{` and `\}`, and turn **any `<` followed by a non-space character** into `&lt;` (or `\<`) unless it opens a real tag: `useFetch<User>()`, `<script setup>` written as text, `<50 ms`, `<= 5`. Case matters as in JSX: `<input>` is HTML, but `<Input>` is a component, so a generic like `useTool<Input>()` is text. HTML comments become `{/* … */}`, `<https://…>` autolinks become links, and `<br>` becomes `<br />`. Code spans and `$$` math stay as written.
-- **Code fences:** ` ```ts [file.ts]{2} ` → ` ```ts file.ts {2} ` (`title="Two words"` for a label with spaces). Blume reads ` ```ts [file.ts] ` and a multi-word title as written, but a range glued to the `]` stays in the title. Leave MDC samples inside fences alone: they're documentation.
+- **Code fences:** ` ```ts [file.ts]{2} ` → ` ```ts file.ts {2} ` (`title="Two words"` for a label with spaces). Blume reads ` ```ts [file.ts]{2} ` and a multi-word title as written too, the range highlighting its lines, so this only tidies. Leave MDC samples inside fences alone: they're documentation.
 
 ## What the codemod leaves
 
@@ -211,7 +211,7 @@ Docus routes a page by its path under `content/`. It strips an `N.` prefix from 
 
 - **`routeRules` → `redirects`.** A string `redirect` is a 307 in Nitro (`status: 307`); `{ to, statusCode }` → `{ to, status }`. A `/**` key strips its base: `'/old/**': { redirect: '/new/**' }` → `{ from: "/old/:path*", to: "/new/:path*" }`.
 - **`/raw/<route>.md`** is the Markdown copy of each page, which Docus links from `llms.txt`. Blume serves it at `/<route>.md`, so one rule covers it: `{ from: "/raw/:path*", to: "/:path*" }`. A `routeRules` redirect between two `/raw/…md` paths should target Blume's copy directly (`/raw/old.md` → `/new.md`), or it chains through that rule.
-- **Agent skills:** a `skills/` folder Docus published under `/.well-known/skills/` → `agents.skills: "./skills"`. Blume publishes them under `/.well-known/agent-skills/`, a skill with references as one `.tar.gz`. Redirect the old index to the new one, and report the change. Link to the old index path: `blume validate` doesn't know the generated `/.well-known/agent-skills/` files, and calls a link to them a broken asset.
+- **Agent skills:** a `skills/` folder Docus published under `/.well-known/skills/` → `agents.skills: "./skills"`. Blume publishes them under `/.well-known/agent-skills/`, a skill with references as one `.tar.gz`. Redirect the old index to the new one, and report the change. Links can name the new index (`/.well-known/agent-skills/index.json`): `blume validate` accepts the files Blume generates.
 - **Anchors:** MDC slugs headings like Blume (`github-slugger`), then collapses repeated dashes, trims edge dashes, and prefixes a leading digit with `_`. `## Name & Title` is `#name-title` in Docus and `#name--title` in Blume; `## 1. Install` is `#_1-install`. After the first build, run `node <skill>/scripts/pin-heading-ids.mjs --old <old build>`, `--write`, and rebuild until it reports 0. On a server build (`vercel()`, `node()`) it reads the pages from `dist/client` itself.
 - **Verify** every old URL: a built page, or a redirect `from` whose target is built (SKILL.md Verification).
 
@@ -227,7 +227,7 @@ Docus routes a page by its path under `content/`. It strips an `N.` prefix from 
 - **Dependencies:** remove `docus`, `nuxt`, the `@nuxt/*`/`@nuxtjs/*` modules, `nuxt-studio`, `better-sqlite3`, `@iconify-json/*`, `tailwindcss` (if only the theme used it), mapped analytics packages, `@nuxt/eslint-config`, and `vue` (keep it with `@astrojs/vue` for islands). Keep what the site's tests or scripts still import.
 - **Scripts:** `dev`/`build`/`generate`/`preview` → `blume dev`/`build`/`build`/`preview`. **Delete `postinstall: nuxt prepare`**, which fails once Nuxt is gone.
 - **Files:** after harvesting, delete `nuxt.config.ts`, `app/`, `content.config.ts`, `server/` (report its routes), and a Nuxt `eslint.config.mjs`. The codemod leaves a `.navigation.yml` whose keys `meta.ts` can't hold.
-- **`tsconfig.json`:** a Nuxt one points into `.nuxt/`, and `blume build` then fails with `Tsconfig not found`. Delete or replace it.
+- **`tsconfig.json`:** a Nuxt one points into `.nuxt/`, and `blume build` then fails with `BLUME_TSCONFIG_EXTENDS`. Delete or replace it.
 - **`.gitignore`:** in the docs package's own file, `.nuxt`, `.output`, `.data` → `.blume`, `dist`.
 - **CI:** grep for `nuxt generate`, `nuxi`, `.output/public`, and `--extends docus`.
 

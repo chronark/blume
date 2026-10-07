@@ -41,7 +41,12 @@
 // the old sidebar left it out; `content.exclude` adds to its defaults, so
 // the config below no longer lists them; `<YouTube>` embeds playlists; and
 // `blume preview` redirects a slashed URL instead of answering it with a
-// 404. The Acme example below is invented: a six-page Just
+// 404. Later still: an attribute list in `.md` warns
+// `BLUME_MD_ATTRIBUTE_LIST`, `blume check` reports Liquid in `.mdx` as
+// `BLUME_MDX_SYNTAX` at its line (a partial's own line for one in a
+// partial), and Blume adds `deployment.base` to root paths in raw HTML, so
+// the codemod no longer flags them and the raw-image troubleshooting entry is
+// gone. The Acme example below is invented: a six-page Just
 // the Docs site with a `baseurl`, built with Jekyll 4.4.1 and just-the-docs
 // 0.12.0. Its before/after, codemod report, and folders are the codemod's
 // real output, unchanged by the fixes (the YouTube before/after is the
@@ -587,9 +592,9 @@ const baseConfig = [
   </p>
   <CodeBlock code={baseConfig} lang="ts" title="blume.config.ts" />
   <p>
-    Blume adds the base to Markdown links and images, not to raw HTML, so a
-    root path in an <code>{"<img src>"}</code> or <code>{"<a href>"}</code>{" "}
-    needs it written in.
+    Blume adds the base to root paths in Markdown links and raw HTML alike, so
+    the ones the codemod writes into an <code>{"<img src>"}</code> or{" "}
+    <code>{"<a href>"}</code> need nothing more.
   </p>
   <p>
     Replace your Jekyll workflow with the one in{" "}
@@ -638,17 +643,19 @@ const baseConfig = [
   <p>
     It's a <code>.md</code> page, which shows leftover Kramdown and Liquid as
     text without an error. Liquid gets a <code>BLUME_TEMPLATE_TAG</code>{" "}
-    warning with its line; an attribute list gets none. Convert it, and
-    rename the page <code>.mdx</code> if it now has a callout.
+    warning with its line, and an attribute list a{" "}
+    <code>BLUME_MD_ATTRIBUTE_LIST</code> one. Convert it, and rename the page{" "}
+    <code>.mdx</code> if it now has a callout.
   </p>
   <h3>The build fails with "Could not parse expression"</h3>
   <p>
     An <code>.mdx</code> page, or a partial it includes, still has a{" "}
     <code>{"{"}</code> in its text: leftover Liquid or a Kramdown attribute
     list, or a brace in prose. Convert it, or escape a brace as{" "}
-    <code>{"\\{"}</code>. A <code>BLUME_MDX_ATTRIBUTE_LIST</code> warning
-    names an attribute list's line; when the error names only the page, look
-    in the partials it includes.
+    <code>{"\\{"}</code>. <code>blume check</code> names the line first, in
+    the partial when it's there: <code>BLUME_MDX_ATTRIBUTE_LIST</code> for an
+    attribute list, and <code>BLUME_MDX_SYNTAX</code> for anything MDX can't
+    parse.
   </p>
   <h3>Validate fails with BLUME_NAV_INDEX_TITLE_MISMATCH</h3>
   <p>
@@ -656,11 +663,5 @@ const baseConfig = [
     <code>meta.ts</code> title. Make the two titles match, set the page's{" "}
     <code>sidebar.label</code> to the folder's title to keep its own title, or
     remove its <code>sidebar.hidden</code> to show its row again.
-  </p>
-  <h3>An image shows locally but not on GitHub Pages</h3>
-  <p>
-    It's a raw <code>{"<img>"}</code> with a root path on a site with a{" "}
-    <code>deployment.base</code>. Add the base to its <code>src</code>, or
-    write it as a Markdown image.
   </p>
 </GuidePage>

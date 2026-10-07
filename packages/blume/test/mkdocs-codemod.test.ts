@@ -399,6 +399,7 @@ describe("mkdocs-codemod", () => {
     expect(report).toContain("plugin mkdocstrings: manual");
     expect(report).toContain("theme.custom_dir overrides");
     expect(report).toContain("nav entry index.md has no file");
+    expect(report).not.toContain("auto_append");
     expect(
       body(await readFile(join(dir, "docs/guide/install.mdx"), "utf-8"))
     ).toBe(
@@ -409,6 +410,20 @@ describe("mkdocs-codemod", () => {
         "",
         "::: fixture.module",
       ].join("\n")
+    );
+  });
+
+  it("says to include auto_append link definitions, which resolve in the page", async () => {
+    const dir = await project("auto-append", {
+      "docs/index.md": "# Home\n\nSee [PEP 508].\n",
+      "includes/links.md": "[pep 508]: https://peps.python.org/pep-0508/\n",
+      "mkdocs.yml": CONFIG.replace(
+        "  - pymdownx.snippets\n",
+        "  - pymdownx.snippets:\n      auto_append:\n        - includes/links.md\n"
+      ),
+    });
+    expect(runCodemod(dir, "docs")).toContain(
+      "snippets auto_append includes/links.md — abbreviations: delete; link definitions: <include> the file at the end of each page that uses them"
     );
   });
 
@@ -471,7 +486,9 @@ describe("mkdocs-codemod", () => {
       "inc/step.md": "Do the step.\n",
     });
     const report = runCodemod(dir, "--write", "docs");
-    expect(report).toContain("raw <img> with a relative src");
+    expect(report).toContain(
+      "raw <img> with a relative src — Blume reads it from the page's folder"
+    );
     // An include indented in a list splices only in .mdx.
     expect(
       body(await readFile(join(dir, "docs/guide/install.mdx"), "utf-8"))

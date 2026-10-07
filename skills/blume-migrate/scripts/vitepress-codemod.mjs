@@ -1158,7 +1158,7 @@ const HAZARDS = [
   ],
   [
     /<img\b[^>]*\ssrc="\.{1,2}\//u,
-    "raw `<img>` with a relative src ships broken: use a Markdown image",
+    "raw `<img>` with a relative src: Blume publishes the file but doesn't optimize it, so use a Markdown image",
   ],
   [
     /<!--/u,

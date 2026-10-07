@@ -118,7 +118,7 @@ GitHub showed two things in the right rail: the **Pages** list (every page, alph
 
 Every `[[…]]` outside code converts. GitHub leaves `[[ … ]]` in fenced code alone (bash tests), and so does `convert`: it skips fenced (in a quote too) and indented code, inline code spans, `<code>` and `<tt>` elements, and HTML comments. An indented block that holds `[[` gets a `REVIEW` line, since list continuation and code look alike there. A code span that runs across lines isn't seen as code, so check any `REVIEW` line that quotes shell syntax (`[[ -f x ]]`).
 
-- **Inside an HTML block** (a line opening with `<div>`, `<p>`, `<table>`, `<details>`, and the like, up to the next blank line), Markdown shows as text, but gollum, the engine behind GitHub's wikis, resolves `[[…]]` before the Markdown is parsed, so it made a link there: `convert` writes `<a href="/page-name">text</a>` there, and a bare wiki URL too. An image tag there gets a `REVIEW` line: copy the file into `public/` and use `<img src="/…">`. A `#` line inside the block is text, not a heading, so it isn't demoted.
+- **Inside an HTML block** (a line opening with `<div>`, `<p>`, `<table>`, `<details>`, and the like, up to the next blank line), Markdown shows as text, but gollum, the engine behind GitHub's wikis, resolves `[[…]]` before the Markdown is parsed, so it made a link there: `convert` writes `<a href="/page-name">text</a>` there, and a bare wiki URL too. An image tag there gets a `REVIEW` line: write it as `<img src="…" />` with the relative path the line gives (Blume publishes the file with the page), or move it out of the block. A `#` line inside the block is text, not a heading, so it isn't demoted.
 - **`'[[Page]]`** (an apostrophe right before, none right after) is gollum's escape for literal brackets: `convert` leaves it and reports it. Check the live page, and drop the apostrophe if it showed the brackets.
 - **`\[\[Page\]\]`** converts as a wiki link, because pandoc writes them that way (Other markup formats), with a `REVIEW` line: on a page that was always Markdown, GitHub showed those brackets, so restore them there.
 
@@ -152,7 +152,7 @@ Every `[[…]]` outside code converts. GitHub leaves `[[ … ]]` in fenced code 
 | `…/wiki/_pages`, `…/wiki/<Page>/_history`, revision URLs | left and reported: they point at the wiki's UI and stop working with it |
 | another repository's wiki | unchanged |
 
-`#123` and `@user` are plain text in wikis (GitHub doesn't autolink them there), so they stay. Bare URLs autolink in both. A raw HTML `<a href>` to a wiki page gets the route too (and a wiki link in an HTML block becomes one), but Blume doesn't add `deployment.base` to raw HTML, and `blume validate` doesn't flag a raw link that lacks it: add it by hand on a site with a base (`convert` reports the pages).
+`#123` and `@user` are plain text in wikis (GitHub doesn't autolink them there), so they stay. Bare URLs autolink in both. A raw HTML `<a href>` to a wiki page gets the route too (and a wiki link in an HTML block becomes one); Blume adds `deployment.base` to its root path like a Markdown link's.
 
 ### Link definitions
 
@@ -205,8 +205,8 @@ GitHub reads no frontmatter, so wiki pages have none. Each page gets `title`, pl
 - **A relative image that pointed at nothing** (it climbs out of the wiki root, like `../../screenshots/x.png`, or names a file the wiki doesn't have) was broken on GitHub too, and fails `blume build`: `convert` drops it and reports it.
 - **Uploaded attachments** (`user-images.githubusercontent.com`, `github.com/user-attachments/assets/…`, `private-user-images.githubusercontent.com`) are served outside the wiki and keep working for a public repository. `convert` reports each one: download and vendor it next to the pages (one request at a time) unless the user objects. From a private or internal repository they need a GitHub login, so vendoring is required.
 - **`https://github.com/<owner>/<repo>/blob/<ref>/<path>`** shown as an image is an HTML page anywhere but GitHub: `convert` uses `https://raw.githubusercontent.com/<owner>/<repo>/<ref>/<path>`.
-- **Raw `<img>` alone on its line** becomes a Markdown image; its `width`/`height`/`align` drop and are reported. A raw `<img>` of a wiki file inside other HTML (a table cell, a `<p>`) is reported: Blume doesn't rebase or validate it, so copy the file into `public/` and use a root path, or make it a Markdown image.
-- **Linked files** (PDFs, archives, an image opened as a link) are reported: copy each into `public/` and link its root path.
+- **Raw `<img>` alone on its line** becomes a Markdown image; its `width`/`height`/`align` drop and are reported. A raw `<img>` of a wiki file inside other HTML (a table cell, a `<p>`) is reported: its `src` still reads from the wiki root, which isn't the page's new folder. Copy the file into `docs/` at the same path, as `convert` does for the others, and point `src` at it relative to the page (`../images/x.png`), which Blume publishes with the page, unoptimized; or make it a Markdown image.
+- **Linked files** (PDFs, archives, an image opened as a link) are reported: copy each into `docs/` at the same path and link it relative to the page, which publishes it with the page, or into `public/` and link its root path for a URL that never changes.
 - `#gh-dark-mode-only` / `#gh-light-mode-only` pairs: keep the light image (report).
 - Files nothing references stay in the wiki (other sites may hotlink them): report them, don't copy them.
 

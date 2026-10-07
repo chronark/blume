@@ -422,6 +422,8 @@ describe("vitepress-codemod", () => {
         "",
         "Line<br>break.",
         "",
+        '<img src="./shot.png" />',
+        "",
       ].join("\n"),
     });
 
@@ -431,6 +433,9 @@ describe("vitepress-codemod", () => {
     expect(report).toContain("component <Banner>");
     expect(report).toContain("Vue binding or directive");
     expect(report).toContain("`{{ }}` is a JSX expression in .mdx");
+    expect(report).toContain(
+      "raw `<img>` with a relative src: Blume publishes the file but doesn't optimize it"
+    );
 
     const page = await readFile(join(root, "page.mdx"), "utf-8");
     expect(page).toContain("Tip {/* note */} here.");

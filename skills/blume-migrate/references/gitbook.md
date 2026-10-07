@@ -96,15 +96,15 @@ One `git mv` per page keeps both the route and the sidebar:
 
 ### `.md` or `.mdx`
 
-Rename to `.mdx` every page with a `{% … %}` block, `$$` math, a mermaid fence, or a component after conversion. Directives, components, math, mermaid, `package-install`, and `ts2js` are MDX-only: in `.md`, a leftover `{% hint %}` or `:::note` is literal text with a green build (each `{% … %}` tag warns `BLUME_TEMPLATE_TAG` at its line; a `:::note` doesn't), and in `.mdx` a leftover `{% … %}` fails it. Plain pages can stay `.md`; tables, footnotes, fence meta, `<include>`, `{{variables}}`, `[#id]`, and raw HTML work in both. An include is spliced as text, so it's parsed in the including page's format.
+Rename to `.mdx` every page with a `{% … %}` block, `$$` math, a mermaid fence, or a component after conversion. Directives, components, math, mermaid, `package-install`, and `ts2js` are MDX-only: in `.md`, a leftover `{% hint %}` or `:::note` is literal text with a green build (each `{% … %}` tag warns `BLUME_TEMPLATE_TAG` at its line, a `:::note` `BLUME_MD_DIRECTIVE`), and in `.mdx` a leftover `{% … %}` fails it (`BLUME_MDX_SYNTAX`, which `blume validate` and `blume check` report too). Plain pages can stay `.md`; tables, footnotes, fence meta, `<include>`, `{{variables}}`, `[#id]`, and raw HTML work in both. An include is spliced as text, so it's parsed in the including page's format.
 
 ### MDX hazards
 
-Each of these fails `blume build` in `.mdx`:
+Each of these fails `blume build` in `.mdx` (`blume check` and `validate` name the ones MDX can't parse as `BLUME_MDX_SYNTAX`, at their line):
 
 - **Unclosed `<img …>` and `<br>`** (`BLUME_MDX_UNCLOSED_ELEMENT` names each). Close them — better, convert images to Markdown.
 - **HTML comments** → `{/* */}`.
-- **A `{` outside code.** GitBook's `\{{x\}}` isn't enough; write `` `{{x}}` `` or `\{\{x\}\}`. Braces inside raw HTML (`<code>CN={{DeviceId}}</code>`, `<td>${EMAIL}</td>`) compile, then crash the render with a `ReferenceError`: turn `<code>`, `<strong>`, `<a>`, `<p>`, and `<br>` inside table cells into Markdown.
+- **A `{` outside code.** GitBook's `\{{x\}}` isn't enough; write `` `{{x}}` `` or `\{\{x\}\}`. Braces inside raw HTML (`<code>CN={{DeviceId}}</code>`, `<td>${EMAIL}</td>`) compile, then fail the render: `blume build` names each as `BLUME_MDX_UNDEFINED_NAME` at its line. Turn `<code>`, `<strong>`, `<a>`, `<p>`, and `<br>` inside table cells into Markdown.
 - **Markdown inside JSX** (`<Tab>`, `<Step>`, `<Frame>`) needs blank lines around it.
 
 GitBook's `\<` and entities (`&#x20;`, `&#x3C;`) are fine (an escaped `\<Name` can still warn `BLUME_UNKNOWN_COMPONENT`; the page renders correctly). Strip the U+200B/U+200C characters GitBook leaves at the start of some code lines.
@@ -124,12 +124,12 @@ GitBook's `\<` and entities (`&#x20;`, `&#x3C;`) are fine (an escaped `\<Name` c
 | `{% content-ref url="x.md" %}`; legacy `{% page-ref page="x.md" %}` | `<Card title="<x's title>" href="<x's route>" />` (the link text is a file name, so look the title up); a run → `<CardGroup>`; links to a parent's own children → `directory: "card"` |
 | `[text](x.md#h "mention")` | a plain link without `"mention"`, its text replaced by the target's title |
 | `{% embed url="…" %}`, often with no `{% endembed %}` | YouTube → `<YouTube url="…" />` (`?t=122` → `start={122}`; `url` ignores `t`); anything else → `<Card title="…" href="…" />`. A caption → `<Frame caption="…">` around it (YouTube's `title` only reaches screen readers) |
-| `{% file src="…" %}caption{% endfile %}` | the file in `public/files/`, linked `[caption](/files/x.pdf)`: Blume neither copies nor rewrites a relative link to a non-image file |
-| `<figure><img src alt><figcaption>` | `![alt](relative/path.png)` (optimized); a caption → `<Frame caption="…">` around it; `<div data-with-frame="true">` → `<Frame>`. **A raw `<img>` keeps its relative `src` and 404s, and `blume validate` doesn't flag it** |
+| `{% file src="…" %}caption{% endfile %}` | `[caption](../assets/x.pdf)`, relative to the page: Blume publishes a file a relative link names with the page. For a URL that never changes, put the file in `public/files/` and link `/files/x.pdf` |
+| `<figure><img src alt><figcaption>` | `![alt](relative/path.png)` (optimized); a caption → `<Frame caption="…">` around it; `<div data-with-frame="true">` → `<Frame>`. A raw `<img>` with a relative `src` works too, but unoptimized |
 | `<img class="gitbook-drawing">` | a Markdown image |
 | inline `<img data-size="line">` | a Markdown image (renders at its own size), or `<img src="/<public path>" alt="" height="20" />` to stay text-height (report) |
 | `<picture>` with a dark-mode source | the light image (report) |
-| `<table data-view="cards">` | `<CardGroup cols={3}>` (`data-card-size="large"` → `cols={2}`), a `<Card>` per row: first text cell → `title`, other text → body, the `data-card-target` link → `href`, the `data-card-cover` file → `img` as a `public/` path or URL (it isn't resolved relative to the page), an `<i class="fa-…">` cell → `icon` |
+| `<table data-view="cards">` | `<CardGroup cols={3}>` (`data-card-size="large"` → `cols={2}`), a `<Card>` per row: first text cell → `title`, other text → body, the `data-card-target` link → `href`, the `data-card-cover` file → `img`, relative to the page like a Markdown image (`img="../assets/cover.png"`), an `<i class="fa-…">` cell → `icon` |
 | other `<table>` (`data-header-hidden`, `data-search`, cells with `<p>`/`<br>`) | a GFM table (a hidden header's first row becomes the header); a cell's `<ul><li>` can stay inline in `.mdx` |
 | `$$…$$`, a ` ```mermaid ` fence | unchanged, in `.mdx` |
 | Emoji: `:rocket:`, escaped `:ballot\_box\_with\_check:`, `<span data-gb-custom-inline data-tag="emoji">☑️</span>` | the character itself: Blume renders no shortcodes |
@@ -150,7 +150,7 @@ GitBook's `\<` and entities (`&#x20;`, `&#x3C;`) are fine (an escaped `\<Name` c
 ### Images and assets
 
 - Move `.gitbook/assets/` to `assets/` at the space root and replace the string `.gitbook/assets/` with `assets/`, then recompute the paths in every moved page.
-- File names have spaces and parentheses. On a page, `![](<../assets/image (1).png>)` and `%20` both work; **in an `_includes/` partial, use `%20`** (`../assets/image%20(1).png`): the angle-bracket form isn't rebased when the partial is spliced, and the build fails on the including page.
+- File names have spaces and parentheses. `![](<../assets/image (1).png>)` and `../assets/image%20(1).png` both work, in a page and in an `_includes/` partial alike: a partial's images are rebased onto the including page in any form.
 - GitBook keeps every upload, so many files in `assets/` may be referenced by nothing. Report them and offer to prune.
 
 ### Variables and expressions

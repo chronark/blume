@@ -54,8 +54,11 @@
 // Later Blume fixes changed what the run saw, and the text was updated to
 // match without a rerun: `blume validate` reads a fence inside a blockquote
 // as code, Blume warns about a wiki link that names a page
-// (BLUME_WIKILINK_UNSUPPORTED), and git dates follow a rename that leaves
-// the file unchanged.
+// (BLUME_WIKILINK_UNSUPPORTED), git dates follow a rename that leaves the
+// file unchanged, a project with no `public/` folder gets its asset links
+// checked (BLUME_ASSETS_UNCHECKED is gone), and Blume adds
+// `deployment.base` to root paths in raw HTML, so `convert` no longer
+// reports HTML-block links for it.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -578,10 +581,9 @@ const checkTable = [
   <p>
     On Vercel or Netlify, Blume detects the URL. For other hosts, see{" "}
     <a href="/docs/deployment">Deployment</a>. With a base, Blume prefixes it
-    to Markdown links but not to raw HTML ones, and{" "}
-    <code>blume validate</code> doesn't flag those, so add it by hand to any{" "}
-    <code>&lt;a href&gt;</code> the codemod reports, such as a wiki link it
-    found inside an HTML block. Once the site is live, run the stubs command
+    to root paths in Markdown links and raw HTML alike, such as the{" "}
+    <code>&lt;a href&gt;</code> the codemod writes for a wiki link inside an
+    HTML block. Once the site is live, run the stubs command
     with its real address, push the stubs if you've decided to, and rewrite
     the links in your repository.
   </p>

@@ -12,9 +12,12 @@
 // pages, 670 translated pages, 134 Markdown URLs) reached a page from `blume
 // dev` with `curl -sL`; `blume preview` served 268 of them, since it didn't
 // apply pattern redirects then. Blume changed after the run: `blume preview`
-// now applies them, accordion titles render inline Markdown, and a leftover
-// `{% … %}` tag in `.md` warns `BLUME_TEMPLATE_TAG`; the page below says
-// so. The skill, the GitBook reference, and the
+// now applies them, accordion titles render inline Markdown, a leftover
+// `{% … %}` tag in `.md` warns `BLUME_TEMPLATE_TAG`, `blume check` reports
+// `.mdx` that doesn't parse as `BLUME_MDX_SYNTAX` and the build a brace that
+// fails the render as `BLUME_MDX_UNDEFINED_NAME`, and a partial's image path
+// is rebased in any form, so the include image error is gone; the page below
+// says so. The skill, the GitBook reference, and the
 // pin-heading-ids script came from the repository's working tree: blume
 // 2.1.3 on npm ships none of them, nor `gitbook` as a `blume migrate`
 // source. Also checked after the run: `blume migrate` with no agent flag
@@ -393,8 +396,7 @@ const urlCheck = [
     <li>
       <strong>Includes.</strong> Open a page that uses reusable content.
       Headings inside an include move down one level, since an include has no
-      title of its own, and its images use <code>%20</code> for spaces in file
-      names.
+      title of its own, and its images resolve from the include's folder.
     </li>
     <li>
       <strong>Accordions.</strong> An accordion's title renders inline
@@ -540,9 +542,17 @@ npx blume audit --only redirects`}
   <h3>A page fails with "Could not parse expression"</h3>
   <p>
     A <code>{"{% … %}"}</code> tag or a bare brace is left in an{" "}
-    <code>.mdx</code> page. Convert the tag, or put text like{" "}
-    <code>{"{{DeviceId}}"}</code> in inline code. GitBook's escaped form,{" "}
+    <code>.mdx</code> page, and <code>blume check</code> reports it as{" "}
+    <code>BLUME_MDX_SYNTAX</code> at its line. Convert the tag, or put text
+    like <code>{"{{DeviceId}}"}</code> in inline code. GitBook's escaped form,{" "}
     <code>{"\\{{name\\}}"}</code>, still fails in MDX.
+  </p>
+  <h3>A page fails with BLUME_MDX_UNDEFINED_NAME</h3>
+  <p>
+    Braces inside raw HTML, like{" "}
+    <code>{"<code>CN={{DeviceId}}</code>"}</code> in a table cell, parse as an
+    expression and fail when the page renders. The error names the line.
+    Write the cell's <code>&lt;code&gt;</code> as Markdown inline code.
   </p>
   <h3>A page fails with "Expected a closing tag"</h3>
   <p>
@@ -551,12 +561,5 @@ npx blume audit --only redirects`}
     error reads "Unexpected closing tag" instead. A{" "}
     <code>BLUME_MDX_UNCLOSED_ELEMENT</code> warning names each one's line.
     Write <code>&lt;br /&gt;</code>, or turn the image into Markdown.
-  </p>
-  <h3>The build can't resolve an image from an include</h3>
-  <p>
-    An image path with spaces inside an include must use <code>%20</code>, as
-    in <code>../assets/image%20(1).png</code>. The angle-bracket form,{" "}
-    <code>&lt;../assets/image (1).png&gt;</code>, works on a page but not in an
-    include, and the error names the page that includes it.
   </p>
 </GuidePage>

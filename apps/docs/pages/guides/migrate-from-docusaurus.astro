@@ -4,7 +4,8 @@
 // (cli/commands/migrate.ts, migrate/migrate.ts), the syntax docs (inline
 // `$$` math), and the deployment, versioning, blog, and islands docs on main;
 // Docusaurus's doc ID and URL rules against docusaurus.io. Not yet run end to
-// end on a sample Docusaurus repository.
+// end on a sample Docusaurus repository. Rechecked for BLUME_MD_DIRECTIVE,
+// which now warns about a `:::` directive left in a `.md` page.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -304,7 +305,8 @@ import { guideById } from "../_guides/guides.ts";
     The fixes most worth checking by hand are the ones the build can't catch.
     Blume reads a <code>.md</code> file as plain Markdown, so an admonition
     left in one renders as literal <code>:::note</code> text, and the build
-    stays green. This lists any that remain:
+    stays green, with only a <code>BLUME_MD_DIRECTIVE</code> warning. This
+    lists any that remain:
   </p>
   <CodeBlock code={`grep -rl '^:::' --include='*.md' docs`} lang="bash" />
   <p>
@@ -469,8 +471,9 @@ export default defineConfig({
   <h2>Troubleshooting</h2>
   <h3>A page shows <code>:::note</code> as text</h3>
   <p>
-    The page is a <code>.md</code> file. Rename it to <code>.mdx</code>, where
-    directives work.
+    The page is a <code>.md</code> file, and a{" "}
+    <code>BLUME_MD_DIRECTIVE</code> warning names the line. Rename it to{" "}
+    <code>.mdx</code>, where directives work.
   </p>
   <h3>The build fails on a page's frontmatter</h3>
   <p>

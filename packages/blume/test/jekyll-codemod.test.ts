@@ -631,9 +631,8 @@ describe("jekyll-codemod", () => {
     expect(await read(root, "guide/_parts/steps.md")).toBe(
       "Steps for [intro](/guide/intro).\n"
     );
-    expect(out).toContain(
-      "raw HTML href and src values are root paths, which Blume doesn't prefix with deployment.base"
-    );
+    // Blume adds the base to a raw root path, as to a Markdown one.
+    expect(out).not.toContain("deployment.base");
     expect(out).toContain("serve that file from public/guide/diagram.png");
   });
 

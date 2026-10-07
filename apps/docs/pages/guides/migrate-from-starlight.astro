@@ -15,7 +15,9 @@
 // (markdown/fence-meta.ts), and that unknown layout slot names render nowhere
 // and warn (core/component-overrides.ts, astro/generate.ts). Not yet
 // run end to end: no agent migration, `blume build`, or `blume dev` on the
-// example.
+// example. Rechecked since for BLUME_MD_DIRECTIVE, which warns about a `:::`
+// aside left in a `.md` page, and for `showLineNumbers`, which no longer
+// joins a code block's title.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -468,8 +470,9 @@ export default defineMeta({ collapsed: false });`}
   <h2>Review pages</h2>
   <p>
     Blume renders asides only in <code>.mdx</code> files: in a <code>.md</code>{" "}
-    page, <code>:::note</code> shows as literal text and the build stays green.
-    The agent renames each page with an aside, which doesn't change its URL.
+    page, <code>:::note</code> shows as literal text and the build stays green,
+    with only a <code>BLUME_MD_DIRECTIVE</code> warning. The agent renames
+    each page with an aside, which doesn't change its URL.
     This lists any it missed:
   </p>
   <CodeBlock code={`grep -rl '^:::' --include='*.md' src/content/docs`} lang="bash" />
@@ -805,8 +808,9 @@ npx blume validate --strict`}
   <h2>Troubleshooting</h2>
   <h3>A page shows <code>:::note</code> as text</h3>
   <p>
-    The page is a <code>.md</code> file. Rename it to <code>.mdx</code>, where
-    asides render.
+    The page is a <code>.md</code> file, and a{" "}
+    <code>BLUME_MD_DIRECTIVE</code> warning names the line. Rename it to{" "}
+    <code>.mdx</code>, where asides render.
   </p>
   <h3>The build fails on a page's frontmatter</h3>
   <p>
@@ -815,13 +819,13 @@ npx blume validate --strict`}
     <code>lastUpdated: false</code>, a <code>sidebar.badge</code> object, and{" "}
     <code>sidebar.attrs</code>. Map each with the table above, or remove it.
   </p>
-  <h3>A code block's header reads showLineNumbers</h3>
+  <h3>A code block's header reads "text" or /regex/</h3>
   <p>
     Blume titles a fence with every bare word after the language, so a
-    leftover <code>showLineNumbers</code>, <code>"text"</code> marker, or{" "}
-    <code>/regex/</code> marker joins its header. Blume warns about a{" "}
-    <code>showLineNumbers</code> as <code>BLUME_CODE_FENCE_OPTION</code>, but
-    not about the markers. Convert or remove each one.
+    leftover <code>"text"</code> or <code>/regex/</code> marker joins its
+    header, with no warning. A leftover <code>showLineNumbers</code> stays out
+    of the header but does nothing, and Blume warns about it as{" "}
+    <code>BLUME_CODE_FENCE_OPTION</code>. Convert or remove each one.
   </p>
   <h3>A page warns BLUME_UNKNOWN_COMPONENT</h3>
   <p>

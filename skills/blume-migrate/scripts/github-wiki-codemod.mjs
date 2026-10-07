@@ -667,7 +667,6 @@ const wikiFileOf = (ctx, src) => {
 const createPage = (file, name) => ({
   edits: {},
   file,
-  htmlLinks: false,
   name,
   reviews: [],
 });
@@ -865,14 +864,6 @@ const linkMarkup = (ctx, text, href) => {
     return `[${text}](${href})`;
   }
   edit(ctx.page, "link in an HTML block written as <a href>");
-  if (href.startsWith("/") && !ctx.page.htmlLinks) {
-    ctx.page.htmlLinks = true;
-    review(
-      ctx.page,
-      ctx.line,
-      "links inside HTML blocks are now raw <a href>: Blume adds deployment.base to Markdown links only, and validate doesn't flag a raw one that lacks it, so add the base by hand if the site has one"
-    );
-  }
   return `<a href="${escapeHtml(href)}">${escapeHtml(text)}</a>`;
 };
 
@@ -920,7 +911,7 @@ const convertImageTag = (ctx, first, parts) => {
     review(
       ctx.page,
       ctx.line,
-      `[[${first}]] sits in an HTML block, where a Markdown image shows as text: copy the file to public/ and use <img src="/…">, or move the image out of the block`
+      `[[${first}]] sits in an HTML block, where a Markdown image shows as text: write it as <img src="${src ?? file}" />, which Blume publishes with the page, or move the image out of the block`
     );
   }
   edit(ctx.page, "[[image]] → Markdown image");
@@ -1543,15 +1534,19 @@ const convertDefinition = (ctx, line, index, lines, seen) => {
 const RAW_IMG_SRC =
   /<img\b[^<>]*?\bsrc\s*=\s*(?<quote>["'])(?<src>[^"']*)\k<quote>/giu;
 
-/** A raw `<img>` of a wiki file inside other HTML: Blume doesn't rebase it, so it needs a hand. */
+/**
+ * A raw `<img>` of a wiki file inside other HTML: its `src` reads from the
+ * wiki root, not the page's new folder, so it needs a hand.
+ */
 const reviewRawImages = (ctx, line) => {
   for (const match of mask(line).matchAll(RAW_IMG_SRC)) {
     const found = wikiFileOf(ctx, match.groups.src);
     if (found?.file) {
+      const file = `${ctx.content}/${found.file}`;
       review(
         ctx.page,
         ctx.line,
-        `raw <img src="${match.groups.src}"> shows a file stored in the wiki: copy it to public/ and use /${found.file}, or make it a Markdown image`
+        `raw <img src="${match.groups.src}"> shows a file stored in the wiki: copy it to ${file} and point src at ${relativeAsset(ctx.dest, file)}, which Blume publishes with the page, or make it a Markdown image`
       );
     }
   }

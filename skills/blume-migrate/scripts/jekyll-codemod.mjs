@@ -29,7 +29,7 @@
 //     page lived at `/a/b/`), `.md` and `.html` links, trailing slashes, and
 //     links to the site's own origin → the target's route; relative Markdown
 //     images → a path from the page's new location, and a relative raw HTML
-//     `src` → a root path (raw HTML resolves against the URL).
+//     `src` → a root path (Jekyll resolved it against the page's old URL).
 //   - With `--old <built site>`: the sidebar the old build rendered becomes
 //     folders and `meta.ts` files. A parent page that's a leaf file moves into
 //     a folder of its own (a `(name)` group folder when its children sit
@@ -2202,20 +2202,10 @@ const convertLinks = (text, link, file, ctx) => {
             .replaceAll(
               HTML_URL_ATTR,
               byGroups(({ attr, quote, value }) => {
-                // Raw HTML passes through Blume as written, so a relative
-                // `src` resolves against the URL: a root path, not a rebase.
+                // A relative `src` was read against the page's old URL, which
+                // the new folders don't mirror: a root path, not a rebase.
+                // Blume adds deployment.base to it.
                 const out = rewrite(value, false);
-                if (
-                  ctx.baseurl &&
-                  /^\/(?!\/)/u.test(out) &&
-                  out !== ctx.baseurl &&
-                  !out.startsWith(`${ctx.baseurl}/`)
-                ) {
-                  note(
-                    file.report,
-                    `raw HTML href and src values are root paths, which Blume doesn't prefix with deployment.base: if the site still serves under ${ctx.baseurl}, write it into them, or make them Markdown links and images`
-                  );
-                }
                 return `${attr}=${quote}${out}${quote}`;
               })
             )
