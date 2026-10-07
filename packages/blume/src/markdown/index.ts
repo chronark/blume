@@ -14,6 +14,7 @@ import { resolve } from "pathe";
 import { codeToHtml } from "shiki";
 
 import { withIncludedDefinitions } from "../core/includes.ts";
+import { escapePinnedIds } from "../core/pinned-ids.ts";
 import { hasVariables, substituteVariables } from "../core/variables.ts";
 import type { ContentVariables } from "../core/variables.ts";
 import { apiRailPlugin } from "./api-rail.ts";
@@ -381,13 +382,15 @@ const blumeIncludePlugin = (options: BlumeMarkdownOptions): MdastPlugin =>
 type SatteriProcessor = ReturnType<typeof satteri>;
 
 /**
- * `processor`, rendering each page with the link-reference definitions its
- * includes write appended to its source (see `withIncludedDefinitions`):
- * the include splice runs after the page is parsed, too late for the parse
- * to resolve a reference in the page against a partial's definition. Pages
- * without an include render their source as given.
+ * `processor`, rendering each page from the source its parse needs: with the
+ * link-reference definitions its includes write appended (see
+ * `withIncludedDefinitions`) — the include splice runs after the page is
+ * parsed, too late for the parse to resolve a reference in the page against
+ * a partial's definition — and with the punctuation in its pinned heading
+ * ids escaped (see `escapePinnedIds`), so smart punctuation leaves a
+ * `[#a--b]` pin as written. Pages with neither render their source as given.
  */
-const withPartialDefinitions = (
+const withRenderSource = (
   processor: SatteriProcessor,
   options: BlumeMarkdownOptions
 ): SatteriProcessor => {
@@ -407,9 +410,12 @@ const withPartialDefinitions = (
       return {
         render: async (content, renderOptions) =>
           renderer.render(
-            renderOptions?.fileURL
-              ? await source(content, fileURLToPath(renderOptions.fileURL))
-              : content,
+            escapePinnedIds(
+              renderOptions?.fileURL
+                ? await source(content, fileURLToPath(renderOptions.fileURL))
+                : content,
+              "markdown"
+            ),
             renderOptions
           ),
       };
@@ -421,7 +427,7 @@ const withPartialDefinitions = (
       return {
         process: async (content, filePath, frontmatter) =>
           renderer.process(
-            await source(content, filePath),
+            escapePinnedIds(await source(content, filePath), "mdx"),
             filePath,
             frontmatter
           ),
@@ -433,7 +439,7 @@ const withPartialDefinitions = (
 
 /** Sätteri processor for plain `.md`, with Blume's curated feature set. */
 export const blumeMarkdownProcessor = (options: BlumeMarkdownOptions = {}) =>
-  withPartialDefinitions(
+  withRenderSource(
     satteri({
       features: { ...MARKDOWN_BODY_FEATURES },
       hastPlugins: blumeHastPlugins(options),
@@ -473,7 +479,7 @@ export type BlumeMdxOptions = BlumeMarkdownOptions;
  * Satteri's full `MdastPlugin` type at this single boundary.
  */
 export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
-  withPartialDefinitions(
+  withRenderSource(
     satteri({
       features: { ...MDX_BODY_FEATURES },
       hastPlugins: blumeHastPlugins(options),

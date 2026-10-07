@@ -13,7 +13,9 @@
  * Both heading pipelines share this parser — the render-time hast plugin
  * (`markdown/heading-anchors.ts`) and the scan-time source scanner
  * (`core/sources/normalize.ts`) — so the rendered `id`, the TOC entry, and the
- * anchor index `blume validate` checks against always agree.
+ * anchor index `blume validate` checks against always agree. Both also escape
+ * a pinned id's punctuation before they parse (`core/pinned-ids.ts`), so
+ * smart punctuation never rewrites the id an author pinned.
  */
 
 import { slug } from "github-slugger";
@@ -191,7 +193,10 @@ const MARKER =
   /\s*(?:\{#(?<curlyId>[^\s}]+)\}|\[(?:#(?<id>[^\s\]]+)|(?<hide>!)?toc)\])\s*$/u;
 
 export interface HeadingMarkers {
-  /** Author-pinned anchor id from `[#id]` or `{#id}`, used verbatim (never re-slugged). */
+  /**
+   * Author-pinned anchor id from `[#id]` or `{#id}`, used verbatim (never
+   * re-slugged, and never smart-punctuated: see `core/pinned-ids.ts`).
+   */
   id?: string;
   /** The heading text with every trailing marker stripped. */
   text: string;

@@ -1,6 +1,7 @@
 import { fileURLToPath } from "node:url";
 
 import { resolve } from "pathe";
+import type { SourceFormat } from "satteri";
 
 import type { IncludeStatement } from "../core/includes.ts";
 import {
@@ -10,6 +11,7 @@ import {
   matchIncludeStatement,
   withDefinitions,
 } from "../core/includes.ts";
+import { escapePinnedIds } from "../core/pinned-ids.ts";
 import { linkDefinitions } from "../core/sources/normalize.ts";
 import type { LinkDefinition } from "../core/sources/normalize.ts";
 import { substituteVariables } from "../core/variables.ts";
@@ -71,6 +73,7 @@ interface PositionedNode extends MdastNode {
 interface IncludeVisitorContext {
   fileURL: URL | undefined;
   source: string;
+  sourceFormat: SourceFormat;
   replaceNode: (node: MdastNode, replacement: { raw: string }) => void;
   textContent: (node: MdastNode) => string;
   report: (report: {
@@ -173,10 +176,14 @@ export const includePlugin = (options: IncludePluginOptions = {}) => {
     // elsewhere in the page (the page's, or another partial's) is resolved
     // through a copy of that definition. Substituted here, before the
     // spliced text is parsed: in an MDX page it parses as MDX, where
-    // `{{name}}` would be a JavaScript expression.
-    return substituteVariables(
-      withDefinitions(expanded.text, pageDefinitions(ctx.source)),
-      options.variables
+    // `{{name}}` would be a JavaScript expression. Its pinned heading ids
+    // are escaped the way the page's own are (see `escapePinnedIds`).
+    return escapePinnedIds(
+      substituteVariables(
+        withDefinitions(expanded.text, pageDefinitions(ctx.source)),
+        options.variables
+      ),
+      ctx.sourceFormat
     );
   };
 

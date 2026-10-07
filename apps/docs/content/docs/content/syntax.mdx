@@ -25,7 +25,7 @@ Anchor ids are generated from the heading text, so a reworded heading gets a new
 ## Getting started [#setup]
 ```
 
-Link to it as `/page#setup`. The syntax matches Fumadocs, so migrated content works verbatim.
+Link to it as `/page#setup`. The syntax matches Fumadocs, so migrated content works verbatim. The id is used exactly as written: smart punctuation turns `--` into a dash and curls quotes in the heading's text, but not in the marker, so `[#read--write]` anchors as `#read--write`.
 
 The `{#custom-id}` form used by Pandoc, kramdown, and Markdown-based specification toolchains is accepted as an equivalent in `.md` files. Only that unspaced spelling pins an anchor: the spaced `{ #custom-id }` and kramdown's `{: #custom-id }` (both from MkDocs' `attr_list`), and an attribute list that sets the id beside classes or attributes (`{ #custom-id .wide }`), stay in the heading's text and its anchor, and `blume check` warns about them in `.md` as `BLUME_MD_CURLY_ANCHOR`. In `.mdx`, a bare `{…}` is a JSX expression and the page fails to compile — `blume check` reports all three spellings as `BLUME_MDX_CURLY_ANCHOR` — so write `[#custom-id]` there, or escape the braces. The escaped form pins the same anchor in both formats, which makes it the right spelling for a partial that `.mdx` pages [include](/docs/content/includes):
 

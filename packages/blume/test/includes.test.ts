@@ -954,6 +954,7 @@ const fakeCtx = (options: {
         reports.push(report.message);
       },
       source: options.source ?? "",
+      sourceFormat: "mdx" as const,
       textContent: () => options.text ?? "",
     },
     replaced,

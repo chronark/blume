@@ -183,6 +183,7 @@ describe("includes", () => {
         },
         report: () => {},
         source: "",
+        sourceFormat: "mdx",
         textContent: () => "./_note.mdx",
       }
     );

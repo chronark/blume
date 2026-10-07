@@ -22,6 +22,7 @@ import { localePlacement, localizeRoute } from "../i18n.ts";
 import { extractElementUses } from "../mdx-elements.ts";
 import { titleWord } from "../navigation.ts";
 import { formerRouteName, stripOrderingPrefix } from "../ordering-prefix.ts";
+import { escapePinnedIds } from "../pinned-ids.ts";
 import { relatedPageLinks } from "../related.ts";
 import { pageMetaSchema } from "../schema.ts";
 import type {
@@ -713,7 +714,8 @@ const plainHeading = (raw: string): RenderedHeading => {
  * text remains. Parsing (rather than regex-stripping) resolves escapes —
  * `\[toc]` still reaches the marker parse as `[toc]` — and emphasis the way
  * CommonMark does, so `snake_case` stays whole while `_note_` loses its
- * underscores.
+ * underscores. A pinned id's punctuation is escaped first, as the renderer
+ * escapes it, so smart punctuation leaves `[#a--b]` as written.
  */
 const renderHeading = (
   raw: string,
@@ -726,7 +728,10 @@ const renderHeading = (
   }
   const source = form === "atx" ? `# ${raw}` : `${raw}\n=`;
   const tree = markdownToMdast(
-    `${source}${definitionsFor(raw, context.labels)}`,
+    escapePinnedIds(
+      `${source}${definitionsFor(raw, context.labels)}`,
+      "markdown"
+    ),
     parse
   );
   const heading = "children" in tree ? tree.children.at(0) : undefined;
