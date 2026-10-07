@@ -8,7 +8,7 @@ import { withBase, withMountedBase } from "../islands/base-path.ts";
 import Self from "./NavTree.astro";
 import NavTreeCache from "./NavTreeCache.astro";
 import NavTreeScript from "./NavTreeScript.astro";
-import { isGroupRowCurrent } from "./nav-utils.ts";
+import { groupStartsOpen, isGroupRowCurrent } from "./nav-utils.ts";
 
 interface PagePanel {
   id: string;
@@ -388,8 +388,13 @@ const initialId =
         if (display === "group") {
           const active = hasActivePage(item);
           // Default every group closed; open only those on the active path (so
-          // the current page's ancestors stay expanded) or forced open via meta.
-          const open = active || item.collapsed === false;
+          // the current page's ancestors stay expanded), forced open via meta,
+          // or alone at the top of the sidebar.
+          const open = groupStartsOpen(
+            item,
+            active,
+            depth === 0 && items.length === 1
+          );
           return (
             <li class={spacing}>
               <details open={open}>

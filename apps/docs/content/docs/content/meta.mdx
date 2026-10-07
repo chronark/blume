@@ -34,7 +34,7 @@ A `meta.ts` outside every `include` glob is still ignored when its folder is a s
 | `title` | `string` | The group's label. Defaults to the humanized folder name. |
 | `icon` | `string` | Icon shown next to the label. |
 | `order` | `number` | Position among sibling groups and pages. Lower numbers sort first. |
-| `collapsed` | `boolean` | Under the [`group` display mode](/docs/content/navigation#display-modes), whether the group starts collapsed. |
+| `collapsed` | `boolean` | Under the [`group` display mode](/docs/content/navigation#display-modes), whether the group starts collapsed. Unset, it starts collapsed unless it holds the current page or is the only row at the top of the sidebar. |
 | `display` | `"flat" \| "group" \| "page"` | Render mode for this group; overrides the global [`navigation.sidebar.display`](/docs/content/navigation#display-modes). |
 | `directory` | `"card" \| "accordion" \| "none"` | List the group's pages below its `index` page's content. Nested folders inherit it. See [directory listings](/docs/content/navigation#directory-listings). |
 | `pages` | `string[]` | Explicit order for the group's children, by slug. |

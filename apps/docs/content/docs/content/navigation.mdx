@@ -69,7 +69,7 @@ navigation: {
 ```
 
 - **`flat`** (default) — a non-collapsible header with its pages listed beneath. Pages that aren't in any group always list first, above the group sections, so they can't be mistaken for a group's children.
-- **`group`** — a collapsible `<details>` disclosure per group. Groups start collapsed by default; a group containing the current page always starts open, so only the section you're in is expanded. Set `collapsed: false` in [folder meta](/docs/content/meta) to force a group open regardless.
+- **`group`** — a collapsible `<details>` disclosure per group. Groups start collapsed by default; a group containing the current page always starts open, so only the section you're in is expanded. A group that is the only row at the top of the sidebar, like a folder that wraps every page, starts open too, so the sidebar never shows a single closed row. Set `collapsed: false` in [folder meta](/docs/content/meta) to force a group open regardless, or `collapsed: true` to keep that lone group closed.
 - **`page`** — each group is a single row whose chevron slides the sidebar into a sub-panel showing only that group's items, with a back arrow at the top. A group with an index page links the row's name to that page, and a group without one slides the panel in from anywhere on the row. The panel is route-aware, so landing directly on a page inside the group opens straight to it. After the back arrow, the row of the section you're in stays highlighted.
 
 :::tip

@@ -5,6 +5,7 @@ import {
   currentTabForRoute,
   directoryEntries,
   directoryGroupForRoute,
+  groupStartsOpen,
   isGroupRowCurrent,
   navGroupIds,
   sidebarForRoute,
@@ -425,6 +426,31 @@ const routedGroup = (
   label: "Configuration",
   path: "/docs/configuration",
   route: "/docs/configuration",
+});
+
+/** A `group`-mode disclosure, optionally with its meta's `collapsed`. */
+const disclosure = (collapsed?: boolean): NavGroup => ({
+  children: [page("Badges", "/flair/badges")],
+  collapsed,
+  display: "group",
+  kind: "group",
+  label: "Flair",
+});
+
+describe("groupStartsOpen", () => {
+  it("opens a group on the current page's path, or forced open", () => {
+    expect(groupStartsOpen(disclosure(), true, false)).toBe(true);
+    expect(groupStartsOpen(disclosure(true), true, false)).toBe(true);
+    expect(groupStartsOpen(disclosure(false), false, false)).toBe(true);
+    expect(groupStartsOpen(disclosure(), false, false)).toBe(false);
+  });
+
+  it("opens the sidebar's lone top-level group unless it asks to collapse", () => {
+    // A wrapper folder around every page: closed, the home page's sidebar
+    // would be one row.
+    expect(groupStartsOpen(disclosure(), false, true)).toBe(true);
+    expect(groupStartsOpen(disclosure(true), false, true)).toBe(false);
+  });
 });
 
 describe("isGroupRowCurrent", () => {

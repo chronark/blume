@@ -274,6 +274,20 @@ export const getPagination = (flat: FlatPage[], route: string) => {
 export type NavGroup = Extract<NavNode, { kind: "group" }>;
 
 /**
+ * Whether a `group`-mode disclosure renders open: it holds the current page,
+ * its meta forces it open (`collapsed: false`), or it is the only row at the
+ * top of the sidebar, where starting closed would leave a sidebar of one row
+ * to click before any link shows (a wrapper folder around every page). An
+ * explicit `collapsed: true` keeps that lone group closed.
+ */
+export const groupStartsOpen = (
+  group: NavGroup,
+  active: boolean,
+  lone: boolean
+): boolean =>
+  active || group.collapsed === false || (lone && group.collapsed !== true);
+
+/**
  * The group whose own page `route` is, when that page lists the group's
  * pages: its `directory` (inherited when the group sets none) is `card` or
  * `accordion`. `null` on every other page.
