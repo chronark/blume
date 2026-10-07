@@ -21,7 +21,7 @@ import { routeSetFor } from "./locale-links.ts";
 import type { RouteSet } from "./locale-links.ts";
 import { buildManifest } from "./manifest.ts";
 import { mirroredPage } from "./markdown-mirrors.ts";
-import { discoverFolderMeta } from "./meta.ts";
+import { discoverFolderMeta, withGeneratedFolderMeta } from "./meta.ts";
 import type { FolderMetaSource } from "./meta.ts";
 import { resolveProjectContext } from "./project.ts";
 import { isPatternPath, pathsUnderPattern } from "./redirect-patterns.ts";
@@ -520,13 +520,16 @@ export const scanProject = async (
   // Folder meta contributed by the sources themselves (the OpenAPI source
   // labels each tag directory with the spec's own tag name). It applies to
   // every locale, so it merges into the shared map — beneath user-authored
-  // entries, which are spread last and win.
-  const sharedFolderMeta = new Map([
-    ...loaded.flatMap(({ folderMeta: sourceMeta }) =>
-      Object.entries(sourceMeta ?? {})
+  // entries, whose own fields win while the generated ones fill the rest.
+  const mergedFolderMeta = withGeneratedFolderMeta(
+    folderMeta,
+    new Map(
+      loaded.flatMap(({ folderMeta: sourceMeta }) =>
+        Object.entries(sourceMeta ?? {})
+      )
     ),
-    ...folderMeta.shared,
-  ]);
+    localeDirs
+  );
 
   const {
     diagnostics: contentDiagnostics,
@@ -598,10 +601,10 @@ export const scanProject = async (
     basePath: config.basePath,
     brandHref: logoHref(config.logo),
     extraRoutes,
-    folderMeta: folderMeta.meta,
+    folderMeta: mergedFolderMeta.meta,
     i18n: config.i18n,
     navigation: config.navigation,
-    sharedFolderMeta,
+    sharedFolderMeta: mergedFolderMeta.shared,
     versions: config.versions,
   });
   const manifest = buildManifest({ config, context, graph });

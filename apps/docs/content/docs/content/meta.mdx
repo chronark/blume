@@ -43,6 +43,10 @@ The array orders pages among pages and groups among groups, but it doesn't inter
 
 How groups render — flat headers, collapsible disclosures, or drill-in panels — defaults to the sidebar-wide `navigation.sidebar.display`; set `display` here to override it for this group alone. A folder's `index` page can also set it from frontmatter, which wins over `meta.ts` — see [per-group overrides](/docs/content/navigation#per-group-overrides).
 
+## Generated groups
+
+An [OpenAPI](/docs/references/openapi), [AsyncAPI](/docs/references/asyncapi), or [GraphQL](/docs/references/graphql) reference names and orders its tag groups from the spec. To change one, add a `meta.ts` in the folder the tag's pages publish under: with the reference at `/api`, `api/pets/meta.ts` in your content folder configures the **Pets** group. The fields it sets replace the generated ones, and the rest keep their generated values, so a `meta.ts` that sets only `title` keeps the tag's place in the spec's order.
+
 ## Computed meta
 
 Because `meta.ts` is a real module, you can compute the meta — pass a function (sync or `async`) instead of an object to build it at scan time. Handy for ordering pages from an external source:

@@ -263,3 +263,46 @@ export const discoverFolderMeta = async (
 
   return { diagnostics, meta, shared };
 };
+
+/** Folder meta by key: per-locale `meta.*` files, and shared `meta.$.*` ones. */
+export interface FolderMetaMaps {
+  meta: Map<string, FolderMeta>;
+  shared: Map<string, FolderMeta>;
+}
+
+/**
+ * Lay the folder meta content sources derive (the OpenAPI source's tag
+ * titles and order) beneath the user's `meta.ts` and `meta.$.ts` files, field
+ * by field: a user file's own keys win, and the generated ones fill the rest,
+ * so a `meta.ts` that only renames a tag group keeps its generated `order`.
+ * Generated meta is locale-agnostic, keyed like `meta.$.*`, so it also sits
+ * beneath a locale's own `meta.ts` (`fr/reference/pets` over
+ * `reference/pets`). It doesn't reach into an archived version's snapshot,
+ * whose groups read only meta keyed under the version.
+ */
+export const withGeneratedFolderMeta = (
+  user: FolderMetaMaps,
+  generated: Map<string, FolderMeta>,
+  localeDirs: readonly string[] = []
+): FolderMetaMaps => {
+  const locales = new Set(localeDirs);
+  const beneath = (key: string, meta: FolderMeta): FolderMeta => {
+    const [head, ...rest] = key.split("/");
+    const generatedMeta = generated.get(
+      head !== undefined && locales.has(head) ? rest.join("/") : key
+    );
+    return generatedMeta ? { ...generatedMeta, ...meta } : meta;
+  };
+  return {
+    meta: new Map(
+      [...user.meta].map(([key, meta]) => [key, beneath(key, meta)])
+    ),
+    shared: new Map([
+      ...generated,
+      ...[...user.shared].map(([key, meta]): [string, FolderMeta] => [
+        key,
+        { ...generated.get(key), ...meta },
+      ]),
+    ]),
+  };
+};
