@@ -18,7 +18,7 @@ import type { ClientContext } from "../core/client-address.ts";
 import { RATE_LIMIT_BINDING } from "./cloudflare.ts";
 import { DEFAULT_REQUESTS, DEFAULT_WINDOW } from "./memory.ts";
 import type { RateLimitAdapter } from "./schema.ts";
-import { unkeySecrets } from "./unkey.ts";
+import { UNKEY_NAMESPACE, unkeySecrets } from "./unkey.ts";
 import { upstashSecrets } from "./upstash.ts";
 
 /** What a limiter says about one request. */
@@ -50,10 +50,6 @@ export interface LimiterRuntime {
 
 /** Past this many tracked readers, a memory limiter drops expired ones. */
 const MEMORY_SWEEP_AT = 10_000;
-
-const unkeyReplySchema = z.object({
-  data: z.object({ reset: z.number(), success: z.boolean() }),
-});
 
 /** One reader's count in the current window. */
 interface MemoryEntry {
@@ -159,6 +155,62 @@ export const upstashLimiter = (
   };
 };
 
+/** Unkey's rate limit endpoint. */
+const UNKEY_LIMIT_URL = "https://api.unkey.com/v2/ratelimit.limit";
+
+/**
+ * How long Unkey gets to count a request, in milliseconds, before the
+ * request is let through without it.
+ */
+export const UNKEY_TIMEOUT = 2000;
+
+/** The part of Unkey's reply the limiter reads. */
+const unkeyReplySchema = z.object({
+  data: z.object({ reset: z.number(), success: z.boolean() }),
+});
+
+/**
+ * Count with Unkey's rate limit API. Unkey takes identifiers of letters,
+ * digits, and `_.:/-`, so anything else in the key (an IPv6 host's brackets,
+ * an address's `%` zone) becomes `_`. Its `reset` is a timestamp on Unkey's
+ * clock, which this server's may not match, so `retryAfter` is kept between
+ * one second and the window.
+ */
+export const unkeyLimiter =
+  (
+    requests: number,
+    window: number,
+    namespace: string,
+    rootKey: string,
+    { fetch: fetchImpl = fetch, now = Date.now }: LimiterRuntime = {}
+  ): Limiter =>
+  async (key) => {
+    const response = await fetchImpl(UNKEY_LIMIT_URL, {
+      body: JSON.stringify({
+        duration: window * 1000,
+        identifier: key.replaceAll(/[^\w.:/-]/gu, "_"),
+        limit: requests,
+        namespace,
+      }),
+      headers: {
+        authorization: `Bearer ${rootKey}`,
+        "content-type": "application/json",
+      },
+      method: "POST",
+      signal: AbortSignal.timeout(UNKEY_TIMEOUT),
+    });
+    if (!response.ok) {
+      await response.body?.cancel();
+      throw new Error(`Unkey answered ${response.status}.`);
+    }
+    const { data } = unkeyReplySchema.parse(await response.json());
+    const seconds = Math.ceil((data.reset - now()) / 1000);
+    return {
+      allowed: data.success,
+      retryAfter: Math.min(window, Math.max(1, seconds)),
+    };
+  };
+
 /** Count with a Workers rate limiting binding. */
 export const bindingLimiter =
   (binding: RateLimitBinding, window: number): Limiter =>
@@ -196,35 +248,13 @@ export const createLimiter = (
     const [secret] = unkeySecrets(adapter.options);
     const rootKey = runtime.secret?.(secret);
     if (rootKey) {
-      return async (key) => {
-        const response = await (runtime.fetch ?? fetch)(
-          "https://api.unkey.com/v2/ratelimit.limit",
-          {
-            body: JSON.stringify({
-              duration: window * 1000,
-              identifier: key,
-              limit: requests,
-              namespace: adapter.options.namespace ?? "docs",
-            }),
-            headers: {
-              authorization: `Bearer ${rootKey}`,
-              "content-type": "application/json",
-            },
-            method: "POST",
-          }
-        );
-        if (!response.ok) {
-          throw new Error(`Unkey answered ${response.status}.`);
-        }
-        const reply = unkeyReplySchema.parse(await response.json());
-        return {
-          allowed: reply.data.success,
-          retryAfter: Math.max(
-            1,
-            Math.ceil((reply.data.reset - (runtime.now ?? Date.now)()) / 1000)
-          ),
-        };
-      };
+      return unkeyLimiter(
+        requests,
+        window,
+        adapter.options.namespace ?? UNKEY_NAMESPACE,
+        rootKey,
+        runtime
+      );
     }
     console.warn(
       `Rate limiting counts in memory: set ${secret} to share the count through Unkey.`

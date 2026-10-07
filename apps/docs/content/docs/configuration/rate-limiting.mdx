@@ -25,7 +25,7 @@ Each route keeps its own count, so a busy playground session doesn't use up the 
 | `memory()` | The server's memory (the default) | Exactly on one server; per instance on serverless hosts |
 | `upstash()` | [Upstash Redis](https://upstash.com) | Exactly, on every host |
 | `cloudflare()` | Cloudflare's Workers rate limiting | Per Cloudflare location |
-| `unkey()` | [Unkey](https://unkey.com) | Global |
+| `unkey()` | [Unkey](https://unkey.com) | On every host; regions catch up within moments |
 
 ### Memory
 
@@ -71,23 +71,21 @@ The binding's namespace comes from the Worker's name, so two sites on one accoun
 
 ### Unkey
 
-`unkey()` counts requests through [Unkey's rate limit API](https://www.unkey.com/docs/api-management/ratelimiting/overview). It works on every deployment host and needs no SDK. Set `UNKEY_ROOT_KEY` on the server to your Unkey root key.
+`unkey()` keeps the count in [Unkey's rate limiting](https://www.unkey.com/docs/api-management/ratelimiting/overview), which every instance shares. Create a root key with the `ratelimit.*.limit` permission, plus `ratelimit.*.create_namespace` so Unkey can create the namespace on the first request, then set it as `UNKEY_ROOT_KEY`. Blume talks to Unkey's REST API, so there's nothing to install. Until the key is set, the routes count in memory and `blume build` warns.
 
 ```ts blume.config.ts lineNumbers
-import { defineConfig } from "blume";
 import { unkey } from "blume/ratelimit";
 
-export default defineConfig({
-  rateLimit: unkey({
-    namespace: "docs", // defaults to "docs"
-    rootKeyEnv: "UNKEY_ROOT_KEY", // defaults to "UNKEY_ROOT_KEY"
-    requests: 10,
-    window: 60,
-  }),
-});
+rateLimit: unkey(),
 ```
 
-If the root key is not set, blume falls back to local ratelimiting and prints a warning.
+The namespace is `docs` unless you name another with `namespace`. Name the variable that holds the key with `rootKeyEnv`:
+
+```ts blume.config.ts lineNumbers
+rateLimit: unkey({ namespace: "acme-docs", rootKeyEnv: "DOCS_UNKEY_ROOT_KEY" }),
+```
+
+Unkey counts in each region and shares the counts between regions within moments, so a short burst split across regions can get a few more requests through than the limit. Every count fails with a key Unkey refuses, like one missing those permissions, and a request a shared store fails to count is let through, so if the server logs `Rate limiting failed`, check the key.
 
 ## Behind a reverse proxy
 
