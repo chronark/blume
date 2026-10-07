@@ -1219,6 +1219,12 @@ const DEFINITION_DESTINATION = new RegExp(
   String.raw`^(?:${DESTINATION})(?=\s|$)`,
   "u"
 );
+// A whole definition on its line: the destination, then at most a title.
+// Anything else after it makes the line paragraph text (CommonMark).
+const DEFINITION_LINE = new RegExp(
+  String.raw`^(?:${DESTINATION})(?:[ \t]+(?:${TITLE}))?[ \t]*$`,
+  "u"
+);
 
 // A CommonMark autolink (`<https://example.com>`). Only http(s) targets are
 // ever checked, so no other scheme is read. MDX rejects the syntax, so in
@@ -1573,6 +1579,27 @@ export const rewriteElementUrls = (
   return applySplices(text, splices);
 };
 
+/** A destination as written in a line, and its offset there. */
+interface WrittenDestination {
+  at: number;
+  written: string;
+}
+
+/**
+ * The destination of the link-reference definition on `line`, if it is one;
+ * a footnote definition (`[^1]: …`) is no link.
+ */
+const definitionDestination = (
+  line: string
+): WrittenDestination | undefined => {
+  const groups = line.match(REF_DEFINITION)?.groups;
+  const rest = groups?.label?.startsWith("^") ? "" : (groups?.rest ?? "");
+  const written = rest.match(DEFINITION_DESTINATION)?.[0];
+  return written === undefined
+    ? undefined
+    : { at: line.length - rest.length, written };
+};
+
 /**
  * Rewrite the target of every Markdown link in `text` (outside code) with
  * `rewrite`, which gets the target as the renderer reads it and returns the
@@ -1585,6 +1612,9 @@ export const rewriteLinkTargets = (
   text: string,
   rewrite: (target: string) => string | null
 ): string => {
+  if (!(text.includes("](") || text.includes("]:"))) {
+    return text;
+  }
   const splices: Splice[] = [];
   const add = (at: number, written: string): void => {
     const { angled, target } = readDestination(written);
@@ -1610,12 +1640,9 @@ export const rewriteLinkTargets = (
         );
       }
     }
-    // A footnote definition (`[^1]: …`) is no link.
-    const groups = line.match(REF_DEFINITION)?.groups;
-    const rest = groups?.label?.startsWith("^") ? "" : (groups?.rest ?? "");
-    const written = rest.match(DEFINITION_DESTINATION)?.[0];
-    if (written !== undefined) {
-      add(start + line.length - rest.length, written);
+    const definition = definitionDestination(line);
+    if (definition) {
+      add(start + definition.at, definition.written);
     }
   }
   for (const match of masked.matchAll(WRAPPED_LINK)) {
@@ -1638,7 +1665,8 @@ export interface LinkDefinition {
  * Every link-reference definition in `text` (`[label]: /url "Title"`,
  * outside code; footnotes aren't links), in order, the first of each label
  * only, since that's the one that renders. A definition is read from its own
- * line: its destination and any title there.
+ * line: its destination and any title there, and nothing else, since a line
+ * with more after them is text.
  */
 export const linkDefinitions = (text: string): LinkDefinition[] => {
   const definitions = new Map<string, LinkDefinition>();
@@ -1652,7 +1680,7 @@ export const linkDefinitions = (text: string): LinkDefinition[] => {
       label.startsWith("^") ||
       key === "" ||
       definitions.has(key) ||
-      !DEFINITION_DESTINATION.test(rest)
+      !DEFINITION_LINE.test(rest)
     ) {
       continue;
     }

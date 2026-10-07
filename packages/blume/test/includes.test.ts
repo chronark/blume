@@ -673,6 +673,7 @@ describe("expandIncludes", () => {
         "[fenced]: /fenced",
         "```",
         "[bare]:",
+        "[text]: /url and then more words",
       ].join("\n")
     );
     expect(definitions).toStrictEqual([
