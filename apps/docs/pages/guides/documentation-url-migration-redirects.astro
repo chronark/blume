@@ -326,7 +326,10 @@ npx blume audit --only redirects,links,indexability,sitemap`}
     The audit walks every configured redirect, old ones included. It reports a
     redirect that lands on no page (<code>BLUME_AUDIT_REDIRECT_BROKEN</code>),
     a loop, and a chain where an older redirect points at a page you've moved
-    since. A redirect from a page you kept is caught before that:{" "}
+    since. A pattern covers too many paths to walk, so the audit walks the
+    one bare path it also matches: <code>/old/*</code> to{" "}
+    <code>/new/:splat</code> sends <code>/old</code> to <code>/new</code>,
+    which has to be a page. A redirect from a page you kept is caught before that:{" "}
     <code>blume validate</code>, <code>doctor</code>, <code>dev</code>, and{" "}
     <code>build</code> warn with <code>BLUME_REDIRECT_MATCHES_PAGE</code>,
     because an exact redirect takes the URL over and the page never publishes.
@@ -457,8 +460,10 @@ npx blume audit --only redirects,links,indexability,sitemap`}
     4xx, 5xx, and header problems. It also requests the old URL of every exact
     redirect and reports <code>BLUME_AUDIT_REDIRECT_NOT_SERVED</code> when one
     fails, answers 200 with the redirect page, or lands somewhere else. It
-    doesn't check the status code or pattern redirects, and it knows nothing
-    about a domain rule, so keep the script for those.
+    doesn't check the status code, it requests no URL a pattern redirect
+    covers (for a pattern, the audit only checks against your build that its
+    bare path, <code>/old</code> for <code>/old/*</code>, leads to a page),
+    and it knows nothing about a domain rule, so keep the script for those.
   </p>
 
   <h2>Keep a way back</h2>

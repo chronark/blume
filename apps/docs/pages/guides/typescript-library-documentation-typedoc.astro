@@ -40,7 +40,9 @@
 // module router (maybe.md at 6,909 lines); and the `.md` and `.mdx` hazard
 // comment
 // (`<string>` read as a tag; `blume build` fails while validate, check, and
-// doctor exit 0).
+// doctor exit 0). Since the run, `blume dev` and `blume preview` redirect a
+// slashed page URL to the page instead of answering 404; the trailing-slash
+// bullet follows that.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -497,9 +499,11 @@ export default defineConfig({
       raw Markdown copy.
     </li>
     <li>
-      <strong>No trailing slash.</strong> <code>blume dev</code> and{" "}
-      <code>blume preview</code> answer{" "}
-      <code>/guide/understanding/task/</code> with a 404.
+      <strong>No trailing slash.</strong> Blume's page URLs end without one,
+      and <code>blume dev</code> and <code>blume preview</code> redirect{" "}
+      <code>/guide/understanding/task/</code> to{" "}
+      <code>/guide/understanding/task</code>. Link to the page's own URL so
+      readers skip the redirect.
     </li>
     <li>
       <strong>Symbols by name.</strong> Link to another export with{" "}

@@ -477,8 +477,9 @@ npx blume audit --only redirects`}
     have pattern redirects, choose one that applies them: Netlify, Cloudflare,
     or Vercel with the <code>vercel()</code> adapter. A plain static host like
     GitHub Pages serves only exact redirects. On Netlify, set{" "}
-    <code>deployment: netlify()</code> too, so exact redirects answer with an
-    HTTP redirect rather than a redirect page.
+    <code>{'deployment: netlify({ output: "static" })'}</code> too, so a
+    static build's exact redirects answer with an HTTP redirect rather than a
+    redirect page. <code>netlify()</code> alone switches to a server build.
   </p>
   <p>
     <strong>Turn off Git Sync before you merge.</strong> GitBook imports every
