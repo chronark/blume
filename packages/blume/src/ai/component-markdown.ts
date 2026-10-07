@@ -2,7 +2,10 @@ import { markdownTable } from "markdown-table";
 import { mdxToMdast } from "satteri";
 
 import { PARAM_LOCATIONS } from "../components/content/api-field.ts";
-import { parseYouTubeId } from "../components/content/youtube.ts";
+import {
+  parseYouTubeId,
+  parseYouTubePlaylist,
+} from "../components/content/youtube.ts";
 import type { ExampleLookup } from "../core/types.ts";
 import { MDX_FEATURES } from "../markdown/features.ts";
 import { readStaticExpression } from "./static-expression.ts";
@@ -553,18 +556,21 @@ const youtube: ComponentMarkdown = ({ props }) => {
   } else if (isString(props.url)) {
     input = props.url;
   }
+  const title =
+    isString(props.title) && props.title !== ""
+      ? props.title
+      : "Watch on YouTube";
   const videoId = parseYouTubeId(input);
   if (!videoId) {
-    return null;
+    const list = parseYouTubePlaylist(input);
+    return list
+      ? `[${title}](https://www.youtube.com/playlist?list=${list})`
+      : null;
   }
   const start =
     isNumber(props.start) && props.start > 0
       ? `&t=${Math.floor(props.start)}s`
       : "";
-  const title =
-    isString(props.title) && props.title !== ""
-      ? props.title
-      : "Watch on YouTube";
   return `[${title}](https://www.youtube.com/watch?v=${videoId}${start})`;
 };
 
@@ -732,10 +738,17 @@ const githubInfo: ComponentMarkdown = ({ lossy, props }) => {
   return `[${linkText(`${owner}/${repo}`)}](${linkDestination(`${host}/${owner}/${repo}`)})`;
 };
 
-/** `CodeBlock` is a fenced block, its title kept in the fence's meta. */
-const codeBlock: ComponentMarkdown = ({ lossy, props }) => {
-  if (lossy || !isString(props.code)) {
+/**
+ * `CodeBlock` is a fenced block, its title kept in the fence's meta. Without
+ * `code` it renders its children (a fence wrapped in `<CodeBlock>`), so those
+ * are its Markdown.
+ */
+const codeBlock: ComponentMarkdown = ({ children, lossy, props }) => {
+  if (lossy) {
     return null;
+  }
+  if (!isString(props.code)) {
+    return props.code === undefined && children !== "" ? children : null;
   }
   const lang = textProp(props.lang) || "txt";
   const title = textProp(props.title);

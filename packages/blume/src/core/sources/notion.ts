@@ -3,7 +3,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import pLimit from "p-limit";
 import { join } from "pathe";
 
-import { parseYouTubeId } from "../../components/content/youtube.ts";
+import { youtubeEmbedSrc } from "../../components/content/youtube.ts";
 import { BlumeError } from "../diagnostics.ts";
 import matter from "../frontmatter.ts";
 import { nodeRequire } from "../node-require.ts";
@@ -316,12 +316,13 @@ const FRAME_ESCAPED = /\\(?=[<>])/gu;
 
 const YOUTUBE_HOST = /(?:^|\.)(?:youtube(?:-nocookie)?\.com|youtu\.be)$/u;
 
-// `parseYouTubeId` is host-agnostic on purpose (the component accepts bare
+// `youtubeEmbedSrc` is host-agnostic on purpose (the component accepts bare
 // ids), so gate on the hostname first: `https://cdn.example.com/live/promo.mp4`
-// matches its `/live/<11 chars>` shape but is a media file, not an embed.
+// matches its `/live/<11 chars>` shape but is a media file, not an embed. A
+// playlist URL embeds too.
 const isYouTubeUrl = (url: string): boolean => {
   const host = URL.parse(url)?.hostname ?? "";
-  return YOUTUBE_HOST.test(host) && parseYouTubeId(url) !== null;
+  return YOUTUBE_HOST.test(host) && youtubeEmbedSrc(url) !== null;
 };
 
 /**

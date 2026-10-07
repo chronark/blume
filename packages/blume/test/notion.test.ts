@@ -845,6 +845,8 @@ describe("notionSource (video blocks)", () => {
   const SAMPLE_ID = "uy6K0h132-c";
   const SAMPLE_WATCH_URL = `https://www.youtube.com/watch?v=${SAMPLE_ID}`;
   const SAMPLE_SHORT_URL = `https://youtu.be/${SAMPLE_ID}`;
+  const PLAYLIST_URL =
+    "https://www.youtube.com/playlist?list=PLx0sYbCqOb8TBPRdmBHs5Iftvv9TPboYG";
   const UPLOAD_URL = "https://notion.so/signed/clip.mp4?X-Amz=1";
   const VIMEO_URL = "https://vimeo.com/123";
 
@@ -863,6 +865,11 @@ describe("notionSource (video blocks)", () => {
         id: "yt-plain",
         type: "video",
         video: { external: { url: SAMPLE_SHORT_URL } },
+      },
+      {
+        id: "yt-list",
+        type: "video",
+        video: { external: { url: PLAYLIST_URL } },
       },
       // An uploaded video: a signed, expiring Notion-hosted file URL.
       {
@@ -945,15 +952,20 @@ describe("notionSource (video blocks)", () => {
     expect(body).toContain(`<YouTube url={"${SAMPLE_SHORT_URL}"} />`);
   });
 
+  it("renders a YouTube playlist link as the embed component", async () => {
+    const { body } = await loadVideos();
+    expect(body).toContain(`<YouTube url={"${PLAYLIST_URL}"} />`);
+  });
+
   it("emits a url the player resolves to the sample video's embed", async () => {
     const { body } = await loadVideos();
     // Close the loop the MDX text alone can't: feed each emitted `url` prop
     // through the same helpers `<YouTube>` uses, so the assertion covers what
     // the component will actually put in the iframe rather than just the
     // string the source wrote.
-    const urls = [
-      ...body.matchAll(/<YouTube[^>]*\surl=\{"(?<url>[^"]+)"\}/gu),
-    ].map((match) => match.groups?.url ?? "");
+    const urls = [...body.matchAll(/<YouTube[^>]*\surl=\{"(?<url>[^"]+)"\}/gu)]
+      .map((match) => match.groups?.url ?? "")
+      .filter((url) => url !== PLAYLIST_URL);
     expect(urls).toHaveLength(3);
     for (const url of urls) {
       const id = parseYouTubeId(url);

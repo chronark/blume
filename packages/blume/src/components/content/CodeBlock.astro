@@ -9,14 +9,16 @@
 // The theme's code styles are scoped to `.prose`, so the output is wrapped in a
 // `.prose` container (`max-w-none` so it fills its own column rather than the
 // prose reading measure); that's what makes the light/dark swap work on a bare
-// page without the manual `[data-theme]` CSS it would otherwise need.
+// page without the manual `[data-theme]` CSS it would otherwise need. Without
+// `code`, the children render as written: a fenced block wrapped in
+// `<CodeBlock>` (Fern's and Mintlify's spelling) is already highlighted.
 import data from "blume:data";
 
-import { highlightCode } from "../../markdown/index.ts";
+import { codeBlockHtml } from "./code-block.ts";
 
 interface Props {
-  /** The source to highlight. */
-  code: string;
+  /** The source to highlight; without it, the children render instead. */
+  code?: string;
   /** Shiki language id (default `txt`); an unknown one renders plain. */
   lang?: string;
   /** Show the brand language icon in the header (default on, like fences). */
@@ -25,12 +27,7 @@ interface Props {
   title?: string;
 }
 
-const { code, lang = "txt", icons, title } = Astro.props;
-const html = await highlightCode(code.replace(/\n+$/u, ""), lang, {
-  icons,
-  themes: data.config.codeThemes,
-  title,
-});
+const html = await codeBlockHtml(Astro.props, data.config.codeThemes);
 ---
 
-<div class="prose max-w-none"><Fragment set:html={html} /></div>
+{html === null ? <slot /> : <div class="prose max-w-none"><Fragment set:html={html} /></div>}

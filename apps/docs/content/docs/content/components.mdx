@@ -383,7 +383,7 @@ Wrap an image or any visual in a centered, bordered frame with an optional `capt
 
 ## YouTube
 
-Embed a YouTube video in a responsive, privacy-friendly (`youtube-nocookie.com`) 16:9 frame that ships no client JavaScript. Pass a video `id` or a full `url`, plus an optional `title` (for accessibility) and a `start` time in seconds.
+Embed a YouTube video in a responsive, privacy-friendly (`youtube-nocookie.com`) 16:9 frame that ships no client JavaScript. Pass a video `id` or a full `url`, plus an optional `title` (for accessibility) and a `start` time in seconds. A playlist `url` (`youtube.com/playlist?list=…` or `youtube.com/embed/videoseries?list=…`) embeds the whole playlist.
 
 <YouTube id="aqz-KE-bpKQ" title="Big Buck Bunny" />
 
@@ -796,6 +796,8 @@ import CodeBlock from "blume/components/content/CodeBlock.astro";
 ```
 
 `title` sets the header label — a filename, say — which otherwise shows the language, and `icons={false}` hides the language's brand icon, as [`markdown.code.icons`](/docs/content/syntax#code-blocks) does for fences.
+
+Without `code`, `CodeBlock` renders its children as written, so a fenced block wrapped in `<CodeBlock>…</CodeBlock>` (the way Fern and Mintlify write code) shows as that fence. `title` and the other props don't apply to it then: give the fence its [title](/docs/content/syntax#code-blocks) after the language instead.
 
 To highlight to an HTML string yourself (e.g. inside your own component), import the underlying helper from `blume/markdown`:
 

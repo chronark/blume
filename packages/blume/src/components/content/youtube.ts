@@ -8,9 +8,15 @@
 const BARE_ID = /^[\w-]{11}$/u;
 
 // Pull the id out of any common YouTube URL: youtu.be/<id>, watch?v=<id>,
-// /embed/<id>, /shorts/<id>, /live/<id>.
+// /embed/<id>, /shorts/<id>, /live/<id>. A playlist embed's
+// `/embed/videoseries` is 11 characters too, but it names no video.
 const URL_ID =
-  /(?:youtu\.be\/|\/embed\/|\/shorts\/|\/live\/|[?&]v=)(?<id>[\w-]{11})/u;
+  /(?:youtu\.be\/|\/embed\/(?!videoseries\b)|\/shorts\/|\/live\/|[?&]v=)(?<id>[\w-]{11})/u;
+
+// A playlist URL: the embed form, `/embed/videoseries?list=<id>`, or the
+// playlist page, `/playlist?list=<id>`.
+const PLAYLIST =
+  /\/(?:embed\/videoseries|playlist)\?(?:[^#]*&)?list=(?<list>[\w-]+)/u;
 
 /**
  * Resolve a YouTube video id from either a bare id or a full URL. Returns `null`
@@ -29,6 +35,18 @@ export const parseYouTubeId = (input: string): string | null => {
 };
 
 /**
+ * The playlist id of a YouTube playlist URL (`/embed/videoseries?list=…` or
+ * `/playlist?list=…`), or `null` for anything else — a video URL that also
+ * carries a `list` (`watch?v=…&list=…`) is that video.
+ */
+export const parseYouTubePlaylist = (input: string): string | null =>
+  PLAYLIST.exec(input.trim())?.groups?.list ?? null;
+
+/** The query a `start` time adds to an embed URL, or nothing. */
+const startParam = (start: number | undefined): Record<string, string> =>
+  start && start > 0 ? { start: String(Math.floor(start)) } : {};
+
+/**
  * Build a privacy-enhanced (`youtube-nocookie.com`) embed URL, optionally
  * starting at `start` seconds.
  */
@@ -37,10 +55,34 @@ export const youtubeEmbedUrl = (
   options: { start?: number } = {}
 ): string => {
   const base = `https://www.youtube-nocookie.com/embed/${id}`;
-  const { start } = options;
-  if (start && start > 0) {
-    const params = new URLSearchParams({ start: String(Math.floor(start)) });
-    return `${base}?${params.toString()}`;
+  const params = new URLSearchParams(startParam(options.start));
+  return params.size > 0 ? `${base}?${params.toString()}` : base;
+};
+
+/**
+ * The privacy-enhanced embed URL for a playlist, optionally starting its
+ * first video at `start` seconds.
+ */
+export const youtubePlaylistEmbedUrl = (
+  list: string,
+  options: { start?: number } = {}
+): string => {
+  const params = new URLSearchParams({ list, ...startParam(options.start) });
+  return `https://www.youtube-nocookie.com/embed/videoseries?${params.toString()}`;
+};
+
+/**
+ * The embed URL for a `<YouTube>`'s `id` or `url`: a video, else a playlist,
+ * else `null` when the input names neither.
+ */
+export const youtubeEmbedSrc = (
+  input: string,
+  options: { start?: number } = {}
+): string | null => {
+  const id = parseYouTubeId(input);
+  if (id) {
+    return youtubeEmbedUrl(id, options);
   }
-  return base;
+  const list = parseYouTubePlaylist(input);
+  return list ? youtubePlaylistEmbedUrl(list, options) : null;
 };
