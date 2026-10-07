@@ -711,7 +711,7 @@ Commit `blume.config.ts`, not `.blume/`.
 ::::
 ```
 
-Write the name right after the colons. `::: tip`, with a space (the spelling VitePress, VuePress, and Docusaurus v2 use), isn't a directive, so the page shows the line as text, and Blume warns about a callout name written that way as `BLUME_DIRECTIVE_SPACED_NAME`. Inside a container, a closing fence with text after its colons still closes it, and the text is dropped: a `::: card` line inside a `:::warning` ends the callout there, and `card` never shows. Blume warns about that line as `BLUME_DIRECTIVE_CLOSING_TEXT`. To keep it inside the callout as text, give the callout a longer fence, as above, or remove the text after the colons.
+Write the name right after the colons. `::: tip`, with a space (the spelling VitePress, VuePress, and Docusaurus v2 use), isn't a directive, so the page shows the line as text, and Blume warns about a callout name written that way as `BLUME_DIRECTIVE_SPACED_NAME`. A title goes in brackets: text after the name, as in `:::tip Some title`, opens the callout but never shows, and Blume warns about it as `BLUME_DIRECTIVE_OPENING_TEXT` with the bracketed spelling, `:::tip[Some title]`. Inside a container, a closing fence with text after its colons still closes it, and the text is dropped: a `::: card` line inside a `:::warning` ends the callout there, and `card` never shows. Blume warns about that line as `BLUME_DIRECTIVE_CLOSING_TEXT`. To keep it inside the callout as text, give the callout a longer fence, as above, or remove the text after the colons.
 
 ### GitHub alerts
 

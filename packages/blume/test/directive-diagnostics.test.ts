@@ -271,6 +271,67 @@ describe("a spaced callout opener", () => {
   });
 });
 
+describe("text after a callout opener's name", () => {
+  it("warns that the title is dropped, with the bracketed spelling", () => {
+    expect(
+      directiveDiagnostics(
+        entry("Intro.\n\n:::tip Some title\nA tip.\n:::\n", {
+          bodyLineOffset: 4,
+        }),
+        "docs"
+      )
+    ).toStrictEqual([
+      {
+        code: "BLUME_DIRECTIVE_OPENING_TEXT",
+        file: "/docs/guide.mdx",
+        line: 7,
+        message:
+          "`:::tip Some title` opens a `tip` callout, but the text after its name, `Some title`, never reaches the page.",
+        severity: "warning",
+        suggestion: "Put the title in brackets: `:::tip[Some title]`.",
+      },
+    ]);
+  });
+
+  it("moves text after a bracketed or attribute title elsewhere", () => {
+    expect(
+      directiveDiagnostics(
+        entry(
+          ':::note[Label] extra\nA.\n:::\n\n> ::::warn{title="x"} more\n> B.\n> ::::\n',
+          { bodyLineOffset: 0 }
+        ),
+        "docs"
+      )
+    ).toEqual([
+      expect.objectContaining({
+        line: 1,
+        suggestion:
+          "Move `extra` into the callout's title, or onto the next line as its text.",
+      }),
+      expect.objectContaining({
+        code: "BLUME_DIRECTIVE_OPENING_TEXT",
+        line: 5,
+      }),
+    ]);
+  });
+
+  it("stays quiet for other names, a bare opener, and code", () => {
+    const quiet = [
+      ":::tip\nA.\n:::\n",
+      ":::tip[Title]\nA.\n:::\n",
+      "```md\n:::tip Title\nAn example.\n:::\n```\n",
+      "Write `:::tip Title` as `:::tip[Title]`.\n",
+    ];
+    for (const text of quiet) {
+      expect(summarize(text)).toStrictEqual([]);
+    }
+    // Any other container keeps its opening line, text and all, as written.
+    expect(summarize(":::details Click me\nHidden.\n:::\n")).toEqual([
+      expect.objectContaining({ code: "BLUME_UNKNOWN_DIRECTIVE" }),
+    ]);
+  });
+});
+
 describe("the project scan", () => {
   it("reports an unknown container with the page's other diagnostics", async () => {
     const root = await mkdtemp(join(tmpdir(), "blume-directive-scan-"));

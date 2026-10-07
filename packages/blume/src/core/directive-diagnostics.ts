@@ -26,6 +26,13 @@ const FENCE_WITH_TEXT = /^[\t >]*:{3,}(?:[\t ]+\S|[^\s:a-z])/imu;
 const CLOSING_LINE =
   /^[\t >]*(?<written>(?<fence>:{3,})[\t ]*(?<text>.*?))\s*$/u;
 
+// A container opener with text after its name, and after any `[label]` or
+// `{attributes}`: `:::tip Some title`. Sätteri drops that text.
+const OPENING_TEXT =
+  /^[\t >]*(?<written>(?<fence>:{3,})(?<name>[a-z][\w-]*)(?<label>\[[^\]\n]*\])?(?<attributes>\{[^}\n]*\})?[\t ]+(?<text>\S.*?))\s*$/iu;
+const OPENING_TEXT_LINE =
+  /^[\t >]*:{3,}[a-z][\w-]*(?:\[[^\]\n]*\])?(?:\{[^}\n]*\})?[\t ]+\S/imu;
+
 // A markdown-it style opener, `::: tip Title`, which is no directive at all.
 const SPACED_OPENING =
   /^[\t >]*(?<written>(?<fence>:{3,})[\t ]+(?<name>[a-z][\w-]*)(?<title>.*?))\s*$/iu;
@@ -88,6 +95,40 @@ const closingText = (
 };
 
 /**
+ * Text after a callout opener's name (`:::tip Some title`). Sätteri ends the
+ * name at the space and drops the rest of the line, so the callout renders
+ * untitled and the text never shows. Docusaurus and the markdown-it
+ * containers VitePress uses read that text as the title, which is where the
+ * spelling comes from. Only callouts count: any other container renders its
+ * opening line as written (see `markdown/directives.ts`), text and all.
+ */
+const openingText = (
+  node: ContainerDirective,
+  lines: readonly string[]
+): Finding[] => {
+  const line = node.position?.start.line ?? 1;
+  const groups = OPENING_TEXT.exec(lines[line - 1] ?? "")?.groups;
+  if (
+    !(groups?.fence && groups.name && groups.text && groups.written) ||
+    calloutTypeFor(node.name) === null
+  ) {
+    return [];
+  }
+  const opener = `${groups.fence}${groups.name}`;
+  return [
+    {
+      code: "BLUME_DIRECTIVE_OPENING_TEXT",
+      line,
+      message: `\`${groups.written}\` opens a \`${groups.name}\` callout, but the text after its name, \`${groups.text}\`, never reaches the page.`,
+      suggestion:
+        groups.label || groups.attributes
+          ? `Move \`${groups.text}\` into the callout's title, or onto the next line as its text.`
+          : `Put the title in brackets: \`${opener}[${groups.text}]\`.`,
+    },
+  ];
+};
+
+/**
  * Callout openers written with a space after the colons (`::: tip`, the
  * markdown-it spelling VitePress, VuePress, and Docusaurus v2 use). That is
  * never a directive, so the line and its whole block render as plain text.
@@ -132,6 +173,7 @@ const spacedOpenings = (
 const directiveFindings = (text: string): Finding[] => {
   const suspect =
     FENCE_WITH_TEXT.test(text) ||
+    OPENING_TEXT_LINE.test(text) ||
     [...text.matchAll(CONTAINER_OPENING)].some(
       (match) => calloutTypeFor(match.groups?.name ?? "") === null
     );
@@ -148,7 +190,11 @@ const directiveFindings = (text: string): Finding[] => {
   const found: Finding[] = [];
   const walk = (node: Nodes): void => {
     if (node.type === "containerDirective") {
-      found.push(...unknownContainer(node), ...closingText(node, lines));
+      found.push(
+        ...unknownContainer(node),
+        ...openingText(node, lines),
+        ...closingText(node, lines)
+      );
     } else if (node.type === "paragraph") {
       found.push(...spacedOpenings(node, lines));
     }
@@ -171,6 +217,8 @@ const directiveFindings = (text: string): Finding[] => {
  *   lines (see `markdown/directives.ts`) — but a typo like `:::warnig`, or a
  *   `:::details` carried over from another docs tool, should read as the
  *   mistake it is rather than as a finished page.
+ * - `BLUME_DIRECTIVE_OPENING_TEXT`: a callout opener with text after its
+ *   name, which the page drops (`:::tip Some title`).
  * - `BLUME_DIRECTIVE_CLOSING_TEXT`: a closing fence with text after it, which
  *   the page drops (`::: card` inside a `:::warning`).
  * - `BLUME_DIRECTIVE_SPACED_NAME`: a spaced callout opener (`::: tip`), which
