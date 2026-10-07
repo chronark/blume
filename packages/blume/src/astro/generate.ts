@@ -85,6 +85,7 @@ import { trimChar } from "../core/trim.ts";
 import { resolveTsconfigAliases } from "../core/tsconfig-aliases.ts";
 import type { Diagnostic, Navigation } from "../core/types.ts";
 import { getBlumeVersion } from "../core/version.ts";
+import { servedFiles } from "../deploy/generated-files.ts";
 import { buildRssFeeds, renderRssFeed } from "../deploy/rss.ts";
 import {
   languageIconCss,
@@ -2443,7 +2444,8 @@ export const generateRuntime = async (
     ...[
       ...validateNavTargets(
         project.graph.navigation,
-        navTargetRoutes(project, pages)
+        navTargetRoutes(project, pages),
+        servedFiles(project)
       ),
       ...validateSearchPopularIcons(config.search.popular),
     ].map(diagnosticWarning)

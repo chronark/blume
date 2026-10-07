@@ -1,5 +1,3 @@
-import { existsSync } from "node:fs";
-
 import { defineCommand } from "citty";
 import { join } from "pathe";
 
@@ -13,6 +11,7 @@ import { validateLinks } from "../../core/links.ts";
 import { buildManifest } from "../../core/manifest.ts";
 import { scanProject } from "../../core/project-graph.ts";
 import type { Diagnostic } from "../../core/types.ts";
+import { generatedFilePaths } from "../../deploy/generated-files.ts";
 import { parseIgnoreFlag } from "../args.ts";
 import { commandMeta } from "../command-meta.ts";
 import { reportInternalError } from "../internal-error.ts";
@@ -84,15 +83,18 @@ export const validateCommand = defineCommand({
         );
       }
 
-      const publicDir = join(root, "public");
+      // Links to `public/` files and to the files the build generates
+      // (`/llms.txt`, `/sitemap.xml`) resolve too. With no `public/` folder,
+      // the site ships no public files, so links to one are reported.
       diagnostics.push(
         ...(await validateLinks(project.graph, {
           basePath: project.config.basePath,
           checkExternal: Boolean(args.external),
           extraRoutes,
+          generatedFiles: generatedFilePaths(project),
           i18n: project.config.i18n,
           ignore,
-          publicDir: existsSync(publicDir) ? publicDir : null,
+          publicDir: join(root, "public"),
           redirects: project.config.redirects,
         }))
       );
@@ -105,8 +107,8 @@ export const validateCommand = defineCommand({
       }
     }
 
-    // `--strict` escalates warnings to failures; info-level notes (e.g.
-    // BLUME_ASSETS_UNCHECKED when there is no public/ dir) stay advisory.
+    // `--strict` escalates warnings to failures; info-level notes stay
+    // advisory.
     const strictFailure =
       Boolean(args.strict) &&
       diagnostics.some((diagnostic) => diagnostic.severity !== "info");

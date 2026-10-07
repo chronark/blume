@@ -5,12 +5,6 @@ import { dirname, join, resolve } from "pathe";
 
 import { buildAgentReadability } from "../ai/agent-readability.ts";
 import { advertisedConfig, servesMcp } from "../ai/agent-surface.ts";
-import {
-  AI_CATALOG_PATH,
-  ARD_MANIFEST_PATH,
-  buildAiCatalog,
-} from "../ai/ai-catalog.ts";
-import { API_CATALOG_PATH, buildApiCatalog } from "../ai/api-catalog.ts";
 import { buildHomeLinkHeader } from "../ai/link-headers.ts";
 import { buildLlmsFiles } from "../ai/llms.ts";
 import { markdownRoutePaths } from "../ai/markdown.ts";
@@ -26,10 +20,6 @@ import {
   collectSkills,
 } from "../ai/skills.ts";
 import type { SkillArtifact } from "../ai/skills.ts";
-import {
-  buildSignaturesDirectory,
-  SIGNATURES_DIRECTORY_PATH,
-} from "../ai/web-bot-auth.ts";
 import { normalizeBasePath } from "../core/base-path.ts";
 import { discoverPagesSync } from "../core/custom-pages.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
@@ -38,6 +28,7 @@ import { buildNarration } from "../narration/build.ts";
 import { buildSearchIndex } from "../search/build.ts";
 import { syncSearchProvider } from "../search/sync/index.ts";
 import { readsHeaderFiles } from "./adapter-output.ts";
+import { wellKnownFiles } from "./generated-files.ts";
 import { buildNetlifyHeaders, buildVercelHeaders } from "./headers.ts";
 import { deployPlatform } from "./platforms/index.ts";
 import { VERCEL_JSON_FILE } from "./platforms/vercel.ts";
@@ -352,24 +343,7 @@ const emitWellKnownFiles = async (
   skills: readonly SkillArtifact[],
   logger: ArtifactLogger
 ): Promise<void> => {
-  // One document, two paths: the ai-catalog spec's well-known URI and the
-  // ARD v0.91 one (see `ai/ai-catalog.ts`).
-  const aiCatalog = buildAiCatalog(config, skills);
-  const files = [
-    {
-      content: buildSignaturesDirectory(config),
-      label: "Web Bot Auth",
-      path: SIGNATURES_DIRECTORY_PATH,
-    },
-    {
-      content: buildApiCatalog(config),
-      label: "RFC 9727",
-      path: API_CATALOG_PATH,
-    },
-    { content: aiCatalog, label: "AI Catalog", path: AI_CATALOG_PATH },
-    { content: aiCatalog, label: "ARD manifest", path: ARD_MANIFEST_PATH },
-  ];
-  for (const file of files) {
+  for (const file of wellKnownFiles(config, skills)) {
     const target = join(distDir, file.path.slice(1));
     if (!file.content || existsSync(target)) {
       continue;

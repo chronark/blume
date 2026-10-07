@@ -6,8 +6,7 @@ import { dirname, join } from "pathe";
 
 /**
  * `blume validate` exercised end-to-end as a subprocess: the exit code is the
- * CLI's CI contract, and `--strict` must escalate warnings — but not info-level
- * notes like BLUME_ASSETS_UNCHECKED — to failures.
+ * CLI's CI contract, and `--strict` must escalate warnings to failures.
  */
 
 const CLI = join(import.meta.dir, "..", "src", "cli", "index.ts");
@@ -50,16 +49,42 @@ const validate = async (
 };
 
 describe("blume validate --strict", () => {
-  it("does not fail on info-level diagnostics", async () => {
-    // An asset link with no public/ dir yields only the info-severity
-    // BLUME_ASSETS_UNCHECKED note — documented strict behavior is "treat
-    // warnings as errors", so this must still exit 0.
+  it("fails on an asset link when the project has no public/ folder", async () => {
+    // No `public/` means no public files: the link 404s on the built site.
     const root = await fixture({
       "docs/index.md": "---\ntitle: Home\n---\n\n![logo](/logo.png)\n",
     });
     const { exitCode, stderr } = await validate(root, "--strict");
-    expect(stderr).toContain("BLUME_ASSETS_UNCHECKED");
-    expect(exitCode).toBe(0);
+    expect(stderr).toContain("BLUME_BROKEN_ASSET");
+    expect(stderr).toContain("docs/index.md:5:9");
+    expect(exitCode).toBe(1);
+  });
+
+  it("accepts links to the files the build generates, unless the config turns them off", async () => {
+    const files = {
+      "docs/index.md": [
+        "---",
+        "title: Home",
+        "---",
+        "",
+        "[llms.txt](/llms.txt) and [the API](/openapi.json)",
+        "",
+      ].join("\n"),
+    };
+    const on = await validate(await fixture(files), "--strict");
+    expect(on.stderr).not.toContain("BLUME_BROKEN_ASSET");
+    expect(on.exitCode).toBe(0);
+
+    const off = await validate(
+      await fixture({
+        ...files,
+        "blume.config.ts": "export default { agents: { llmsTxt: false } };\n",
+      }),
+      "--strict"
+    );
+    expect(off.stderr).toContain("Asset /llms.txt was not found");
+    expect(off.stderr).not.toContain("/openapi.json");
+    expect(off.exitCode).toBe(1);
   });
 
   it("fails on warning-level diagnostics", async () => {

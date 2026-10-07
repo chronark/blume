@@ -583,14 +583,44 @@ describe(validateLinks, () => {
     expect(diagnostics.map((d) => d.code)).toStrictEqual(["BLUME_BROKEN_LINK"]);
   });
 
-  it("reports an info note for asset links when no public dir exists", async () => {
+  it("reports an asset link as missing when there's no public dir", async () => {
+    // No `public/` folder means the site ships no public files, so the link
+    // 404s: it's reported, not skipped.
     const diagnostics = await validate([
       makePage({ id: "a.mdx", links: [link("/logo.png")], route: "/a" }),
     ]);
     expect(diagnostics.map((d) => d.code)).toStrictEqual([
-      "BLUME_ASSETS_UNCHECKED",
+      "BLUME_BROKEN_ASSET",
     ]);
-    expect(diagnostics[0]?.severity).toBe("info");
+    expect(diagnostics[0]?.severity).toBe("warning");
+  });
+
+  it("accepts links to the files the build generates, and only those", async () => {
+    const page = makePage({
+      id: "a.mdx",
+      links: [
+        link("/llms.txt"),
+        link("/.well-known/agent-skills/index.json"),
+        link("/docs/sitemap.xml"),
+        link("/robots.txt"),
+      ],
+      route: "/docs/a",
+    });
+    const diagnostics = await validateLinks(makeGraph([page]), {
+      // Generated files sit at the site root like `public/` ones, outside
+      // `basePath`.
+      basePath: "/docs",
+      generatedFiles: [
+        "/llms.txt",
+        "/.well-known/agent-skills/index.json",
+        "/sitemap.xml",
+      ],
+      publicDir: null,
+    });
+    // `robots.txt` is off in this config, so a link to it is broken.
+    expect(diagnostics.map((d) => d.message)).toStrictEqual([
+      "Asset /robots.txt was not found in the public directory.",
+    ]);
   });
 
   it("skips external, mailto, and tel links by default", async () => {
@@ -675,6 +705,10 @@ describe("validateLinks — assets against a public dir", () => {
     await mkdir(join(contentDir, "images"), { recursive: true });
     await mkdir(publicDir, { recursive: true });
     await writeFile(join(publicDir, "logo.png"), "binary");
+    // A static demo app: `/demo` and `/demo/` serve its `index.html`.
+    await mkdir(join(publicDir, "demo"), { recursive: true });
+    await writeFile(join(publicDir, "demo", "index.html"), "<p>demo</p>");
+    await mkdir(join(publicDir, "empty"), { recursive: true });
     await writeFile(join(contentDir, "guides", "screenshot.png"), "binary");
     await writeFile(join(contentDir, "guides", "my photo.png"), "binary");
     await writeFile(join(contentDir, "images", "diagram.png"), "binary");
@@ -696,6 +730,28 @@ describe("validateLinks — assets against a public dir", () => {
       makePage({ id: "a.mdx", links: [link("/logo.png")], route: "/a" }),
     ]);
     expect(diagnostics).toHaveLength(0);
+  });
+
+  it("accepts a public folder that has an index.html, with or without the slash", async () => {
+    const diagnostics = await validateWithPublic([
+      makePage({
+        id: "a.mdx",
+        links: [
+          link("/demo/"),
+          link("/demo"),
+          link("./demo/"),
+          link("/empty"),
+          link("/logo.png/"),
+        ],
+        route: "/a",
+      }),
+    ]);
+    // A folder with no `index.html` serves nothing, and a host answers a
+    // file's path with a trailing slash with a 404.
+    expect(diagnostics.map((d) => d.message)).toStrictEqual([
+      "Broken link to /empty: no page resolves to /empty.",
+      "Broken link to /logo.png/: no page resolves to /logo.png.",
+    ]);
   });
 
   it("warns when a referenced asset is missing", async () => {
@@ -841,15 +897,17 @@ describe("validateLinks — assets against a public dir", () => {
     expect(diagnostics[0]?.suggestion).not.toContain("public");
   });
 
-  it("warns on a missing colocated image even without a public directory", async () => {
-    // The page source dir was checked and missed — that is enough to report,
-    // not to demote to the unchecked-assets info aggregate.
+  it("checks colocated images without a public directory", async () => {
+    // No `public/` only means no public files: images beside the page are
+    // still resolved there, found or reported.
     const diagnostics = await validateLinks(
-      makeGraph([guidePage([image("./missing.png")])]),
+      makeGraph([
+        guidePage([image("./screenshot.png"), image("./missing.png", 2)]),
+      ]),
       { publicDir: null }
     );
-    expect(diagnostics.map((d) => d.code)).toStrictEqual([
-      "BLUME_BROKEN_ASSET",
+    expect(diagnostics.map((d) => d.message)).toStrictEqual([
+      "Image ./missing.png was not found next to a.mdx.",
     ]);
   });
 });

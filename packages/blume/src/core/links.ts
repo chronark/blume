@@ -11,6 +11,7 @@ import type { LocaleRouting } from "./i18n.ts";
 import { localizeLinkPath } from "./locale-links.ts";
 import { gradeExternal, probeAll } from "./probe.ts";
 import { isPatternPath, pathsUnderPattern } from "./redirect-patterns.ts";
+import { staticFileResolver } from "./static-files.ts";
 import type {
   ContentGraph,
   Diagnostic,
@@ -101,20 +102,18 @@ interface LinkContext {
   fileRoutes: FileRouteIndex;
   /** Locale routing, when the site is multi-locale; drives served-route resolution. */
   i18n: LocaleRouting | null;
-  publicDir: string | null;
   /** Normalized `redirect.from` paths — valid targets that resolve at runtime. */
   redirects: Set<string>;
   /** Pattern `redirect.from`s (`/beta/:slug*`), based like `redirects`. */
   redirectPatterns: string[];
   routes: Set<string>;
+  /** Whether a base-less path is a `public/` file (a folder's `index.html`
+   * included) or a file Blume generates (see `staticFileResolver`). */
+  servesFile: (path: string) => boolean;
 }
 
-/** Whether a resolved asset path exists under `public/`. */
-const assetIsPresent = (resolved: string, ctx: LinkContext): boolean =>
-  ctx.publicDir !== null && existsSync(join(ctx.publicDir, resolved));
-
 /** Outcome of classifying one link target. */
-type LinkResult = Diagnostic | "asset-unchecked" | null;
+type LinkResult = Diagnostic | null;
 
 // Mirrors the ordering-prefix strip in `sources/normalize.ts`: route mapping
 // drops the prefix before recognizing `index`, so `01-index.mdx` is an index.
@@ -382,12 +381,14 @@ const checkPathLink = (
   }
 
   // Assets live in `public/` at the site root, unaffected by the base, so strip
-  // it back off before probing the filesystem.
+  // it back off before probing the filesystem. Blume's own generated files
+  // (`/llms.txt`, `/sitemap.xml`) sit beside them, and a `public/` folder
+  // with an `index.html` is served at its path, as a static host serves it.
   const assetPath = stripBasePath(ctx.basePath, resolved);
+  if (ctx.servesFile(assetPath)) {
+    return null;
+  }
   if (FILE_EXT.test(assetPath) && !DOC_EXT.test(assetPath)) {
-    if (assetIsPresent(assetPath, ctx)) {
-      return null;
-    }
     // A colocated image embed (`![](./diagram.png)`) is resolved from beside
     // the page source and emitted to `_astro/` by the image pipeline, so it
     // never lands in `public/`. The *raw* target goes through the same
@@ -415,10 +416,7 @@ const checkPathLink = (
           "Add the file next to the page source or fix the reference.",
       };
     }
-    // Nowhere to look: no `public/` directory.
-    if (ctx.publicDir === null) {
-      return "asset-unchecked";
-    }
+    // With no `public/` folder at all, the site ships no such file either.
     return {
       ...site,
       code: "BLUME_BROKEN_ASSET",
@@ -655,8 +653,16 @@ export const validateLinks = async (
      * full-route-set resolution in `nav-diagnostics.ts`/`generateRuntime`.
      */
     extraRoutes?: string[];
+    /**
+     * The files the build generates beside `public/` (`/llms.txt`,
+     * `/sitemap.xml`; see `deploy/generated-files.ts`), base-less: links to
+     * them resolve like links to `public/` files.
+     */
+    generatedFiles?: string[];
     /** Locale routing when i18n is on; links then resolve into the page's locale. */
     i18n?: LocaleRouting | null;
+    /** The project's `public/` folder, or `null` when it has none (and so
+     * ships no public files). */
     publicDir: string | null;
     checkExternal?: boolean;
     /** External URLs not to request (`--ignore`). Internal links are always checked. */
@@ -672,7 +678,6 @@ export const validateLinks = async (
     extraRoutes: new Set((options.extraRoutes ?? []).map(toRoute)),
     fileRoutes: buildFileRouteIndex(graph.pages, options.i18n ?? null),
     i18n: options.i18n ?? null,
-    publicDir: options.publicDir,
     redirectPatterns: (options.redirects ?? []).flatMap((redirect) =>
       isPatternPath(redirect.from)
         ? [withBasePath(basePath, redirect.from)]
@@ -684,28 +689,18 @@ export const validateLinks = async (
       )
     ),
     routes: new Set(graph.routes.keys()),
+    servesFile: staticFileResolver(options.publicDir, options.generatedFiles),
   };
   const diagnostics: Diagnostic[] = [];
   const external: ExternalRef[] = [];
-  let uncheckedAssets = 0;
 
   for (const page of graph.pages) {
     for (const link of page.links) {
       const result = classifyLink(page, link, ctx, (ref) => external.push(ref));
-      if (result === "asset-unchecked") {
-        uncheckedAssets += 1;
-      } else if (result) {
+      if (result) {
         diagnostics.push(result);
       }
     }
-  }
-
-  if (uncheckedAssets > 0) {
-    diagnostics.push({
-      code: "BLUME_ASSETS_UNCHECKED",
-      message: `${uncheckedAssets} asset link(s) not checked: no public/ directory found.`,
-      severity: "info",
-    });
   }
 
   // `--ignore` names URLs that can't be checked from where this runs: a

@@ -108,7 +108,10 @@ const resolvesToPages = (routes: Set<string>, path: string): boolean =>
  * Warn when a config-linked tab/selector target has no matching page. `routes`
  * must be the full set of servable routes — content, custom `.astro` pages, and
  * generated routes — so this runs where all three are known (`generateRuntime`),
- * not in the content-only graph build.
+ * not in the content-only graph build. `servesFile` answers for the files the
+ * site serves beside its pages — `public/` and the generated ones (see
+ * `staticFileResolver`) — so a featured link to `/spec.pdf` or `/llms.txt`
+ * resolves too.
  *
  * A tab is checked where it links: its `href` — the author's, or the
  * section's first page that navigation resolved for a `path` with no page of
@@ -116,7 +119,8 @@ const resolvesToPages = (routes: Set<string>, path: string): boolean =>
  */
 export const validateNavTargets = (
   navigation: Navigation,
-  routes: Set<string>
+  routes: Set<string>,
+  servesFile: (path: string) => boolean = () => false
 ): Diagnostic[] => {
   const targets: { label: string; path: string }[] = [
     ...navigation.tabs.map((tab) => ({
@@ -148,7 +152,8 @@ export const validateNavTargets = (
     }
     // A query or fragment (`/guides?tab=cli`) rides on the route; only the
     // path names a page.
-    if (!resolvesToPages(routes, path.split(/[?#]/u)[0] ?? path)) {
+    const bare = path.split(/[?#]/u)[0] ?? path;
+    if (!(resolvesToPages(routes, bare) || servesFile(bare))) {
       seen.add(path);
       diagnostics.push({
         code: "BLUME_NAV_MISSING_PAGE",

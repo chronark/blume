@@ -259,6 +259,24 @@ describe("validateNavTargets", () => {
     expect(result[0]?.message).toContain("/missing");
   });
 
+  it("accepts a featured link to a file the site serves beside its pages", () => {
+    const served = new Set(["/spec.pdf", "/llms.txt"]);
+    const result = validateNavTargets(
+      nav({
+        featured: [
+          { href: "/spec.pdf", label: "Spec" },
+          { href: "/llms.txt#top", label: "llms.txt" },
+          { href: "/gone.pdf", label: "Gone" },
+        ],
+      }),
+      new Set(["/docs"]),
+      (path) => served.has(path)
+    );
+    expect(result.map((d) => d.message)).toStrictEqual([
+      'Navigation entry "Gone" points to /gone.pdf, but no page matches it.',
+    ]);
+  });
+
   it("checks header actions and the cta like featured links", () => {
     const result = validateNavTargets(
       nav({

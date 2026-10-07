@@ -22,6 +22,7 @@ import type { ResolvedConfig } from "../../core/schema.ts";
 import { serverFeatures } from "../../core/server-features.ts";
 import type { Diagnostic } from "../../core/types.ts";
 import { unregisteredSnapshotDiagnostics } from "../../core/version-cut.ts";
+import { servedFiles } from "../../deploy/generated-files.ts";
 import { commandMeta } from "../command-meta.ts";
 import { loadEnvFiles } from "../env.ts";
 import { reportInternalError } from "../internal-error.ts";
@@ -142,7 +143,8 @@ export const doctorCommand = defineCommand({
         ...unregisteredSnapshotDiagnostics(project),
         ...validateNavTargets(
           project.graph.navigation,
-          navTargetRoutes(project, userPages)
+          navTargetRoutes(project, userPages),
+          servedFiles(project)
         )
       );
 
