@@ -2,9 +2,9 @@
  * Code-fence meta. A Shiki transformer reads the tokens after the language and
  * promotes them to attributes on the rendered `<pre>`:
  *
- * - a title — the first bare token (```ts blume.config.ts) or `title="..."` —
- *   becomes `data-title`; the theme's code header shows it, falling back to the
- *   language label.
+ * - a title — the bare words (```ts blume.config.ts, ```js Install the
+ *   client) or `title="..."` — becomes `data-title`; the theme's code header
+ *   shows it, falling back to the language label.
  * - the `lineNumbers` keyword (```ts file.ts lineNumbers) becomes
  *   `data-line-numbers`; the theme renders a counter-driven line-number gutter.
  * - the `wrap` keyword becomes `data-wrap`: this block's long lines wrap
@@ -51,14 +51,18 @@ export interface CodeTitleTransformer {
 
 const TITLE_ATTR = /(?:^|\s)title=(?:"(?<dq>[^"]*)"|'(?<sq>[^']*)')/u;
 
-// The first bare token is the title (```ts blume.config.ts): a non-empty token
-// that isn't a Shiki line range (`{1,3-5}`), a `key=value` attr, or a reserved
-// keyword.
+// The bare words are the title (```ts blume.config.ts, ```js Install the
+// client): every token that isn't a Shiki line range (`{1,3-5}`), a
+// `key=value` attr, or a reserved keyword.
 const isTitleToken = (token: string): boolean =>
   token.length > 0 &&
   !isLineRange(token) &&
   !token.includes("=") &&
   !RESERVED_META_KEYWORDS.has(token);
+
+// A title wrapped in one pair of brackets (```ts [file.ts], the Docus and
+// VitePress code-group spelling) shows without them.
+const BRACKETED_TITLE = /^\[(?<inner>[^\]]+)\]$/u;
 
 /** The title a fence's meta string promotes to `data-title`, if any. */
 export const parseCodeTitle = (raw: string | undefined): string | undefined => {
@@ -79,7 +83,8 @@ export const parseCodeTitle = (raw: string | undefined): string | undefined => {
   // The shared tokenizer keeps a quoted attr (rejected below by its `=`) and
   // a spaced line range (`{1, 3-5}`) whole, so neither can shed a fragment
   // that reads as a bare title.
-  return metaTokens(raw).find(isTitleToken);
+  const title = metaTokens(raw).filter(isTitleToken).join(" ");
+  return BRACKETED_TITLE.exec(title)?.groups?.inner ?? (title || undefined);
 };
 
 // The shared tokenizer keeps a quoted attr whole, so a keyword inside a

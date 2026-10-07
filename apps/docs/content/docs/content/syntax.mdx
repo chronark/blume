@@ -204,6 +204,8 @@ export default defineConfig({
 ```
 ````
 
+The title is every word after the language, so ` ```js Install the client ` titles the block "Install the client". Keywords like `lineNumbers` and `wrap`, line ranges like `{1,4-5}`, and `key="value"` options aren't part of it, and `title="..."` sets the title explicitly. A title in brackets, like ` ```ts [blume.config.ts] `, shows without them.
+
 The language is any [Shiki language](https://shiki.style/languages) id or alias, in any case: ` ```JSON ` highlights like ` ```json `.
 
 Inline code can be highlighted too: add a `{:lang}` marker inside a backtick span and it's colored like a tiny code block — `useState(){:js}` or `T extends object{:ts}`. It only kicks in when you add the marker, so plain inline code stays untouched — nothing to switch on.

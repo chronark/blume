@@ -252,8 +252,27 @@ describe(lineCount, () => {
 });
 
 describe(codeTitleTransformer, () => {
-  it("promotes the first bare token to a title", () => {
+  it("promotes a bare token to a title", () => {
     expect(metaAttrs("blume.config.ts").dataTitle).toBe("blume.config.ts");
+  });
+
+  it("keeps every bare word of a multi-word title", () => {
+    // `javascript I am a tab` used to title the block "I".
+    expect(metaAttrs("I am a tab").dataTitle).toBe("I am a tab");
+    // Keywords, ranges, and attrs around the words stay out of the title.
+    const attrs = metaAttrs('{2} Install  the client lineNumbers icon="x"');
+    expect(attrs.dataTitle).toBe("Install the client");
+    expect(attrs.dataLineNumbers).toBeTruthy();
+  });
+
+  it("drops the brackets around a bracketed title", () => {
+    // ```ts [file.ts], the Docus and VitePress code-group spelling.
+    expect(metaAttrs("[file.ts]").dataTitle).toBe("file.ts");
+    expect(metaAttrs("[my file.ts] {2}").dataTitle).toBe("my file.ts");
+    // Only one pair around the whole title is a wrapper.
+    expect(metaAttrs("[a] [b]").dataTitle).toBe("[a] [b]");
+    expect(metaAttrs("[]").dataTitle).toBe("[]");
+    expect(metaAttrs('title="[file.ts]"').dataTitle).toBe("[file.ts]");
   });
 
   it("reads an explicit title attribute", () => {
