@@ -5,7 +5,12 @@ import { dirname, extname, join, relative, resolve } from "pathe";
 import { nextFenceState } from "./code-fences.ts";
 import type { FenceState } from "./code-fences.ts";
 import matter from "./frontmatter.ts";
-import { INLINE_CODE, MD_IMAGE, targetOffsetIn } from "./sources/normalize.ts";
+import {
+  INLINE_CODE,
+  MD_IMAGE,
+  rewriteCardImages,
+  targetOffsetIn,
+} from "./sources/normalize.ts";
 import type { Diagnostic } from "./types.ts";
 import { substituteVariables } from "./variables.ts";
 
@@ -361,6 +366,28 @@ const resolveIncludePath = (
 };
 
 /**
+ * An image target written in the included file's directory, rebased onto the
+ * including file's, or `null` when it means the same thing from either: only
+ * filesystem-relative targets move with the file, while URLs, public-dir
+ * absolutes, and anchors stay.
+ */
+const rebaseImageTarget = (
+  target: string,
+  fromDir: string,
+  toDir: string
+): string | null => {
+  if (
+    target.startsWith("/") ||
+    target.startsWith("#") ||
+    URL.canParse(target)
+  ) {
+    return null;
+  }
+  const rebased = relative(toDir, resolve(fromDir, target));
+  return rebased.startsWith(".") ? rebased : `./${rebased}`;
+};
+
+/**
  * Rewrite one line's relative image targets from the included file's
  * directory to the including file's, so a partial's colocated
  * `![](./diagram.png)` still resolves once its markdown lives in the
@@ -379,17 +406,10 @@ const rebaseImageLine = (
   let cursor = 0;
   for (const match of masked.matchAll(MD_IMAGE)) {
     const target = match.groups?.target ?? "";
-    // Only filesystem-relative targets move with the file: URLs, public-dir
-    // absolutes, and anchors mean the same thing from either directory.
-    if (
-      target.startsWith("/") ||
-      target.startsWith("#") ||
-      URL.canParse(target)
-    ) {
+    const url = rebaseImageTarget(target, fromDir, toDir);
+    if (url === null) {
       continue;
     }
-    const rebased = relative(toDir, resolve(fromDir, target));
-    const url = rebased.startsWith(".") ? rebased : `./${rebased}`;
     const offset =
       (match.index ?? 0) +
       targetOffsetIn(match[0], target, match.groups?.title);
@@ -409,12 +429,17 @@ const rebaseImages = (
     return lines;
   }
   let fence: FenceState = null;
-  return lines.map((line) => {
+  const rebased = lines.map((line) => {
     const next = nextFenceState(line, fence);
     const inFence = fence !== null || next !== null;
     fence = next;
     return inFence ? line : rebaseImageLine(line, fromDir, toDir);
   });
+  // A `<Card img>` is an image embed too, and its tag may wrap onto later
+  // lines, so it's rebased over the whole text.
+  return rewriteCardImages(rebased.join("\n"), (target) =>
+    rebaseImageTarget(target, fromDir, toDir)
+  ).split("\n");
 };
 
 /** Wrap raw file content as a fenced code block that can't be broken by the

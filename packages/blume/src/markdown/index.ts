@@ -14,6 +14,7 @@ import { hasVariables } from "../core/variables.ts";
 import type { ContentVariables } from "../core/variables.ts";
 import { apiRailPlugin } from "./api-rail.ts";
 import { baseLinksPlugin } from "./base-links.ts";
+import { cardImagesPlugin } from "./card-images.ts";
 import { codeTitleTransformer } from "./code-title.ts";
 import { directiveToCalloutPlugin } from "./directives.ts";
 import { externalLinksPlugin } from "./external-links.ts";
@@ -334,6 +335,12 @@ const blumeSharedMdastPlugins = (
   asMdastPlugin(
     relativeLinksPlugin({
       contentRoot: options.contentRoot,
+      dataFile: options.dataFile,
+      deployBase: options.deployBase,
+    })
+  ),
+  asMdastPlugin(
+    cardImagesPlugin({
       dataFile: options.dataFile,
       deployBase: options.deployBase,
     })

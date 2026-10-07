@@ -33,7 +33,7 @@ Cards link to a destination with an icon, title, and short blurb. Group them wit
 
 `Card` takes `title`, an optional `href` (omit it for a non-clickable card), and an `icon` from Blume's built-in icon set. `CardGroup` takes `cols` (default `2`).
 
-A card also takes `img`, an image across its top (or beside the text from the `sm` breakpoint up, with `horizontal`); `cta`, a call-to-action line in the accent color beneath the text; `arrow`, an arrow after the title and the CTA (shown by default only for external links); `type`, which tints the card and picks a matching icon the way a callout does (`note`, `info`, `tip`, `check`, `warning`, or `danger`); and `color`, any CSS color for the icon.
+A card also takes `img`, an image across its top (or beside the text from the `sm` breakpoint up, with `horizontal`), given like a Markdown image's path: a file next to the page (`./cover.png`), a path under `public/`, or a URL; `cta`, a call-to-action line in the accent color beneath the text; `arrow`, an arrow after the title and the CTA (shown by default only for external links); `type`, which tints the card and picks a matching icon the way a callout does (`note`, `info`, `tip`, `check`, `warning`, or `danger`); and `color`, any CSS color for the icon.
 
 ## Steps
 

@@ -14,7 +14,12 @@ import { normalizeBasePath } from "./base-path.ts";
 import { nextFenceState } from "./code-fences.ts";
 import type { FenceState } from "./code-fences.ts";
 import { hashText } from "./sources/cache.ts";
-import { INLINE_CODE, MD_IMAGE, targetOffsetIn } from "./sources/normalize.ts";
+import {
+  INLINE_CODE,
+  MD_IMAGE,
+  rewriteCardImages,
+  targetOffsetIn,
+} from "./sources/normalize.ts";
 import { readExpandedEntryText } from "./sources/read.ts";
 import type { ContentSource } from "./sources/types.ts";
 import type { PageRecord } from "./types.ts";
@@ -141,9 +146,16 @@ export const resolveRelativeImage = (
   return existsAsWritten(abs, segments) ? abs : null;
 };
 
-/** Encode an endpoint param for use in a Markdown URL, keeping `/` separators. */
-const encodedParam = (param: string): string =>
-  param.split("/").map(encodeURIComponent).join("/");
+/**
+ * The URL a colocated image's endpoint param is served at, under
+ * `deployment.base` when set, encoded for a Markdown or HTML URL with its `/`
+ * separators kept.
+ */
+export const contentAssetUrl = (param: string, deployBase?: string): string =>
+  `${normalizeBasePath(deployBase)}${CONTENT_ASSETS_PREFIX}/${param
+    .split("/")
+    .map(encodeURIComponent)
+    .join("/")}`;
 
 /**
  * Rewrite one line's relative image targets. Matches run on a copy with inline
@@ -191,7 +203,6 @@ export const rewriteRelativeImages = (options: {
 }): string => {
   const { source, sourcePath, projectRoot, deployBase, register } = options;
   const sourceDir = dirname(sourcePath);
-  const prefix = `${normalizeBasePath(deployBase)}${CONTENT_ASSETS_PREFIX}`;
   const toUrl = (target: string): string | null => {
     const abs = resolveRelativeImage(sourceDir, target);
     if (abs === null) {
@@ -199,7 +210,7 @@ export const rewriteRelativeImages = (options: {
     }
     const param = contentAssetParam(projectRoot, abs);
     register?.(param, abs);
-    return `${prefix}/${encodedParam(param)}`;
+    return contentAssetUrl(param, deployBase);
   };
 
   let fence: FenceState = null;
@@ -209,7 +220,10 @@ export const rewriteRelativeImages = (options: {
     fence = next;
     return inFence ? line : rewriteLine(line, toUrl);
   });
-  return lines.join("\n");
+  // A `<Card img>` is an image embed too: its file is served and its value
+  // pointed there, which the HTML render reads back (see
+  // `markdown/card-images.ts`).
+  return rewriteCardImages(lines.join("\n"), toUrl);
 };
 
 /**

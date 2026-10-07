@@ -1217,6 +1217,15 @@ const ELEMENT_SRC =
   /(?<=(?:^|[^\\])(?:\\\\)*)<(?<tag>img|source|video|audio)(?=[\s/>])[^<>]*?\ssrc=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
 
 /**
+ * A `<Card>`'s string `img` (`<Card img="./cover.png">`), read the way
+ * `ELEMENT_HREF` reads an `href`. It's an image embed: resolved from beside
+ * the page source and published like `![](./cover.png)` (see
+ * {@link rewriteCardImages}).
+ */
+const CARD_IMG =
+  /(?<=(?:^|[^\\])(?:\\\\)*)<Card(?=[\s/>])[^<>]*?\simg=(?:"(?<double>[^"]*)"|'(?<single>[^']*)')/gu;
+
+/**
  * An inline link whose label wraps onto later lines of its paragraph
  * (`[a long⏎label](/x)`), as a formatter leaves one: the line scan can't see
  * it. The label holds a line break but no blank line (which would end the
@@ -1321,11 +1330,46 @@ const mediaSourceLinks = (
     ];
   });
 
+/** Each `<Card img>` value in the masked `text`, with its offset there. */
+const cardImages = (text: string): { at: number; target: string }[] =>
+  [...text.matchAll(CARD_IMG)].map((match) => {
+    const target = match.groups?.double ?? match.groups?.single ?? "";
+    // The value ends one character (its closing quote) before the match does.
+    return { at: match.index + match[0].length - target.length - 1, target };
+  });
+
+/**
+ * Rewrite every `<Card img="…">` value in `text` (outside code) with
+ * `rewrite`, which returns the new value or `null` to leave one as written.
+ * The include expander rebases a partial's values with it and the
+ * content-asset rewriter points them at their served URL, exactly as both
+ * treat image embeds, so a card's image resolves like `![](./cover.png)`.
+ */
+export const rewriteCardImages = (
+  text: string,
+  rewrite: (target: string) => string | null
+): string => {
+  if (!text.includes("<Card")) {
+    return text;
+  }
+  let out = "";
+  let cursor = 0;
+  for (const { at, target } of cardImages(maskCode(text.split("\n")))) {
+    const next = rewrite(target);
+    if (next !== null) {
+      out += text.slice(cursor, at) + next;
+      cursor = at + target.length;
+    }
+  }
+  return out + text.slice(cursor);
+};
+
 /**
  * Every link in the masked `text` (see `maskCode`) of `lines` that can span
  * lines, with its 1-based position: an element's `href` (see `ELEMENT_HREF`),
- * a media element's `src` (see `ELEMENT_SRC`), and a link whose label wraps
- * (see `WRAPPED_LINK`). A lowercase `<a>` is raw
+ * a media element's `src` (see `ELEMENT_SRC`), a `<Card>`'s `img` (see
+ * `CARD_IMG`, an image embed), and a link whose label wraps (see
+ * `WRAPPED_LINK`). A lowercase `<a>` is raw
  * HTML in `.md` and a plain element in `.mdx`; the Markdown pipeline passes
  * either through as written, so its target is marked `raw`.
  */
@@ -1349,7 +1393,14 @@ const multilineLinks = (
     }
     links.push(link);
   }
-  links.push(...mediaSourceLinks(text, lineStarts, lineOffset));
+  links.push(
+    ...mediaSourceLinks(text, lineStarts, lineOffset),
+    ...cardImages(text).flatMap(({ at, target }): PageLink[] =>
+      target === ""
+        ? []
+        : [{ ...positionIn(lineStarts, at, lineOffset), image: true, target }]
+    )
+  );
   for (const match of text.matchAll(WRAPPED_LINK)) {
     const written = match.groups?.target ?? "";
     const at =
