@@ -22,6 +22,8 @@ export default defineComponents({
 
 Keys are the names you write in MDX (`<Callout>`, `<Pricing>`). Use the `.tsx` filename when you import React components.
 
+A capitalized tag that's neither a built-in, an [island](/docs/content/islands), nor an override fails the page when it renders, so `blume dev`, `blume build`, and `blume check` warn about it first as `BLUME_UNKNOWN_COMPONENT`, once per tag, naming every page that uses it.
+
 ### Reference form
 
 Every override — in `mdx` or `layout` — accepts three forms:

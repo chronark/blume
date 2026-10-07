@@ -80,16 +80,38 @@ describe("validateUsedComponents", () => {
     expect(result[0]?.suggestion).toContain("blume add pagination");
   });
 
-  it("dedupes a repeated unknown tag across pages", () => {
+  it("warns once for a tag used across pages, naming every page", () => {
     const result = validateUsedComponents(
       [
-        page({ componentsUsed: ["Bogus"], route: "/a" }),
+        page({
+          componentsUsed: ["Bogus"],
+          route: "/a",
+          sourcePath: "/d/a.mdx",
+        }),
         page({ componentsUsed: ["Bogus"], route: "/b" }),
+        page({ componentsUsed: ["Callout"], route: "/c" }),
+        page({ componentsUsed: ["Bogus"], route: "/d" }),
       ],
       new Set(),
       new Set()
     );
     expect(result).toHaveLength(1);
+    expect(result[0]?.message).toBe(
+      "<Bogus> is used on 3 pages but isn't a known component: /a, /b, and /d."
+    );
+    expect(result[0]?.file).toBe("/d/a.mdx");
+  });
+
+  it("names the one page that uses a tag", () => {
+    const [diagnostic] = validateUsedComponents(
+      [page({ componentsUsed: ["Bogus"], route: "/a" })],
+      new Set(),
+      new Set()
+    );
+    expect(diagnostic?.message).toBe(
+      "<Bogus> is used in /a but isn't a known component."
+    );
+    expect(diagnostic?.file).toBe("p");
   });
 });
 

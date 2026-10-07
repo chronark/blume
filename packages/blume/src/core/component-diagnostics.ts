@@ -9,40 +9,47 @@ const toKebab = (tag: string): string =>
     .replaceAll(/(?<lower>[a-z0-9])(?<upper>[A-Z])/gu, "$<lower>-$<upper>")
     .toLowerCase();
 
+const LIST = new Intl.ListFormat("en", { type: "conjunction" });
+
 /**
  * Warn when an `.mdx` page uses a `<Component>` tag that resolves to nothing —
  * a built-in, an island, or a `components.ts` override — so a typo surfaces as a
  * friendly diagnostic (with a `blume add` hint where one exists) instead of a raw
  * MDX "X is not defined" build error. `extraTags` are the project's own known
  * components (islands + overrides); `registryNames` gates the install hint.
+ * One warning per tag names every page that uses it, anchored to the first.
  */
 export const validateUsedComponents = (
   pages: PageRecord[],
   extraTags: Set<string>,
   registryNames: Set<string>
 ): Diagnostic[] => {
-  const diagnostics: Diagnostic[] = [];
-  const seen = new Set<string>();
+  const users = new Map<string, PageRecord[]>();
   for (const page of pages) {
     for (const tag of page.componentsUsed ?? []) {
-      if (BUILTIN_MDX_TAGS.has(tag) || extraTags.has(tag) || seen.has(tag)) {
-        continue;
+      if (!(BUILTIN_MDX_TAGS.has(tag) || extraTags.has(tag))) {
+        users.set(tag, [...(users.get(tag) ?? []), page]);
       }
-      seen.add(tag);
-      const name = toKebab(tag);
-      const suggestion = registryNames.has(name)
-        ? `Run \`blume add ${name}\` to install it, or register <${tag}> in components.ts (mdx).`
-        : `Register <${tag}> in components.ts (mdx), or add an islands/${tag}.tsx component.`;
-      diagnostics.push({
-        code: "BLUME_UNKNOWN_COMPONENT",
-        file: page.sourcePath ?? page.id,
-        message: `<${tag}> is used in ${page.route} but isn't a known component.`,
-        severity: "warning",
-        suggestion,
-      });
     }
   }
-  return diagnostics;
+  return [...users].map(([tag, using]) => {
+    const name = toKebab(tag);
+    const suggestion = registryNames.has(name)
+      ? `Run \`blume add ${name}\` to install it, or register <${tag}> in components.ts (mdx).`
+      : `Register <${tag}> in components.ts (mdx), or add an islands/${tag}.tsx component.`;
+    const routes = using.map((page) => page.route);
+    const [first] = using;
+    return {
+      code: "BLUME_UNKNOWN_COMPONENT",
+      file: first?.sourcePath ?? first?.id,
+      message:
+        routes.length === 1
+          ? `<${tag}> is used in ${LIST.format(routes)} but isn't a known component.`
+          : `<${tag}> is used on ${routes.length} pages but isn't a known component: ${LIST.format(routes)}.`,
+      severity: "warning",
+      suggestion,
+    };
+  });
 };
 
 /** What example discovery found: where it looked, and each example's key. */
