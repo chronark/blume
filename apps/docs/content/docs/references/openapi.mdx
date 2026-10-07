@@ -34,6 +34,8 @@ The sidebar's tag groups and the overview page's sections follow the same order:
 
 A tag's `x-displayName`, Redocly's extension, labels its sidebar group and overview section in place of its name. Its URL still comes from its name, so adding one doesn't move any page. An operation is labeled by its `summary`, or by its method and path (`GET /pets`), as its page is titled, when it has none.
 
+The spec's `info.description` opens the overview page, and each tag's `description` opens its section there. Their headings move one level under where they sit, so the page's title stays its only top-level heading: a `# Authentication` in `info.description` or an operation's `description` renders as a second-level heading, and in a tag's description as a third-level one, under the tag's own.
+
 :::note
 Operations are indexed for search by their **summary, description, tag, and endpoint** (`GET /pets/{id}`). The rendered schema tables and generated code samples aren't full-text indexed; search matches an operation's title, prose, section, and path, then links to its own page. [Your own samples](#your-own-samples) are indexed like any code block, only with [`search.indexing.includeCodeBlocks`](/docs/configuration/search).
 :::
@@ -337,6 +339,8 @@ Blume doesn't validate a spec against the OpenAPI schema: run a linter such as [
 | `BLUME_OPENAPI_X_WEBHOOKS` | A 3.1 or later spec keeps its webhooks under `x-webhooks`, the extension 3.0 tools read, and has no `webhooks`, so none of them render. Rename the field to `webhooks`. |
 | `BLUME_OPENAPI_REF_PATH_ITEM` | A path or webhook is a `$ref` to a shared path item, such as one under `components.pathItems`. Blume doesn't resolve these, so its operations are missing from the reference. Inline the path item under `paths` or `webhooks`; its schemas, parameters, and responses can stay `$ref`s. |
 | `BLUME_OPENAPI_DUPLICATE_OPERATION_ID` | Two operations share an `operationId`, which must be unique in a spec. The warning names both. Blume adds the method to the second one's id in `<Operation id>`, and to its [URL](#route) when the two share a tag. Give each operation its own `operationId`. |
+| `BLUME_OPENAPI_LOCAL_SERVER` | A server the spec, a path, or an operation declares is a local address (`localhost`, `127.0.0.1`, `0.0.0.0`, `[::1]`), often written by a framework that exported the spec on a dev machine. Try it and the code samples would send requests there, which readers can't reach. List the public URL in `servers`, or set it with an [overlay](#overlays). |
+| `BLUME_OPENAPI_NULLABLE` | A spec that declares OpenAPI 3.1 or later uses `nullable`, which 3.1 removed. Blume still shows those values as nullable, but validators and SDK generators that follow 3.1 read them as never null. The warning names where, as JSON Pointers into the spec. Add `"null"` to the schema's `type` instead (`type: [string, "null"]`). |
 
 [Keep API documentation in sync with backend changes in CI](/guides/openapi-documentation-ci) runs those checks in GitHub Actions: it exports the spec from the backend, fails when the spec is stale, invalid, or breaking, and rebuilds the reference from it.
 

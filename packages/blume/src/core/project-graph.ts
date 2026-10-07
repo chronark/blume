@@ -1,4 +1,6 @@
-import { isAbsolute, relative } from "pathe";
+import { existsSync } from "node:fs";
+
+import { isAbsolute, join, relative } from "pathe";
 
 import { alertDiagnostics } from "./alert-diagnostics.ts";
 import { normalizePath, withBasePath } from "./base-path.ts";
@@ -433,6 +435,34 @@ const withSourceRedirects = (
     : config;
 };
 
+/**
+ * A `public/openapi.json` is served at `/openapi.json`, where Blume
+ * publishes the OpenAPI description of the site's own JSON docs API: the
+ * build stops generating that description, while the API catalog
+ * (`/.well-known/api-catalog`) still lists `/openapi.json` as the docs API's
+ * `service-desc`, so agents reading it get the project's file instead. Only
+ * when the docs API is on; otherwise Blume publishes nothing there.
+ */
+const publicOpenApiDiagnostics = (
+  config: ResolvedConfig,
+  root: string
+): Diagnostic[] => {
+  const file = join(root, "public", "openapi.json");
+  return config.agents.api && existsSync(file)
+    ? [
+        {
+          code: "BLUME_PUBLIC_OPENAPI_JSON",
+          file,
+          message:
+            "public/openapi.json is served at /openapi.json, where Blume publishes the OpenAPI description of the site's JSON docs API, so that description isn't generated, and /.well-known/api-catalog still lists /openapi.json as the docs API's description.",
+          severity: "warning",
+          suggestion:
+            "Move the file to another path, like public/specs/openapi.json, and update what links to it. A spec an openapi() reference renders can live outside public/ altogether. Or set agents.api to false if the site shouldn't publish the JSON docs API.",
+        },
+      ]
+    : [];
+};
+
 /** The configured banner link target, when the banner has a link. */
 const bannerLinkHref = (
   banner: ResolvedConfig["banner"]
@@ -711,6 +741,7 @@ export const scanProject = async (
       ...i18nWarnings,
       ...versionWarnings,
       ...lastModifiedWarnings,
+      ...publicOpenApiDiagnostics(config, context.root),
       ...redirectPageDiagnostics(
         config,
         servedPaths,

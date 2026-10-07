@@ -1,4 +1,4 @@
-import type { List, Nodes, Paragraph, Root } from "mdast";
+import type { Heading, List, Nodes, Paragraph, Root } from "mdast";
 import { fromMarkdown } from "mdast-util-from-markdown";
 import { toString as mdastToString } from "mdast-util-to-string";
 import stringWidth from "string-width";
@@ -161,9 +161,55 @@ const closeOpenFence = (text: string): string => {
     : `${text}\n${fence}`;
 };
 
-/** Spec prose as MDX that is safe to follow with a component. */
-const descriptionMdx = (text: string): string =>
-  mdxSafe(closeOpenFence(text.trim()));
+/** The deepest heading Markdown can write. */
+const MAX_HEADING_DEPTH = 6;
+
+/** A line break inside a heading's text, with any quote or list indentation. */
+const HEADING_BREAK = /[ \t]*\r?\n[\s>]*/gu;
+
+/** Every heading in a Markdown tree, in document order. */
+const headingsOf = (node: Nodes): Heading[] => {
+  if (node.type === "heading") {
+    return [node];
+  }
+  return "children" in node ? node.children.flatMap(headingsOf) : [];
+};
+
+/**
+ * Spec prose with every heading `by` levels deeper, written as an ATX
+ * heading (`#` × depth, capped at 6). A spec's `info.description` is often a
+ * whole document under `# Introduction` and `# Authentication` headings, so
+ * on a page whose title is already its `<h1>` it would add more: the
+ * overview's description and an operation's sit under the title (`#` becomes
+ * `##`), and a tag's under its `##` section (`#` becomes `###`). Headings are
+ * found in the same `<`-masked parse as `mdxSafe`'s, since the emitted MDX
+ * has no HTML blocks to hide one in; a setext heading's lines join into one.
+ */
+const demoteHeadings = (text: string, by: number): string => {
+  let out = "";
+  let cursor = 0;
+  for (const heading of headingsOf(
+    fromMarkdown(text.replaceAll("<", HTML_MASK))
+  )) {
+    // fromMarkdown always stamps positions; 0 is an unreachable guard.
+    const start = heading.position?.start.offset ?? 0;
+    const from = heading.children[0]?.position?.start.offset ?? start;
+    const to = heading.children.at(-1)?.position?.end.offset ?? from;
+    const depth = Math.min(heading.depth + by, MAX_HEADING_DEPTH);
+    out += `${text.slice(cursor, start)}${"#".repeat(depth)} ${text
+      .slice(from, to)
+      .replace(HEADING_BREAK, " ")}`.trimEnd();
+    cursor = heading.position?.end.offset ?? start;
+  }
+  return out + text.slice(cursor);
+};
+
+/**
+ * Spec prose as MDX that is safe to follow with a component, its headings
+ * demoted `by` levels under the page's own (see {@link demoteHeadings}).
+ */
+const descriptionMdx = (text: string, by: number): string =>
+  mdxSafe(closeOpenFence(demoteHeadings(text.trim(), by)));
 
 /**
  * Frontmatter emitted for one operation or overview page. Boolean flags are
@@ -349,7 +395,7 @@ const operationDescription = (
 /** Prepend a markdown description (if any) above a component invocation. */
 const withDescription = (description: string, component: string): string =>
   description.trim()
-    ? `${descriptionMdx(description)}\n\n${component}`
+    ? `${descriptionMdx(description, 1)}\n\n${component}`
     : component;
 
 export const operationMdx = (
@@ -468,7 +514,7 @@ export const overviewMdx = (
       continue;
     }
     const description = tag.description.trim()
-      ? [descriptionMdx(tag.description)]
+      ? [descriptionMdx(tag.description, 2)]
       : [];
     tagSections.push(
       [

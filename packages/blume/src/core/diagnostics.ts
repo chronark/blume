@@ -27,6 +27,7 @@ const DOCS_CONTENT_SOURCES = "/docs/content/sources";
 const DOCS_CONTENT_SOURCES_OBSIDIAN = "/docs/content/sources/obsidian";
 const DOCS_CONTENT_NAVIGATION = "/docs/content/navigation";
 const DOCS_CONTENT_INCLUDES = "/docs/content/includes";
+const DOCS_OPENAPI_WARNINGS = "/docs/references/openapi#spec-warnings";
 
 /** Diagnostic code → the docs page that explains it. */
 const DOCS_PATHS = new Map(
@@ -50,6 +51,7 @@ const DOCS_PATHS = new Map(
     BLUME_DUPLICATE_SIDEBAR_ORDER: DOCS_CONTENT_NAVIGATION,
     BLUME_EXAMPLE_NOT_FOUND: "/docs/content/components#component",
     BLUME_FRONTMATTER_INVALID: "/docs/content/frontmatter",
+    BLUME_GRAPHQL_UNKNOWN_CODE_SAMPLE: "/docs/references/graphql",
     BLUME_INCLUDE_CYCLE: DOCS_CONTENT_INCLUDES,
     BLUME_INCLUDE_MALFORMED: DOCS_CONTENT_INCLUDES,
     BLUME_INCLUDE_NOT_FOUND: DOCS_CONTENT_INCLUDES,
@@ -68,6 +70,12 @@ const DOCS_PATHS = new Map(
     BLUME_NAV_INDEX_TITLE_MISMATCH: DOCS_CONTENT_NAVIGATION,
     BLUME_NAV_MISSING_PAGE: DOCS_CONTENT_NAVIGATION,
     BLUME_NODE_VERSION: "/docs/quickstart",
+    BLUME_OPENAPI_DUPLICATE_OPERATION_ID: DOCS_OPENAPI_WARNINGS,
+    BLUME_OPENAPI_LOCAL_SERVER: DOCS_OPENAPI_WARNINGS,
+    BLUME_OPENAPI_NULLABLE: DOCS_OPENAPI_WARNINGS,
+    BLUME_OPENAPI_UNKNOWN_CODE_SAMPLE:
+      "/docs/references/openapi#code-samples-and-schemas",
+    BLUME_PUBLIC_OPENAPI_JSON: "/docs/discoverability/json-api",
     BLUME_SEARCH_SYNC_FAILED: "/docs/configuration/search",
     BLUME_SERVER_FEATURE_REQUIRED: DOCS_DEPLOYMENT,
     BLUME_SIDEBAR_DISPLAY_IGNORED: DOCS_CONTENT_NAVIGATION,

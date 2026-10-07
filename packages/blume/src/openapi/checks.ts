@@ -1,7 +1,10 @@
 import type { OperationObject } from "@scalar/openapi-types/3.2";
 
+import type { JsonValue } from "../core/adapter.ts";
+import type { AsyncApiSpecValue } from "./asyncapi.ts";
 import type { ApiDocument } from "./model.ts";
-import { HTTP_METHODS, operationLabel } from "./model.ts";
+import { HTTP_METHODS, operationLabel, withServerDefaults } from "./model.ts";
+import { isJsonObject } from "./overlay.ts";
 
 /**
  * Targeted checks for spec mistakes that would otherwise render silently
@@ -197,6 +200,66 @@ const xWebhooksIssues = (document: ApiDocument): SpecIssue[] =>
     : [];
 
 /**
+ * A loopback or unspecified host (`localhost`, `127.0.0.1`, `0.0.0.0`,
+ * `[::1]`): one only the machine that wrote the spec can reach.
+ */
+const LOCAL_HOST =
+  /^(?:localhost|.+\.localhost|127(?:\.\d{1,3}){3}|0\.0\.0\.0|\[::1?\])$/u;
+
+/** One `servers` entry, as a hand-written spec may have written it. */
+type ServerEntry = NonNullable<ApiDocument["servers"]>[number];
+
+/** A server's URL, variables at their defaults, when its host is local. */
+const localServerUrl = (server: ServerEntry): string | undefined => {
+  if (!isName(server.url)) {
+    return undefined;
+  }
+  // SAFETY: a parsed spec is JSON, and `withServerDefaults` checks the shape
+  // of the `variables` map it reads.
+  const variables = server.variables as AsyncApiSpecValue;
+  const url = withServerDefaults(server.url, variables);
+  try {
+    return LOCAL_HOST.test(new URL(url).hostname) ? url : undefined;
+  } catch {
+    // A relative URL (`/v1`) or an unresolved variable names no host.
+    return undefined;
+  }
+};
+
+/**
+ * Servers the spec, a path, or an operation declares at a local address,
+ * which a framework exporting its spec from a dev machine writes (Laravel's
+ * Scramble writes `http://localhost/api` from an `.env`-less CI run). The
+ * reference publishes it as the server Try it sends to and the code samples
+ * call, which no reader can reach. One warning per URL.
+ */
+const localServerIssues = (document: ApiDocument): SpecIssue[] => {
+  const lists = [
+    document.servers,
+    ...Object.values(document.paths ?? {}).flatMap((item) =>
+      isObject(item) && !("$ref" in item)
+        ? [
+            item.servers,
+            ...HTTP_METHODS.map((method) => {
+              const operation = item[method];
+              return isObject(operation) ? operation.servers : undefined;
+            }),
+          ]
+        : []
+    ),
+  ];
+  const urls = new Set(
+    lists.flatMap((servers) => listOf(servers).map(localServerUrl))
+  );
+  return [...urls].filter(isName).map((url) => ({
+    code: "BLUME_OPENAPI_LOCAL_SERVER",
+    message: `The spec's server ${url} is a local address, so the reference publishes it as the server Try it sends requests to and the code samples call, which readers can't reach.`,
+    suggestion:
+      "List the API's public URL in the spec's `servers`, or replace it with an overlay (an action with `target: $.servers[0]` and `update: { url: \"https://api.example.com\" }`).",
+  }));
+};
+
+/**
  * Check a parsed document for the mistakes above, and for the OpenAPI 3.2
  * features Blume doesn't render yet. `$ref` path items are skipped: the
  * extractor already reports them as missing from the reference.
@@ -256,5 +319,100 @@ export const specIssues = (document: ApiDocument): SpecIssue[] => {
   for (const [name, item] of Object.entries(document.webhooks ?? {})) {
     visit(name, item, true);
   }
-  return [...issues, ...securitySchemeIssues(document, requirers)];
+  return [
+    ...issues,
+    ...securitySchemeIssues(document, requirers),
+    ...localServerIssues(document),
+  ];
+};
+
+/** The OpenAPI versions that have no `nullable` keyword: 3.1 and later. */
+const NO_NULLABLE = /^3\.[1-9]/u;
+
+/**
+ * Keys whose values are data rather than schemas, so a `nullable` inside
+ * one belongs to an example. Extensions (`x-…`) are skipped too.
+ */
+const DATA_KEYS = new Set(["const", "default", "enum", "example", "examples"]);
+
+/**
+ * Keys whose values map names to objects: the names aren't keywords, so a
+ * property named `nullable` isn't the keyword, and a `default` response
+ * isn't a default value.
+ */
+const NAME_MAPS = new Set([
+  "$defs",
+  "definitions",
+  "dependentSchemas",
+  "patternProperties",
+  "properties",
+  "responses",
+  "schemas",
+]);
+
+/** A JSON Pointer reference token, `~` and `/` escaped (RFC 6901). */
+const pointerToken = (key: string): string =>
+  key.replaceAll("~", "~0").replaceAll("/", "~1");
+
+const isBoolean = (value: JsonValue): value is boolean =>
+  typeof value === "boolean";
+
+/**
+ * Where `node` sets `nullable` to a boolean, as JSON Pointers from
+ * `pointer`. `names` says `node`'s keys are names (see {@link NAME_MAPS}).
+ */
+const nullablePointers = (
+  node: JsonValue,
+  pointer: string,
+  names: boolean
+): string[] => {
+  if (Array.isArray(node)) {
+    return node.flatMap((item, index) =>
+      nullablePointers(item, `${pointer}/${index}`, false)
+    );
+  }
+  if (!isJsonObject(node)) {
+    return [];
+  }
+  return Object.entries(node).flatMap(([key, value]) => {
+    const at = `${pointer}/${pointerToken(key)}`;
+    if (names) {
+      return nullablePointers(value, at, false);
+    }
+    if (key === "nullable" && isBoolean(value)) {
+      return [at];
+    }
+    return DATA_KEYS.has(key) || key.startsWith("x-")
+      ? []
+      : nullablePointers(value, at, NAME_MAPS.has(key));
+  });
+};
+
+/**
+ * A spec written as OpenAPI 3.1 or later that still uses `nullable`, which
+ * 3.1 removed for `type: [T, "null"]`. Read as written (before Blume
+ * upgrades a 3.0 spec, which rewrites `nullable` itself), since that's the
+ * document the author edits. Blume still renders those values as nullable,
+ * but validators and SDK generators that follow 3.1 read them as never
+ * null. One warning per spec, naming the first few places.
+ */
+export const nullableIssues = (document: JsonValue): SpecIssue[] => {
+  const version =
+    isJsonObject(document) && isName(document.openapi) ? document.openapi : "";
+  if (!NO_NULLABLE.test(version)) {
+    return [];
+  }
+  const pointers = nullablePointers(document, "#", false);
+  if (pointers.length === 0) {
+    return [];
+  }
+  const more = pointers.length - NAMED_OPERATIONS;
+  return [
+    {
+      code: "BLUME_OPENAPI_NULLABLE",
+      message: `The spec is OpenAPI ${version}, which removed \`nullable\`, but sets it at ${pointers.slice(0, NAMED_OPERATIONS).join(", ")}${more > 0 ? ` and ${more} more` : ""}. Blume still shows those values as nullable, but tools that follow ${version}, like validators and SDK generators, read them as never null.`,
+      suggestion:
+        'Add "null" to the schema\'s `type` instead (`type: [string, "null"]`), or beside a `$ref`, use `anyOf` with `{ type: "null" }`. If the spec is really 3.0, declare `openapi: 3.0.3`, and Blume upgrades it.',
+    },
+  ];
 };

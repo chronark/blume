@@ -15,6 +15,7 @@ import { nodeRequire } from "../core/node-require.ts";
 import { hashText } from "../core/sources/cache.ts";
 import type { AsyncApiDocument } from "./asyncapi.ts";
 import { normalizeAsyncApiDocument } from "./asyncapi.ts";
+import { nullableIssues } from "./checks.ts";
 import type { SpecIssue } from "./checks.ts";
 import { buildGraphqlDocument } from "./graphql-build.ts";
 import type { GraphqlDocument } from "./graphql.ts";
@@ -62,7 +63,10 @@ const PROXY_ENV_VARS = [
 
 export interface ParsedSpec {
   document: ApiDocument;
-  /** `x-codeSamples` entries whose `$ref` couldn't be inlined. */
+  /**
+   * Issues only the spec as written shows: `nullable` in a 3.1 spec, and
+   * `x-codeSamples` entries whose `$ref` couldn't be inlined.
+   */
   issues: SpecIssue[];
   warnings: string[];
 }
@@ -493,6 +497,8 @@ export const parseSpec = async (
     root,
     options
   );
+  // Checked as written: upgrading a 3.0 spec rewrites its `nullable`s.
+  const nullable = isJsonObject(normalized) ? nullableIssues(normalized) : [];
   const { specification } = upgrade(normalized);
   // Reject a non-mapping here so the renderer never sees a non-document.
   if (!isApiDocument(specification)) {
@@ -501,7 +507,11 @@ export const parseSpec = async (
     );
   }
   const issues = await inlineSampleRefs(specification, spec, root, options);
-  return { document: specification, issues, warnings };
+  return {
+    document: specification,
+    issues: [...nullable, ...issues],
+    warnings,
+  };
 };
 
 export interface ParsedAsyncApiSpec {
