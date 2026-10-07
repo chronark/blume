@@ -3,10 +3,14 @@ import { readFile } from "node:fs/promises";
 
 import { languageLabel } from "../src/components/code-language.ts";
 
-const component = (path: string): Promise<string> =>
-  readFile(new URL(`../src/components/${path}`, import.meta.url), {
-    encoding: "utf-8",
-  });
+// Read with Unix line endings: a Windows checkout writes CRLF.
+const component = async (path: string): Promise<string> => {
+  const source = await readFile(
+    new URL(`../src/components/${path}`, import.meta.url),
+    { encoding: "utf-8" }
+  );
+  return source.replaceAll("\r\n", "\n");
+};
 
 describe(languageLabel, () => {
   it("names a language by its id or an alias, in any case", () => {

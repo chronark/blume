@@ -1,6 +1,7 @@
 import { afterAll, describe, expect, it } from "bun:test";
 import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
+import { stripVTControlCharacters } from "node:util";
 
 import { dirname, join } from "pathe";
 
@@ -45,7 +46,8 @@ const validate = async (
     proc.exited,
     new Response(proc.stderr).text(),
   ]);
-  return { exitCode, stderr };
+  // CI forces color, so read the report as plain text.
+  return { exitCode, stderr: stripVTControlCharacters(stderr) };
 };
 
 describe("blume validate --strict", () => {
