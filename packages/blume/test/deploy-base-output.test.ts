@@ -603,5 +603,9 @@ describe("Vercel server build under a base", () => {
       })
     ).toBe(false);
     expect(errors[0]).toContain('deployment base "/docs"');
+    // Nor leaves the adapter's routes behind for a deploy to pick up.
+    expect(
+      existsSync(join(built.context.root, ".vercel", "output", "config.json"))
+    ).toBe(false);
   });
 });

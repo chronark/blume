@@ -437,9 +437,41 @@ describe("vercel platform", () => {
         project: built,
       })
     ).toBe(false);
-    // The fatal audit stops the build before negotiation is wired.
+    // The fatal audit stops the build before negotiation is wired, and takes
+    // the adapter's routing config with it, so the output can't be deployed
+    // without Blume's routes.
     expect(recorded.error).toHaveLength(1);
     expect(recorded.success).toEqual([]);
+    expect(recorded.info).toEqual([
+      "Removed .vercel/output/config.json, so this failed build can't be deployed.",
+    ]);
+    const outputDir = join(built.context.root, ".vercel", "output");
+    expect(existsSync(join(outputDir, "config.json"))).toBe(false);
+    expect(
+      existsSync(
+        join(outputDir, "functions", "_render.func", ".vc-config.json")
+      )
+    ).toBe(true);
+  });
+
+  it("fails a crashing bundle with no routing config to remove", async () => {
+    const built = await project(JSON.stringify(vercel()), {
+      ".vercel/output/functions/_render.func/.vc-config.json": JSON.stringify({
+        handler: "dist/server/entry.mjs",
+        runtime: "nodejs22.x",
+      }),
+      ".vercel/output/functions/_render.func/dist/server/entry.mjs":
+        'import { z } from "zod";\n',
+    });
+    const { log, recorded } = recorder();
+    expect(
+      await vercelPlatform.finalizeBuild?.({
+        isolated: false,
+        log,
+        project: built,
+      })
+    ).toBe(false);
+    expect(recorded.info).toEqual([]);
   });
 });
 

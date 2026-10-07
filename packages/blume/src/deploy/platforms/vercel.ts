@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
 
 import { dirname, join } from "pathe";
 
@@ -97,6 +97,28 @@ export const checkVercelFunctionBundles = async (
     }
   }
   return !fatal;
+};
+
+/**
+ * Remove the routing config of a build that failed after the adapter wrote
+ * it. The adapter's config is complete as far as the adapter goes, but the
+ * redirects, negotiation, and base routes Blume adds were never spliced in,
+ * so `vercel deploy --prebuilt` would ship a site missing them. Without a
+ * `config.json`, the tree is no Build Output a deploy accepts; the function
+ * bundles stay for inspection.
+ */
+const withdrawBuildOutput = async (
+  context: ProjectContext,
+  log: BuildLog
+): Promise<void> => {
+  const configPath = join(buildOutputDir(context), "config.json");
+  if (!existsSync(configPath)) {
+    return;
+  }
+  await rm(configPath, { force: true });
+  log.info(
+    "Removed .vercel/output/config.json, so this failed build can't be deployed."
+  );
 };
 
 /**
@@ -299,6 +321,7 @@ export const vercelPlatform: DeployPlatform = {
       log
     );
     if (!ok) {
+      await withdrawBuildOutput(context, log);
       return false;
     }
     // A verify build moves its static files too, where the budget gate reads
@@ -310,6 +333,7 @@ export const vercelPlatform: DeployPlatform = {
       return true;
     }
     if (!(await rebaseVercelRoutes(project, log))) {
+      await withdrawBuildOutput(context, log);
       return false;
     }
     await emitVercelNegotiation(project, log);
