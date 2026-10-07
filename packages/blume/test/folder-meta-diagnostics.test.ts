@@ -137,6 +137,22 @@ describe("BLUME_META_UNKNOWN_PAGE", () => {
 });
 
 describe("BLUME_META_OUTSIDE_INCLUDE", () => {
+  it("counts a file another source sharing the root reads as read", async () => {
+    const root = await makeTree({
+      "docs/meta.ts": 'export default { title: "Docs" };\n',
+      "guides/meta.ts": 'export default { title: "Guides" };\n',
+      "scripts/meta.ts": "export default { runtime: 'edge' };\n",
+    });
+    const discovered = await discoverFolderMeta([
+      { include: ["docs/**/*.md"], root },
+      { include: ["guides/**/*.md"], prefix: "guides", root },
+    ]);
+    expect(discovered.unread.map((entry) => entry.dir)).toStrictEqual([
+      "scripts",
+      "scripts",
+    ]);
+  });
+
   it("warns about a reference tag folder's meta.ts no include glob reaches", async () => {
     const root = await makeTree({
       "blume.config.ts":

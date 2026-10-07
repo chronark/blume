@@ -168,7 +168,7 @@ export interface DiscoveredFolderMeta extends FolderMetaMaps {
   diagnostics: Diagnostic[];
   /** The file each meta in `meta` and `shared` was read from. */
   files: Map<FolderMeta, string>;
-  /** Meta files under a source root that its `include` globs don't reach. */
+  /** Meta files under a source root that no source's `include` globs reach. */
   unread: UnreadFolderMeta[];
 }
 
@@ -312,7 +312,18 @@ export const discoverFolderMeta = async (
     }
   }
 
-  return { diagnostics, files, meta, shared, unread };
+  // Sources sharing a root partition it with `include` globs, so a file one
+  // source skips may be another's: only a file no source reads is unread.
+  const read = new Set(
+    perSource.flatMap(({ loaded }) => loaded.map((entry) => entry.file))
+  );
+  return {
+    diagnostics,
+    files,
+    meta,
+    shared,
+    unread: unread.filter((entry) => !read.has(entry.file)),
+  };
 };
 
 /**
