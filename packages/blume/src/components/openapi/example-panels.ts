@@ -19,6 +19,8 @@ import type {
 export interface ExamplePanel {
   key: string;
   label: string;
+  /** The status or media type the tab is under. */
+  name: string;
   /** The media type the value is an example of. */
   type: string;
   /** The example, or `null`/`undefined` when there's none to show. */
@@ -61,6 +63,7 @@ const mediaPanels = (
     return named.map((example) => ({
       key: `${name}-${example.key}`,
       label: `${name} · ${example.label}`,
+      name,
       text,
       type,
       value: example.value,
@@ -70,6 +73,7 @@ const mediaPanels = (
     {
       key: name,
       label: name,
+      name,
       text,
       type,
       value: media ? responseExample(media, schemas, components) : undefined,

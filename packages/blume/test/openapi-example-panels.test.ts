@@ -94,6 +94,7 @@ describe("response tabs", () => {
       {
         key: "200-cat",
         label: "200 · A cat",
+        name: "200",
         text: "OK",
         type: "application/json",
         value: { name: "Tom" },
@@ -101,6 +102,7 @@ describe("response tabs", () => {
       {
         key: "200-dog",
         label: "200 · dog",
+        name: "200",
         text: "OK",
         type: "application/json",
         value: { name: "Rex" },
@@ -108,6 +110,7 @@ describe("response tabs", () => {
       {
         key: "404",
         label: "404",
+        name: "404",
         text: "No example response.",
         type: "",
         value: undefined,
@@ -133,6 +136,7 @@ describe("response tabs", () => {
       {
         key: "201",
         label: "201",
+        name: "201",
         text: "Created",
         type: "text/json",
         value: { id: 0, name: "string" },

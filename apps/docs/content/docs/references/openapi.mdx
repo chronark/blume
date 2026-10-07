@@ -37,7 +37,7 @@ A tag's `x-displayName`, Redocly's extension, labels its sidebar group and overv
 The spec's `info.description` opens the overview page, and each tag's `description` opens its section there. Their headings move one level under where they sit, so the page's title stays its only top-level heading: a `# Authentication` in `info.description` or an operation's `description` renders as a second-level heading, and in a tag's description as a third-level one, under the tag's own.
 
 :::note
-Operations are indexed for search by their **summary, description, tag, and endpoint** (`GET /pets/{id}`). The rendered schema tables and generated code samples aren't full-text indexed; search matches an operation's title, prose, section, and path, then links to its own page. [Your own samples](#your-own-samples) are indexed like any code block, only with [`search.indexing.includeCodeBlocks`](/docs/configuration/search).
+Operations are indexed for search by their **summary, description, tag, and endpoint** (`GET /pets/{id}`), and by what their [Markdown copy](#your-own-samples) lists: the request body's top-level properties and the responses' descriptions. The rendered schema tables and generated code samples aren't full-text indexed; search matches an operation's title, prose, section, and path, then links to its own page. [Your own samples](#your-own-samples) are indexed like any code block, only with [`search.indexing.includeCodeBlocks`](/docs/configuration/search).
 :::
 
 ## A local spec
@@ -141,7 +141,7 @@ paths:
             planter list
 ```
 
-These samples render as their own tabs, ahead of the generated ones, and stay as written when readers change the [Try it](#try-it-playground) form. The older `x-code-samples` spelling works too. To show only your own samples, set `codeSamples: false`. Unlike the generated samples, they're also in the operation page's Markdown copy, so `llms-full.txt`, the MCP server, and the assistant see your SDK calls.
+These samples render as their own tabs, ahead of the generated ones, and stay as written when readers change the [Try it](#try-it-playground) form. The older `x-code-samples` spelling works too. To show only your own samples, set `codeSamples: false`. Unlike the generated samples, they're also in the operation page's Markdown copy, so `llms-full.txt`, the MCP server, and the assistant see your SDK calls. That copy also lists the request body's media type and top-level properties with its example (every named one), and each response's status and description, with the examples the spec records and a sampled one for the first success response that records none.
 
 A `source` can also be a `$ref` to a file that holds the sample's code, the way Redocly describes keeping samples in files of their own. Blume reads the file relative to the spec, fetching it when the spec is a URL. A `$ref` it can't read, or one that points inside a document (`#/…`), leaves that sample out with a [`BLUME_OPENAPI_CODE_SAMPLE_REF`](#spec-warnings) warning:
 
@@ -343,6 +343,23 @@ Blume doesn't validate a spec against the OpenAPI schema: run a linter such as [
 | `BLUME_OPENAPI_NULLABLE` | A spec that declares OpenAPI 3.1 or later uses `nullable`, which 3.1 removed. Blume still shows those values as nullable, but validators and SDK generators that follow 3.1 read them as never null. The warning names where, as JSON Pointers into the spec. Add `"null"` to the schema's `type` instead (`type: [string, "null"]`). |
 
 [Keep API documentation in sync with backend changes in CI](/guides/openapi-documentation-ci) runs those checks in GitHub Actions: it exports the spec from the backend, fails when the spec is stale, invalid, or breaking, and rebuilds the reference from it.
+
+## Operations in your own pages
+
+Any MDX page can show an operation from a reference with `<Operation>`: its authorization, parameters, request body, and responses, beside the Try it panel and code samples, as the operation's own page shows them. A quickstart can walk through the one call it's about without sending readers away:
+
+```mdx docs/quickstart.mdx lineNumbers
+---
+title: Quickstart
+mode: wide
+---
+
+Create your first pet:
+
+<Operation source="reference" id="add-pet" />
+```
+
+`source` names the reference by its route, without slashes and lowercased with hyphens (`/reference` is `reference`, `/api/v2` is `api-v2`). `id` names the operation: its `operationId`, lowercased with its words split by hyphens (`addPet` is `add-pet`), or its method and path (`post-pets`) when it has none. The surest way to get both is an operation page's raw MDX copy, at its URL plus `.mdx`, whose body is the tag to copy. The operation lays out in two columns, so give the page [`mode: wide`](/docs/content/frontmatter#layout): beside the table of contents, the left column is narrow. In the page's Markdown copy the tag becomes the endpoint, request body, and responses, as on the operation's own page.
 
 ## Embedding Scalar instead
 
