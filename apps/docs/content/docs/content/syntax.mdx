@@ -206,7 +206,9 @@ export default defineConfig({
 
 The title is every word after the language, so ` ```js Install the client ` titles the block "Install the client". Keywords like `lineNumbers` and `wrap`, line ranges like `{1,4-5}`, and `key="value"` options aren't part of it, and `title="..."` sets the title explicitly. A title in brackets, like ` ```ts [blume.config.ts] `, shows without them.
 
-The language is any [Shiki language](https://shiki.style/languages) id or alias, in any case: ` ```JSON ` highlights like ` ```json `.
+The language is any [Shiki language](https://shiki.style/languages) id or alias, in any case: ` ```JSON ` highlights like ` ```json `. A block in a language Shiki doesn't know renders as plain text, and Blume warns about its fence as `BLUME_UNKNOWN_CODE_LANGUAGE`; write `text` for a block that's plain on purpose.
+
+Options other docs tools read do nothing here, and Blume warns about each as `BLUME_CODE_FENCE_OPTION` with the spelling to use instead: MkDocs' `hl_lines="2 3"` (a `{2,3}` range here) and `linenums="1"` (`lineNumbers`), `showLineNumbers` (`lineNumbers`), Fern's `wordWrap` (`wrap`), and `filename="app.js"` (`title="app.js"`).
 
 Inline code can be highlighted too: add a `{:lang}` marker inside a backtick span and it's colored like a tiny code block — `useState(){:js}` or `T extends object{:ts}`. It only kicks in when you add the marker, so plain inline code stays untouched — nothing to switch on.
 

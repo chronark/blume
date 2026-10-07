@@ -2,6 +2,7 @@ import { isAbsolute, relative } from "pathe";
 
 import { normalizePath, withBasePath } from "./base-path.ts";
 import { CHANGELOG_INDEX_ROUTE, hasChangelogIndex } from "./changelog-index.ts";
+import { codeFenceDiagnostics } from "./code-fence-diagnostics.ts";
 import { loadConfig } from "./config.ts";
 import { customStaticRoutes, discoverPages } from "./custom-pages.ts";
 import { directiveDiagnostics } from "./directive-diagnostics.ts";
@@ -215,7 +216,10 @@ const normalizeLoadedEntries = (
       pages.push(...normalized.pages);
       allDiagnostics.push(...normalized.diagnostics);
       if (normalized.pages.length > 0) {
-        allDiagnostics.push(...directiveDiagnostics(entry, source.name));
+        allDiagnostics.push(
+          ...directiveDiagnostics(entry, source.name),
+          ...codeFenceDiagnostics(entry, source.name)
+        );
       }
     }
   }
