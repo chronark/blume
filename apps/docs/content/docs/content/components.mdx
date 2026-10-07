@@ -119,6 +119,22 @@ pip install acme-commerce
 
 The first view shows until the reader picks another. Blume remembers that pick across pages written in views, and writes it to the URL as `?view=Python`, so a link opens on the same view. A link to a heading inside a view opens that view. Use `<View>` when most of the page changes with the choice, and [Tabs](#tabs) when only one part of the page does. The agent-facing Markdown includes every view, each under its name.
 
+## Callout
+
+`<Callout>` is the component behind [callout directives](/docs/content/syntax#callouts): `:::warning[Heads up]` renders `<Callout type="warning" title="Heads up">`. Write the component itself when a callout needs its own icon or color, which a directive can't set.
+
+<Callout type="tip" title="Ship it" icon="rocket">
+  Run `blume build` before you deploy.
+</Callout>
+
+```astro
+<Callout type="tip" title="Ship it" icon="rocket">
+  Run `blume build` before you deploy.
+</Callout>
+```
+
+`type` sets the tint and the default icon: `note`, `info` (the default), `tip`, `success` (or `check`), `warning`, or `danger`. The aliases `caution`, `error`, `important`, and `warn` work only in the `:::` form. `title` adds a bold first line. `icon` replaces the type's icon and takes the same inputs as [`<Icon>`](#icon): a Lucide name, an image path or URL, or an inline SVG. `color`, any CSS color, replaces the type's tint: the border, the icon, and the body text take that color over the page background.
+
 ## Badge
 
 A small inline label for status or metadata — version tags, “new” or “beta” markers, stability levels. The `variant` tunes the color to the meaning.
