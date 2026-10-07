@@ -99,7 +99,7 @@ describe(codeFenceDiagnostics, () => {
     );
   });
 
-  it("names a foreign keyword that became the block's title", () => {
+  it("keeps showLineNumbers and wordWrap out of the block's title", () => {
     const diagnostics = codeFenceDiagnostics(
       entry(
         '```js wordWrap\nx\n```\n\n```jsx title="a.jsx" showLineNumbers{3}\nx\n```\n'
@@ -116,11 +116,10 @@ describe(codeFenceDiagnostics, () => {
       {
         line: 1,
         message:
-          "`wordWrap` isn't a Blume code block option, so the block doesn't wrap its long lines, and the word shows in its title.",
+          "`wordWrap` isn't a Blume code block option, so the block doesn't wrap its long lines.",
         suggestion: "Write `wrap` after the language instead.",
       },
       {
-        // An explicit title wins, so the keyword shows nowhere.
         line: 5,
         message:
           "`showLineNumbers{3}` isn't a Blume code block option, so the block shows no line numbers.",

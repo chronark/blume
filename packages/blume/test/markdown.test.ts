@@ -279,6 +279,14 @@ describe(codeTitleTransformer, () => {
   it("keeps other tools' keywords out of the title", () => {
     // Mintlify's `lines`, on any fence.
     expect(metaAttrs("app.py lines", undefined, "py").dataTitle).toBe("app.py");
+    // Docusaurus' `showLineNumbers` (with or without a start line) and Fern's
+    // `wordWrap`, on any fence.
+    expect(
+      metaAttrs("app.js showLineNumbers wordWrap", undefined, "js").dataTitle
+    ).toBe("app.js");
+    expect(
+      metaAttrs("showLineNumbers{3}", undefined, "js").dataTitle
+    ).toBeUndefined();
     // rustdoc's and mdBook's, on a Rust fence only.
     expect(
       metaAttrs(

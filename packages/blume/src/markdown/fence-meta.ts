@@ -50,12 +50,20 @@ export const RESERVED_META_KEYWORDS: ReadonlySet<string> = new Set([
 
 /**
  * Bare keywords other docs tools read after the language, which Blume
- * doesn't: Mintlify's `lines` (line numbers) on any fence, and rustdoc's and
- * mdBook's test and playground attributes on a Rust one. They do nothing
- * here, so they're never promoted to a block title, and `blume check` warns
- * about each (`BLUME_CODE_FENCE_OPTION`).
+ * doesn't: Mintlify's `lines` and Docusaurus' `showLineNumbers` (line
+ * numbers) and Fern's `wordWrap` on any fence, and rustdoc's and mdBook's test
+ * and playground attributes on a Rust one. They do nothing here, so they're
+ * never promoted to a block title, and `blume check` warns about each
+ * (`BLUME_CODE_FENCE_OPTION`).
  */
-const FOREIGN_META_KEYWORDS: ReadonlySet<string> = new Set(["lines"]);
+const FOREIGN_META_KEYWORDS: ReadonlySet<string> = new Set([
+  "lines",
+  "wordWrap",
+]);
+
+// Docusaurus' line-numbers keyword, with an optional start line
+// (`showLineNumbers{3}`).
+const SHOW_LINE_NUMBERS = /^showLineNumbers(?:\{\d*\})?$/u;
 
 export const RUST_META_KEYWORDS: ReadonlySet<string> = new Set([
   "compile_fail",
@@ -79,6 +87,7 @@ export const isForeignKeyword = (
   lang: string | null | undefined
 ): boolean =>
   FOREIGN_META_KEYWORDS.has(token) ||
+  SHOW_LINE_NUMBERS.test(token) ||
   (RUST_LANGUAGES.has(lang ?? "") && RUST_META_KEYWORDS.has(token));
 
 /** A Shiki `{1,3-5}` line-range token. */

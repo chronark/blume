@@ -1,7 +1,6 @@
 import type { Nodes } from "mdast";
 import { markdownToMdast, mdxToMdast } from "satteri";
 
-import { parseCodeTitle } from "../markdown/code-title.ts";
 import {
   MARKDOWN_BODY_FEATURES,
   MDX_BODY_FEATURES,
@@ -76,7 +75,8 @@ const FOREIGN_OPTIONS: readonly ForeignOption[] = [
     pattern: /^showLineNumbers(?:\{\d*\})?$/u,
   },
   {
-    // Mintlify's. It never joins the title (see `markdown/fence-meta.ts`).
+    // Mintlify's. Like `showLineNumbers` and `wordWrap`, it never joins the
+    // title (see `markdown/fence-meta.ts`).
     effect: "the block shows no line numbers",
     instead: () =>
       'Write `lineNumbers` after the language instead. To keep the word in the block\'s title, set the title with `title="…"`.',
@@ -149,8 +149,7 @@ const unknownLanguage = (node: Code, line: number): Finding[] => {
 };
 
 const foreignOptions = (node: Code, line: number): Finding[] => {
-  const { lang, meta, tokens } = fenceParts(node.lang, node.meta);
-  const title = parseCodeTitle(meta ?? undefined, lang)?.split(" ") ?? [];
+  const { lang, tokens } = fenceParts(node.lang, node.meta);
   // A fence with options and no language reads its first option as the
   // language, so that token counts too.
   return [node.lang ?? "", ...tokens].flatMap((token) => {
@@ -158,14 +157,11 @@ const foreignOptions = (node: Code, line: number): Finding[] => {
     if (!found) {
       return [];
     }
-    const shown = title.includes(token)
-      ? ", and the word shows in its title"
-      : "";
     return [
       {
         code: "BLUME_CODE_FENCE_OPTION",
         line,
-        message: `\`${token}\` isn't a Blume code block option, so ${found.option.effect}${shown}.`,
+        message: `\`${token}\` isn't a Blume code block option, so ${found.option.effect}.`,
         suggestion: found.option.instead(found.value),
       },
     ];
@@ -242,9 +238,9 @@ const fenceFindings = (text: string, format: "md" | "mdx"): Finding[] => {
  *   language, with no page or line.
  * - `BLUME_CODE_FENCE_OPTION`: an option another docs tool reads, like MkDocs'
  *   `hl_lines="2 3"`, Docusaurus' `showLineNumbers`, Mintlify's `lines`, or
- *   rustdoc's `no_run`, which Blume ignores (`showLineNumbers` and `wordWrap`
- *   become part of the block's title). The suggestion gives the Blume
- *   spelling, or says to remove an option Blume has no use for.
+ *   rustdoc's `no_run`, which Blume ignores. None of them becomes part of the
+ *   block's title. The suggestion gives the Blume spelling, or says to remove
+ *   an option Blume has no use for.
  *
  * Lines point into the file the author wrote, a partial's own file for a
  * fence an `<include>` brought in.
