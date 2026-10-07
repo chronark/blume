@@ -57,6 +57,7 @@ import type {
 } from "../core/data.ts";
 import { BlumeError } from "../core/diagnostics.ts";
 import { writeTextAtomic } from "../core/fs-atomic.ts";
+import { gitIgnoredPaths } from "../core/git-ignored.ts";
 import {
   apiUrl as githubApiUrl,
   editBaseUrl as githubEditBaseUrl,
@@ -1120,9 +1121,22 @@ export const buildRuntimeData = (project: BlumeProject): string => {
   const editBase = github ? githubEditBaseUrl(github) : null;
   const logo = resolveLogo(project);
   const ogLogo = resolveOgMark(project, logo?.svg);
+  // Files git ignores (a generated reference in a gitignored folder) are
+  // never in the repository, so an edit link would 404. One git call covers
+  // every page an edit link is built for.
+  const ignored = editBase
+    ? gitIgnoredPaths(
+        context.root,
+        manifest.routes.flatMap((route) =>
+          route.editUrl === undefined && route.sourcePath
+            ? [route.sourcePath]
+            : []
+        )
+      )
+    : new Set<string>();
 
   const editUrlFor = (sourcePath?: string): string | null => {
-    if (!(editBase && sourcePath)) {
+    if (!(editBase && sourcePath) || ignored.has(sourcePath)) {
       return null;
     }
     const rel = relative(context.root, sourcePath).split("\\").join("/");

@@ -355,7 +355,7 @@ A right-rail outline is generated automatically from each page's headings — `#
 
 Below the table of contents, every page shows a set of quick actions. In windows at least 1,280px wide they sit in the right-hand column with the outline. In narrower windows and on phones they sit at the bottom of the “On this page” dropdown above the content, which shows on a page with no headings too:
 
-- **Edit on GitHub** — links straight to the source file. Appears once you set [`github`](/docs/configuration) in your config.
+- **Edit on GitHub** — links straight to the source file. Appears once you set [`github`](/docs/configuration) in your config, on every page whose file is in the repository: a file git ignores, like a generated API reference written into a gitignored folder, gets no edit link, since GitHub has no file to open.
 - **Scroll to top** — smoothly returns to the top of long pages. It's in the right-hand column only, since the dropdown already sits at the top of the page.
 
 Others hand the page to AI tools — **Copy as Markdown** and **Open in chat** — covered in [Markdown for agents](/docs/discoverability/markdown#copy-as-markdown).

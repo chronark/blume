@@ -27,7 +27,7 @@ const GIT_LOCATION_VARS = new Set([
   "GIT_WORK_TREE",
 ]);
 
-const gitEnv = (): NodeJS.ProcessEnv =>
+export const gitEnv = (): NodeJS.ProcessEnv =>
   Object.fromEntries(
     Object.entries(process.env).filter(([key]) => !GIT_LOCATION_VARS.has(key))
   );
