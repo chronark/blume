@@ -194,6 +194,8 @@ redirects: [{ from: "/old", to: "/new", status: 301 }],
 
 A redirect that moves one page to another moves the page's [raw Markdown](/docs/discoverability/markdown#raw-markdown) with it: `/old.md` and `/old.mdx` redirect to `/new.md` and `/new.mdx` with the same status, in `blume dev` and every build. A redirect from an `.html` URL, like `/old.html` from a site you migrated, doesn't, since that URL never had a Markdown copy. Nor does one whose Markdown URL already serves a copy: `/index.md` is the home page's, so a redirect from `/index` to `/` leaves it alone.
 
+A redirect from a page's own `index.html` URL, like `/guide/index.html` to `/guide`, gets no redirect page in a static build, because the page itself is written to that file. Hosts that read the redirect files answer it with the redirect. Any other host serves the page at that URL.
+
 Two hosts need more than the file:
 
 - **Netlify** serves a file that exists ahead of a redirect rule unless the rule is forced, and a static build has a redirect page at every `from`. The `_redirects` for `netlify()` forces its rules (`/old /new 301!`). Cloudflare rejects that flag, so the file a build for no named host writes leaves it off, and on Netlify that build answers with the redirect page instead; name the host with `netlify({ output: "static" })` to get the HTTP redirect.

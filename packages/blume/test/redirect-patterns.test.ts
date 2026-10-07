@@ -511,6 +511,28 @@ describe("the generated Astro config", () => {
     );
   });
 
+  it("writes no redirect page over a page's own index.html", () => {
+    // Astro would write the redirect page to `guide/index.html/index.html`,
+    // where the page `/guide` is written as a file: the build fails with
+    // EISDIR. The host files and the dev server still answer it.
+    const redirects = [
+      { from: "/guide/index.html", to: "/guide" },
+      { from: "/index.html", to: "/" },
+      { from: "/gone/index.html", to: "/" },
+    ];
+    const generated = configFor({ redirects }, ["/", "/guide"]);
+    expect(generated).toContain(
+      'redirects: {"/gone/index.html":{"destination":"/","status":301}},'
+    );
+    expect(generated).toContain(
+      '"redirects":[["^/guide/index\\\\.html/?$","/guide",301],["^/index\\\\.html/?$","/",301],["^/gone/index\\\\.html/?$","/",301]]'
+    );
+    // A server build writes no redirect pages, and its adapter routes them.
+    expect(
+      configFor({ deployment: vercel(), redirects }, ["/", "/guide"])
+    ).toContain('"/guide/index.html":{"destination":"/guide","status":301}');
+  });
+
   it("leaves the home page's Markdown copies to their endpoint", () => {
     // `/index.md` is the home page's copy: a redirect there would replace it
     // with a redirect page pointing at itself.

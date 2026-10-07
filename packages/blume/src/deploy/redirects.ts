@@ -124,6 +124,23 @@ export const applyBaseToPlatformRedirects = (
  */
 const HTML_FILE_PATH = /\.html$/u;
 
+/** A path naming a folder's `index.html` (`/guide/index.html`, `/index.html`). */
+const INDEX_FILE_PATH = /^(?<folder>.*)\/index\.html$/u;
+
+/**
+ * Whether `from` names a page's own `index.html` (`/guide/index.html` for the
+ * page `/guide`, `/index.html` for the root), a URL a migrated site may have
+ * linked. A static build writes the page there, and Astro writes a redirect
+ * page to `<from>/index.html`, which would need that file to be a folder:
+ * the build fails with `EISDIR`. Hosts serve the page at that URL anyway,
+ * unless a redirect rule answers it first. `pages` are the served page
+ * routes, which carry `basePath`, as `from` does.
+ */
+export const isPageIndexFile = (from: string, pages: RouteSet): boolean => {
+  const folder = INDEX_FILE_PATH.exec(normalizePath(from))?.groups?.folder;
+  return folder !== undefined && servesRoute(pages, folder || "/");
+};
+
 /**
  * Where a page's Markdown copy is served, from the page's served path and the
  * deployment base that path carries.

@@ -29,6 +29,7 @@ import { deployPlatform } from "../deploy/platforms/index.ts";
 import { adapterRoot, distDir } from "../deploy/platforms/paths.ts";
 import {
   applyBaseToAstroRedirects,
+  isPageIndexFile,
   withMirrorRedirects,
 } from "../deploy/redirects.ts";
 import { API_RAIL_KEY } from "../markdown/api-rail.ts";
@@ -718,8 +719,16 @@ export const astroConfigTemplate = (options: {
   // Only exact redirects: Astro can't prerender a pattern's redirect pages
   // (it would need every path the pattern covers), so a pattern reaches the
   // dev server through the integration and each host through its own rules.
+  // Nor one from a page's own `index.html` in a static build, where Astro
+  // would write its redirect page inside the page's file (see
+  // `isPageIndexFile`); the host files and the dev server still carry it.
+  const staticOutput = deployment.options.output === "static";
   const exactRedirects = basedRedirects.filter(
-    (redirect) => !isPatternPath(redirect.from)
+    (redirect) =>
+      !(
+        isPatternPath(redirect.from) ||
+        (staticOutput && isPageIndexFile(redirect.from, redirectPages))
+      )
   );
   const redirectsOption =
     exactRedirects.length > 0
