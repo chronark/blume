@@ -233,6 +233,24 @@ describe("buildLlmsFiles — index", () => {
     const { index } = await buildLlmsFiles(project());
     expect(index.startsWith("# Docs\n\n> Desc\n\n## Docs\n")).toBe(true);
   });
+
+  it("summarizes each page with its meta description", async () => {
+    const { index } = await buildLlmsFiles(
+      makeProject([
+        // A generated reference page often sets only `seo.description`.
+        makePage("a.md", "/ref", "Ref", {
+          meta: pageMetaSchema.parse({ seo: { description: "From seo" } }),
+        }),
+        // `seo.description` wins, as in the page's <meta name="description">.
+        makePage("b.md", "/both", "Both", {
+          description: "Subtitle",
+          meta: pageMetaSchema.parse({ seo: { description: "Meta" } }),
+        }),
+      ])
+    );
+    expect(index).toContain("- [Ref](https://example.com/ref): From seo");
+    expect(index).toContain("- [Both](https://example.com/both): Meta");
+  });
 });
 
 /** The lines of an llms.txt index's trailing "Agent resources" section. */

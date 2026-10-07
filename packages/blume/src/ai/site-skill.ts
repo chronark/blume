@@ -7,6 +7,7 @@ import {
 import { CHANGELOG_INDEX_ROUTE } from "../core/changelog-index.ts";
 import { discoverPagesSync } from "../core/custom-pages.ts";
 import { isHiddenPage } from "../core/hidden-pages.ts";
+import { metaDescription } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { absoluteUrl } from "../core/site-url.ts";
 import type { NavNode, PageRecord } from "../core/types.ts";
@@ -105,7 +106,9 @@ class PageMap {
       return [];
     }
     this.#listed.add(route);
-    const summary = page.description ? `: ${page.description}` : "";
+    // As `llms.txt` lists it: the page's meta description.
+    const description = metaDescription(page);
+    const summary = description ? `: ${description}` : "";
     return [`- [${linkText(page.title)}](${this.#url(route)})${summary}`];
   }
 

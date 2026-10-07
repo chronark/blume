@@ -40,7 +40,12 @@ const page = (title: string, extra = ""): string =>
 
 const PAGES = {
   "docs/guides/index.md": page("Guides", "description: How-tos.\n"),
-  "docs/guides/setup.md": page("Setup [beta]", "description: Install Acme.\n"),
+  // Summarized only in `seo.description`, which the map reads as the page's
+  // <meta name="description"> does.
+  "docs/guides/setup.md": page(
+    "Setup [beta]",
+    "seo:\n  description: Install Acme.\n"
+  ),
   "docs/index.md": page("Home", "description: Start here.\n"),
   "docs/releases/v1.md": page("v1", "type: changelog\ndate: 2026-01-01\n"),
   "docs/secret.md": page("Secret", "sidebar:\n  hidden: true\n"),

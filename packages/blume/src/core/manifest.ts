@@ -68,9 +68,10 @@ export const contentIndexable = (
 /**
  * The description a page's `<head>` emits — `seo.description` over the front
  * matter `description` — mirrored onto its route so the OG card's subtitle
- * matches the page's `og:description`.
+ * matches the page's `og:description`, and the summary page indexes like
+ * `llms.txt` give it.
  */
-const routeDescription = (page: PageRecord): string | undefined =>
+export const metaDescription = (page: PageRecord): string | undefined =>
   page.meta.seo.description ?? page.description;
 
 const buildFallbackRoutes = (
@@ -123,7 +124,7 @@ const buildFallbackRoutes = (
         alternates: alternatesByKey.get(key) ?? [],
         collection: source.collection ?? "docs",
         contentType: source.contentType,
-        description: routeDescription(source),
+        description: metaDescription(source),
         draft: source.meta.draft,
         editUrl: source.editUrl,
         entryId: source.entryId ?? source.source.ref,
@@ -189,7 +190,7 @@ export const buildManifest = (options: {
     alternates: alternatesByKey.get(page.translationKey) ?? [],
     collection: page.collection ?? "docs",
     contentType: page.contentType,
-    description: routeDescription(page),
+    description: metaDescription(page),
     draft: page.meta.draft,
     editUrl: page.editUrl,
     entryId: page.entryId ?? page.source.ref,

@@ -2,6 +2,7 @@ import { mountBasePath, normalizeBasePath } from "../core/base-path.ts";
 import { rewriteRelativeImages } from "../core/content-assets.ts";
 import matter from "../core/frontmatter.ts";
 import { isHiddenPage } from "../core/hidden-pages.ts";
+import { metaDescription } from "../core/manifest.ts";
 import type { BlumeProject } from "../core/project-graph.ts";
 import { absoluteUrl } from "../core/site-url.ts";
 import { readExpandedEntryText } from "../core/sources/read.ts";
@@ -188,7 +189,10 @@ export const buildLlmsIndex = (
 
   const line = (page: PageRecord): string => {
     seen.add(page.route);
-    const summary = page.description ? `: ${page.description}` : "";
+    // The page's meta description, so a page summarized only in
+    // `seo.description` (a generated reference page) still gets one.
+    const description = metaDescription(page);
+    const summary = description ? `: ${description}` : "";
     return `- [${linkText(page.title)}](${pageUrl(page.route, site, base)})${summary}`;
   };
 
