@@ -2214,6 +2214,7 @@ export const generateRuntime = async (
           context,
           filesystem: hasFilesystemSource,
           staged: hasStaged,
+          unparsable: project.unparsable,
         })
       ),
       write(

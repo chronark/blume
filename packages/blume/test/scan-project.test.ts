@@ -31,6 +31,9 @@ const CONTENT = {
 const routesOf = (paths: { path: string }[]): string[] =>
   paths.map((route) => route.path);
 
+const syntaxErrors = (project: { diagnostics: { code: string }[] }) =>
+  project.diagnostics.filter((d) => d.code === "BLUME_MDX_SYNTAX");
+
 afterAll(async () => {
   await Promise.all(
     dirs.map((dir) => rm(dir, { force: true, recursive: true }))
@@ -106,6 +109,69 @@ export default { content: { types: { rfc: { frontmatter: { status } } } } };`,
     // The invalid entry yields no pages — surfaced as a dropped-page count so
     // the CLI can fail (or at least say so) instead of reporting a clean build.
     expect(project.droppedPages).toBe(1);
+  });
+
+  it("drops an .mdx page that doesn't parse from a build, and keeps it in dev", async () => {
+    // Invalid front matter and MDX together still count as one page.
+    const root = await makeProject({
+      "docs/both.mdx": "---\nnope: 1\n---\n\n<!-- x -->\n",
+      "docs/broken.mdx": "---\ntitle: Broken\n---\n\nHello {oops\n",
+      "docs/index.md": "# Home\n",
+    });
+
+    const built = await scanProject(root, { mode: "build" });
+    expect(routesOf(built.manifest.routes)).toStrictEqual(["/"]);
+    expect(built.droppedPages).toBe(2);
+    expect(built.unparsable.toSorted()).toStrictEqual([
+      join(root, "docs/both.mdx"),
+      join(root, "docs/broken.mdx"),
+    ]);
+    expect(syntaxErrors(built)).toContainEqual(
+      expect.objectContaining({
+        file: join(root, "docs/broken.mdx"),
+        line: 5,
+        severity: "error",
+      })
+    );
+
+    // Dev keeps the page, so opening it shows the error in place.
+    const dev = await scanProject(root);
+    expect(routesOf(dev.manifest.routes)).toStrictEqual(["/", "/broken"]);
+    expect(dev.droppedPages).toBe(1);
+    expect(dev.unparsable).toStrictEqual([]);
+    expect(syntaxErrors(dev)).toHaveLength(2);
+  });
+
+  it("reports a parse error once when another diagnostic names its cause", async () => {
+    // `{#setup}` is BLUME_MDX_CURLY_ANCHOR's (an error), and a partial's
+    // attribute list BLUME_MDX_ATTRIBUTE_LIST's. A partial's error nothing
+    // else names is a warning in the partial.
+    const root = await makeProject({
+      "docs/_partials/broken.md": "Text {1 +}\n",
+      "docs/_partials/note.md": "Text\n{: .note }\n",
+      "docs/anchor.mdx": "# Anchor\n\n## Setup {#setup}\n",
+      "docs/index.mdx": "# Home\n\n<include>./_partials/note.md</include>\n",
+      "docs/other.mdx": "# Other\n\n<include>./_partials/broken.md</include>\n",
+    });
+    const project = await scanProject(root, { mode: "build" });
+    const codes = project.diagnostics.map((d) => `${d.code} ${d.file}`);
+    expect(codes).toContain(
+      `BLUME_MDX_CURLY_ANCHOR ${join(root, "docs/anchor.mdx")}`
+    );
+    expect(codes).toContain(
+      `BLUME_MDX_ATTRIBUTE_LIST ${join(root, "docs/_partials/note.md")}`
+    );
+    expect(
+      project.diagnostics.filter((d) => d.code === "BLUME_MDX_SYNTAX")
+    ).toStrictEqual([
+      expect.objectContaining({
+        file: join(root, "docs/_partials/broken.md"),
+        line: 1,
+        severity: "warning",
+      }),
+    ]);
+    // The page with the anchor still doesn't parse, so the build drops it.
+    expect(project.unparsable).toStrictEqual([join(root, "docs/anchor.mdx")]);
   });
 
   it("applies CLI config overrides over the loaded config", async () => {

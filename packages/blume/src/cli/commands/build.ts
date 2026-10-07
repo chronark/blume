@@ -22,7 +22,10 @@ import {
   removedBuildFlags,
   removedBuildFlagsAdvice,
 } from "../../upgrade/upgrade.ts";
-import { astroBuildDiagnostics } from "../build-failure.ts";
+import {
+  astroBuildDiagnostics,
+  buildFailureLocator,
+} from "../build-failure.ts";
 import { commandMeta } from "../command-meta.ts";
 import { refuseIfDevRunning } from "../dev-lock.ts";
 import { refuseIfEjected } from "../eject-scripts.ts";
@@ -248,7 +251,7 @@ const reportBuild = async (
   // count next to the success banner so it can't scroll away unseen.
   if (project.droppedPages > 0) {
     logger.warn(
-      `${project.droppedPages} page(s) failed frontmatter validation and are missing from this build.`
+      `${project.droppedPages} page(s) failed validation and are missing from this build.`
     );
   }
   logger.success(`Built to ${distDir}`);
@@ -348,7 +351,13 @@ export const buildCommand = defineCommand({
       if (error instanceof BlumeError || !(error instanceof Error)) {
         throw error;
       }
-      reportDiagnostics(astroBuildDiagnostics(error), root);
+      reportDiagnostics(
+        await astroBuildDiagnostics(error, {
+          locate: buildFailureLocator(project),
+          root,
+        }),
+        root
+      );
       process.exit(1);
     }
 

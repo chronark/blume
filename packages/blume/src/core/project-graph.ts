@@ -24,6 +24,7 @@ import { routeSetFor } from "./locale-links.ts";
 import type { RouteSet } from "./locale-links.ts";
 import { buildManifest } from "./manifest.ts";
 import { mirroredPage } from "./markdown-mirrors.ts";
+import { mdxSyntaxCheck } from "./mdx-syntax.ts";
 import { folderMetaDiagnostics } from "./meta-diagnostics.ts";
 import { discoverFolderMeta, withGeneratedFolderMeta } from "./meta.ts";
 import type { FolderMetaSource } from "./meta.ts";
@@ -107,8 +108,16 @@ export interface BlumeProject {
   graph: ContentGraph;
   manifest: BlumeManifest;
   diagnostics: Diagnostic[];
-  /** Entries excluded from the graph because their frontmatter failed validation. */
+  /**
+   * Entries excluded from the graph because their frontmatter failed
+   * validation, or (in a build) their MDX doesn't parse.
+   */
   droppedPages: number;
+  /**
+   * The local `.mdx` files a build dropped because they don't parse, which
+   * the docs collection leaves out so Astro never compiles them.
+   */
+  unparsable: string[];
   /** The instantiated content sources, for lazy entry reads (search/AI/raw). */
   sources: ContentSource[];
   /**
@@ -173,11 +182,14 @@ const entryIdDiagnostics = (
  * collecting pages, diagnostics, and the count of entries dropped outright —
  * an entry that yields no pages but did yield diagnostics was rejected for
  * invalid frontmatter, and callers surface that count so a build with missing
- * pages can't read as clean.
+ * pages can't read as clean. With `dropUnparsable`, an `.mdx` page whose own
+ * text doesn't parse is dropped too, and its file listed in `unparsable` so
+ * the docs collection leaves it out.
  */
 const normalizeLoadedEntries = (
   loaded: ({ source: ContentSource } & SourceLoadResult)[],
-  config: ResolvedConfig
+  config: ResolvedConfig,
+  dropUnparsable: boolean
 ) => {
   // Only thread `frontmatter.extend` / `content.types` through when a project
   // opts in, so the known-key split in `normalizeEntry` stays off the default
@@ -198,6 +210,8 @@ const normalizeLoadedEntries = (
 
   const pages: PageRecord[] = [];
   const allDiagnostics: Diagnostic[] = [];
+  const syntaxErrors: Diagnostic[] = [];
+  const unparsable: string[] = [];
   // Published entries, checked for other tools' syntax once every page is
   // known: a wiki link is reported when it names one.
   const published: { entry: SourceEntry; locale: string; source: string }[] =
@@ -206,6 +220,15 @@ const normalizeLoadedEntries = (
   for (const { source, entries, diagnostics } of loaded) {
     allDiagnostics.push(...diagnostics);
     for (const entry of entries) {
+      const syntax = mdxSyntaxCheck(entry, source.name, config.variables);
+      syntaxErrors.push(...syntax.diagnostics);
+      // A build drops a page whose MDX doesn't parse, as it does one whose
+      // front matter fails: with --no-strict the rest of the site still
+      // builds. Dev keeps it, so opening it shows the error in place.
+      const drop = syntax.unparsable && dropUnparsable;
+      if (drop && entry.sourcePath && !source.staged) {
+        unparsable.push(entry.sourcePath);
+      }
       const normalized = normalizeEntry(entry, {
         basePath: config.basePath,
         defaultType: config.content.defaultType,
@@ -221,12 +244,14 @@ const normalizeLoadedEntries = (
         typeFrontmatter,
         versions: config.versions,
       });
-      if (normalized.pages.length === 0 && normalized.diagnostics.length > 0) {
+      const [page] = normalized.pages;
+      if (page ? drop : normalized.diagnostics.length > 0) {
         droppedPages += 1;
       }
-      pages.push(...normalized.pages);
+      if (!drop) {
+        pages.push(...normalized.pages);
+      }
       allDiagnostics.push(...normalized.diagnostics);
-      const [page] = normalized.pages;
       if (page) {
         allDiagnostics.push(
           ...directiveDiagnostics(entry, source.name),
@@ -241,7 +266,19 @@ const normalizeLoadedEntries = (
   for (const { entry, locale, source } of published) {
     allDiagnostics.push(...syntaxDiagnostics(entry, source, names, locale));
   }
-  return { diagnostics: allDiagnostics, droppedPages, pages };
+  // A parse error gives way to a diagnostic as severe at its line, which
+  // names the cause (`BLUME_MDX_CURLY_ANCHOR` for a `{#id}` heading marker,
+  // `BLUME_MDX_ATTRIBUTE_LIST` in a partial).
+  const covered = (diagnostic: Diagnostic): boolean =>
+    allDiagnostics.some(
+      (other) =>
+        other.file === diagnostic.file &&
+        other.line === diagnostic.line &&
+        (other.severity === "error" ||
+          (other.severity === "warning" && diagnostic.severity === "warning"))
+    );
+  allDiagnostics.push(...syntaxErrors.filter((error) => !covered(error)));
+  return { diagnostics: allDiagnostics, droppedPages, pages, unparsable };
 };
 
 /**
@@ -628,7 +665,8 @@ export const scanProject = async (
     diagnostics: contentDiagnostics,
     droppedPages,
     pages: allPages,
-  } = normalizeLoadedEntries(loaded, config);
+    unparsable,
+  } = normalizeLoadedEntries(loaded, config, mode === "build");
 
   // Checked against every page, drafts included: a `pages` entry naming a
   // draft still orders it wherever the draft renders.
@@ -769,5 +807,6 @@ export const scanProject = async (
     mode,
     sources,
     themeFontsConfigured: configResult.themeFontsConfigured,
+    unparsable,
   };
 };

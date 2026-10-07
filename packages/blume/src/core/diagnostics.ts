@@ -29,6 +29,7 @@ const DOCS_CONTENT_NAVIGATION = "/docs/content/navigation";
 const DOCS_CONTENT_INCLUDES = "/docs/content/includes";
 const DOCS_OPENAPI_WARNINGS = "/docs/references/openapi#spec-warnings";
 const DOCS_OTHER_TOOLS_SYNTAX = "/docs/content/syntax#syntax-from-other-tools";
+const DOCS_MARKDOWN_AND_MDX = "/docs/content#markdown-and-mdx";
 
 /** Diagnostic code → the docs page that explains it. */
 const DOCS_PATHS = new Map(
@@ -62,10 +63,11 @@ const DOCS_PATHS = new Map(
     BLUME_MDX_ATTRIBUTE_LIST: DOCS_OTHER_TOOLS_SYNTAX,
     BLUME_MDX_CURLY_ANCHOR: "/docs/content/syntax",
     BLUME_MDX_EVENT_HANDLER: "/docs/content/islands",
+    BLUME_MDX_SYNTAX: DOCS_MARKDOWN_AND_MDX,
     BLUME_MDX_UNCLOSED_ELEMENT: DOCS_OTHER_TOOLS_SYNTAX,
+    BLUME_MDX_UNDEFINED_NAME: DOCS_MARKDOWN_AND_MDX,
     BLUME_MD_CURLY_ANCHOR: "/docs/content/syntax",
     BLUME_MD_GITHUB_ALERT: "/docs/content/syntax",
-
     BLUME_META_INVALID: "/docs/content/meta",
     BLUME_META_LOAD_FAILED: "/docs/content/meta",
     BLUME_META_OUTSIDE_INCLUDE: "/docs/content/meta",
@@ -98,6 +100,7 @@ const DOCS_PATHS = new Map(
     BLUME_THEME_COLOR_INVALID: "/docs/configuration/theming",
     BLUME_TRANSLATE_MISSING: "/docs/cli/translate",
     BLUME_TRANSLATE_STALE: "/docs/cli/translate",
+    BLUME_TSCONFIG_EXTENDS: "/docs/cli#type-checking",
     BLUME_UNKNOWN_CODE_LANGUAGE: "/docs/content/syntax",
     BLUME_UNKNOWN_COMPONENT: "/docs/configuration/customization",
     BLUME_UNKNOWN_DIRECTIVE: "/docs/content/syntax",

@@ -28,7 +28,7 @@ type AttributeValue = Extract<
 type ExpressionValue = Extract<AttributeValue, { type: string }>;
 
 /** Whether an attribute's value is a `{…}` expression, not a string or nothing. */
-const isExpression = (value: AttributeValue): value is ExpressionValue =>
+export const isExpression = (value: AttributeValue): value is ExpressionValue =>
   typeof value === "object" && value !== null;
 
 // An `on*` prop, and a body that may hold one with an expression value.

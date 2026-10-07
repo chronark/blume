@@ -1070,9 +1070,11 @@ describe("astroConfigTemplate", () => {
     // pages that splice it, and the runtime-modules plugin serves the data
     // snapshots (`blume:data`, the search index, …) from memory.
     expect(out).toContain(
-      'import { blumeIntegration, includeHmrPlugin, prerenderDepsPlugin, runtimeModulesPlugin } from "blume/astro"'
+      'import { blumeIntegration, includeHmrPlugin, mdxSourceErrorsPlugin, prerenderDepsPlugin, runtimeModulesPlugin } from "blume/astro"'
     );
     expect(out).toContain("prerenderDepsPlugin()");
+    // An error an `.mdx` page throws while it renders names the page.
+    expect(out).toContain("mdxSourceErrorsPlugin(), prerenderDepsPlugin()");
     expect(out).toContain("plugins: [runtimeModulesPlugin(), tailwindcss()");
     // In-memory modules need no file aliases — only the file-backed ids keep
     // one.
@@ -1854,6 +1856,24 @@ describe("contentConfigTemplate", () => {
     });
     // Absolute bases are emitted as `file://` URLs (Windows drive-letter safety).
     expect(out).toContain(JSON.stringify(pathToFileURL("/custom/base").href));
+  });
+
+  it("leaves the pages a build dropped as unparsable out of the docs glob", () => {
+    // Astro compiles every `.mdx` file the collection holds, routed or not,
+    // so a dropped page left in would still fail a `--no-strict` build.
+    const ctx = context();
+    const out = contentConfigTemplate({
+      config,
+      context: ctx,
+      unparsable: [
+        join(ctx.root, "docs/(guides)/broken [1].mdx"),
+        "/elsewhere/outside.mdx",
+      ],
+    });
+    expect(out).toContain(
+      JSON.stringify(String.raw`!\(guides\)/broken \[1\].mdx`)
+    );
+    expect(out).not.toContain("outside.mdx");
   });
 
   it("excludes dependency, output, and cache trees from the docs glob", () => {
@@ -2684,7 +2704,7 @@ describe("package / tsconfig templates", () => {
     // Plain `astro build` scans the project root for the deploy artifacts.
     expect(out).toContain('"buildArtifactsRoot":"."');
     expect(out).toContain(
-      'import { blumeIntegration, includeHmrPlugin, prerenderDepsPlugin } from "blume/astro"'
+      'import { blumeIntegration, includeHmrPlugin, mdxSourceErrorsPlugin, prerenderDepsPlugin } from "blume/astro"'
     );
   });
 

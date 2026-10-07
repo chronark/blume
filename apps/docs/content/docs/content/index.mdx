@@ -16,6 +16,10 @@ Blume renders two kinds of file:
 
 Reach for `.md` when a page is just prose, and `.mdx` when it needs components or directives. Switching is as simple as renaming the file.
 
+In `.mdx`, `{` starts a JavaScript expression and `<` a JSX tag, so text that's fine in `.md` can break a page: a literal brace, an HTML comment (write `{/* … */}`), or an element left open (write `<br />`). Blume parses every `.mdx` page when it reads the project, so `blume dev`, `blume validate`, `blume doctor`, and `blume check` report one that doesn't parse as `BLUME_MDX_SYNTAX`, an error at the line and column where MDX stopped, and `blume build` stops there before it compiles anything. With `--no-strict`, the build leaves the page out and builds the rest of the site. `blume dev` keeps the page, and opening it shows the error.
+
+An expression can parse and still fail when the page renders, like `{user.name}` on a page where nothing defines `user`. `blume build` reports that as `BLUME_MDX_UNDEFINED_NAME` at the expression's line, in the page or in the [partial](/docs/content/includes) that holds it. To show braces as text, escape each opening brace (`\{`) or put the text in inline code. For a value every page shares, define a [variable](/docs/content/variables).
+
 ## Files and routes
 
 Each file maps to a route by its path under the content root:

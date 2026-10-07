@@ -811,6 +811,7 @@ export const astroConfigTemplate = (options: {
   const blumeImports = [
     "blumeIntegration",
     "includeHmrPlugin",
+    "mdxSourceErrorsPlugin",
     "prerenderDepsPlugin",
     ...runtimeModuleImports,
     ...(adapterOption.includes("withAdapterRoot") ? ["withAdapterRoot"] : []),
@@ -940,7 +941,7 @@ ${userConfigSetup}export default defineConfig({
     plugins: [${runtimeModulesPluginEntry}${variablesPluginEntry}tailwindcss(), includeHmrPlugin(${configPath(
       `${context.outDir}/src/generated/includes.json`,
       ejected
-    )}), prerenderDepsPlugin()],
+    )}), mdxSourceErrorsPlugin(), prerenderDepsPlugin()],
     build: {${features.mermaid ? MERMAID_CHUNK_LIMIT : ""}
       rolldownOptions: {
         ${ROLLDOWN_ON_LOG},
@@ -1041,6 +1042,13 @@ const runtimeDirWithin = (base: string, outDir: string): string | null => {
 const astroGlobBase = (base: string): string =>
   isAbsolute(base) ? pathToFileURL(base).href : base;
 
+// The characters a glob reads as syntax; a `(group)` folder has two.
+const GLOB_SYNTAX = /[!()*+?@[\\\]{|}]/gu;
+
+/** A relative path as a glob that matches only that file. */
+const escapeGlob = (path: string): string =>
+  path.replaceAll(GLOB_SYNTAX, String.raw`\$&`);
+
 /** Generate `.blume/src/content.config.ts`. */
 export const contentConfigTemplate = (options: {
   context: ProjectContext;
@@ -1061,6 +1069,13 @@ export const contentConfigTemplate = (options: {
    * a non-filesystem source), the collection globs nothing — see below.
    */
   filesystem?: boolean;
+  /**
+   * Absolute paths of `.mdx` files the build dropped because they don't
+   * parse. Astro compiles every `.mdx` file in the collection, routed or
+   * not, so each is left out of the glob, or a `--no-strict` build would
+   * still fail on it.
+   */
+  unparsable?: readonly string[];
 }): string => {
   const { context, config } = options;
   const stagedBase = options.stagedBase ?? stagedContentDir(context.outDir);
@@ -1097,6 +1112,12 @@ export const contentConfigTemplate = (options: {
           dir === ".blume" ? [] : [`!**/${dir}/**`]
         ),
         ...outDirIgnore,
+        ...(options.unparsable ?? []).flatMap((file) => {
+          const rel = relative(collectionBase, file);
+          return rel.startsWith("..") || isAbsolute(rel)
+            ? []
+            : [`!${escapeGlob(rel)}`];
+        }),
       ]
     : [];
 

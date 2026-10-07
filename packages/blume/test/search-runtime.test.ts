@@ -616,6 +616,7 @@ const syncProject = (search: BlumeConfigInput["search"]): BlumeProject => {
     mode: "build",
     sources: [],
     themeFontsConfigured: false,
+    unparsable: [],
   };
 };
 

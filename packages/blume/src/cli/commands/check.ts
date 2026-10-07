@@ -6,10 +6,11 @@ import { defineCommand } from "citty";
 import { join } from "pathe";
 
 import { ensureGitignore } from "../../core/gitignore.ts";
+import { astroBuildDiagnostics } from "../build-failure.ts";
 import { commandMeta } from "../command-meta.ts";
 import { refuseIfDevRunning } from "../dev-lock.ts";
 import { refuseIfEjected } from "../eject-scripts.ts";
-import { logger } from "../log.ts";
+import { logger, reportDiagnostics } from "../log.ts";
 import { prepareProject } from "../prepare.ts";
 
 export const checkCommand = defineCommand({
@@ -57,7 +58,17 @@ export const checkCommand = defineCommand({
 
     // Generate Astro's content/collection and font types into `.blume/.astro`
     // so `astro:*` virtual modules resolve during the check.
-    await sync({ logLevel: "warn", root: outDir });
+    try {
+      await sync({ logLevel: "warn", root: outDir });
+    } catch (error) {
+      // A sync that rejects on the site (a tsconfig `extends` that doesn't
+      // resolve, a page Astro can't load) is reported as `blume build` does.
+      if (!(error instanceof Error)) {
+        throw error;
+      }
+      reportDiagnostics(await astroBuildDiagnostics(error, { root }), root);
+      process.exit(1);
+    }
 
     // The project-root tsconfig is what covers the authored `pages/` and config;
     // without it astro check only sees the generated `.blume` project. Falls back

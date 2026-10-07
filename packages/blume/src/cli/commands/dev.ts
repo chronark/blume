@@ -152,7 +152,7 @@ export const devCommand = defineCommand({
       if (error instanceof BlumeError || !(error instanceof Error)) {
         throw error;
       }
-      reportDiagnostics(astroBuildDiagnostics(error), root);
+      reportDiagnostics(await astroBuildDiagnostics(error, { root }), root);
       process.exit(1);
     }
 
