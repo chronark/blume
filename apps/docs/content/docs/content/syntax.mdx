@@ -210,6 +210,14 @@ The language is any [Shiki language](https://shiki.style/languages) id or alias,
 
 Options other docs tools read do nothing here, and Blume warns about each as `BLUME_CODE_FENCE_OPTION` with the spelling to use instead: MkDocs' `hl_lines="2 3"` (a `{2,3}` range here) and `linenums="1"` (`lineNumbers`), `showLineNumbers` (`lineNumbers`), Fern's `wordWrap` (`wrap`), and `filename="app.js"` (`title="app.js"`).
 
+A `console` (or `shellsession`) block is a terminal session: commands after a prompt like `$`, with their output. Its copy button copies only the commands, without their prompts, so the copy pastes straight into a terminal. A command that ends in `\` keeps its continuation lines.
+
+```console
+$ npm install blume
+added 1 package in 2s
+$ npx blume dev
+```
+
 Inline code can be highlighted too: add a `{:lang}` marker inside a backtick span and it's colored like a tiny code block — `useState(){:js}` or `T extends object{:ts}`. It only kicks in when you add the marker, so plain inline code stays untouched — nothing to switch on.
 
 Highlighting uses the `github-light`/`github-dark` themes by default. Swap in any [bundled Shiki theme](https://shiki.style/themes) per color mode with `markdown.code.theme` — it colors every code surface at once (fences, inline snippets, `<CodeBlock>`, and `<Diff>`):

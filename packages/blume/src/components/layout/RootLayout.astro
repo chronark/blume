@@ -1005,6 +1005,7 @@ const localeRedirect = localeTargets
     ></button>
     <script>
       import type { Zoom } from "medium-zoom";
+      import { copyableCode } from "../code-copy.ts";
       import { copyText, createCopyFlash } from "../copy-feedback.ts";
       import { syncDrawerInert } from "./drawer-inert.ts";
       import { chromeIcons as icons } from "../../theme/chrome-icons.ts";
@@ -1176,7 +1177,14 @@ const localeRedirect = localeTargets
           };
           const flash = createCopyFlash(setChecked, copiedLabel);
           button.addEventListener("click", async () => {
-            if (await copyText(codeText(readPre()))) {
+            // A terminal session copies its commands alone (see
+            // code-copy.ts), keyed off the fence's own language id.
+            const pre = readPre();
+            const language =
+              pre instanceof HTMLElement
+                ? (pre.dataset.blumeLanguage ?? pre.dataset.language)
+                : undefined;
+            if (await copyText(copyableCode(codeText(pre), language))) {
               flash();
             }
           });
