@@ -340,6 +340,37 @@ export const playgroundAuth = (
     return input ? [input] : [];
   });
 
+/** A response, `$ref` resolved: the media types its body comes in. */
+interface ResponseLike {
+  content?: Record<string, MediaTypeLike>;
+}
+
+/**
+ * The `Accept` header a request sends: the first JSON media type among the
+ * operation's responses, success responses first, without its parameters.
+ * A request with none reads as a browser's to frameworks like Laravel, so an
+ * unauthenticated call got a 500 from the login redirect it tried instead
+ * of the 401 the API documents. `undefined` when no response is JSON.
+ */
+export const acceptHeader = (
+  responses?: Record<string, ResponseLike>
+): string | undefined => {
+  const entries = Object.entries(responses ?? {});
+  const success = ([status]: [string, ResponseLike]): boolean =>
+    status.startsWith("2");
+  for (const [, response] of [
+    ...entries.filter(success),
+    ...entries.filter((entry) => !success(entry)),
+  ]) {
+    for (const type of Object.keys(response.content ?? {})) {
+      if (bodyEncoding(type) === "json") {
+        return (type.split(";")[0] ?? type).trim();
+      }
+    }
+  }
+  return undefined;
+};
+
 /** Derive the playground request model for one operation, at build time. */
 export const operationModel = (args: {
   method: string;
@@ -347,21 +378,31 @@ export const operationModel = (args: {
   /** Pre-merged/resolved (`mergeParameters` output). */
   parameters: ParameterLike[];
   requestBody?: { content?: Record<string, MediaTypeLike> };
+  /** The operation's responses, `$ref`s resolved: they set its `Accept`. */
+  responses?: Record<string, ResponseLike>;
   /** The operation's effective servers (`effectiveServers` output). */
   servers: ServerLike[];
   schemas: Record<string, SchemaLike>;
   /** The document's `components`, which `$ref`'d examples resolve against. */
   components?: ComponentsLike;
   security: OperationSecurity;
-}): PlaygroundModel => ({
-  auth: playgroundAuth(args.security),
-  authOptional: args.security.optional,
-  body: modelBody(args.requestBody, args.schemas, args.components),
-  method: args.method.toUpperCase(),
-  params: modelParams(args.parameters, args.schemas, args.components),
-  path: args.path,
-  // Variables resolve to their defaults: the samples and Send need a real URL.
-  servers: args.servers.map((server) =>
-    withServerDefaults(server.url ?? "", server.variables)
-  ),
-});
+}): PlaygroundModel => {
+  const model: PlaygroundModel = {
+    auth: playgroundAuth(args.security),
+    authOptional: args.security.optional,
+    body: modelBody(args.requestBody, args.schemas, args.components),
+    method: args.method.toUpperCase(),
+    params: modelParams(args.parameters, args.schemas, args.components),
+    path: args.path,
+    // Variables resolve to their defaults: the samples and Send need a real
+    // URL.
+    servers: args.servers.map((server) =>
+      withServerDefaults(server.url ?? "", server.variables)
+    ),
+  };
+  const accept = acceptHeader(args.responses);
+  if (accept) {
+    model.accept = accept;
+  }
+  return model;
+};

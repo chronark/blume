@@ -108,6 +108,11 @@ export interface PlaygroundModel {
   /** First security alternative (AND set). */
   auth: PlaygroundAuthInput[];
   authOptional: boolean;
+  /**
+   * The `Accept` header every request sends: the operation's first JSON
+   * response media type. Absent when none of its responses is JSON.
+   */
+  accept?: string;
 }
 
 export interface AuthValue {
@@ -430,6 +435,14 @@ export const buildRequest = (
     } else if (param.required && headers[param.name] === undefined) {
       headers[param.name] = value;
     }
+  }
+  // The JSON the operation answers with, unless a header parameter already
+  // names the type it wants.
+  if (
+    model.accept &&
+    !Object.keys(headers).some((name) => name.toLowerCase() === "accept")
+  ) {
+    headers.Accept = model.accept;
   }
 
   const { body, bodyValue, formData } = model.body
