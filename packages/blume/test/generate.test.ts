@@ -2290,7 +2290,7 @@ export default { mdx: { Counter: { component: Counter, client: "visible" } } };
         // An unknown `<Fancy>` tag that isn't a built-in, island, or override,
         // and a `<Component>` example that doesn't exist.
         "docs/page.mdx":
-          '---\ntitle: Page\n---\n\nUse the <Fancy /> widget.\n\n<Component path="missing" />\n',
+          '---\ntitle: Page\n---\n\nUse the <Fancy /> widget.\n\n<Component path="missing" />\n\n<Badge text="beta" />\n',
       })
     );
     const out = project.context.outDir;
@@ -2311,6 +2311,12 @@ export default { mdx: { Counter: { component: Counter, client: "visible" } } };
         w.includes('<Component path="missing"> in /page names no example')
       )
     ).toBe(true);
+    // A childless built-in given a prop it doesn't take is flagged at its
+    // line, with its code.
+    const unknownProp = result.warnings.find((w) =>
+      w.includes("BLUME_UNKNOWN_PROP")
+    );
+    expect(unknownProp).toContain("docs/page.mdx:9:1");
   });
 
   it("fails generation on a components.ts override it cannot plan", async () => {

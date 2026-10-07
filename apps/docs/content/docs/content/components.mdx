@@ -5,6 +5,8 @@ description: Cards, steps, tabs, accordions, badges, code groups, frames, trees,
 
 Blume ships an accessible, themeable component set available in any `.mdx` page with **no imports**. Each one is shown below with a live preview and its source. Components are vanilla and React-free; React switches on only when your project uses it — any `.tsx` or `.jsx` file in the project, a React [island](/docs/content/islands), [`<Component>`](#component) example, or [component override](/docs/configuration/customization) — or when the [assistant](/docs/configuration/assistant) is enabled.
 
+A component ignores props it doesn't take. Most show their children, so other docs tools' spellings can render empty: VitePress's `<Badge type="tip" text="beta" />` is a Badge with no children, which shows nothing. Blume warns about a childless component given props it doesn't take as `BLUME_UNKNOWN_PROP`, with the props it does take. Write the content between the tags instead: `<Badge>beta</Badge>`.
+
 ## Card and CardGroup
 
 Cards link to a destination with an icon, title, and short blurb. Group them with `CardGroup` for a responsive grid. Reach for them on landing pages, section indexes, and “next steps” — anywhere you’re guiding the reader onward.

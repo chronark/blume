@@ -94,6 +94,26 @@ export interface ExampleUse {
 }
 
 /**
+ * A JSX element in an `.mdx` body whose props don't render as written (see
+ * `core/mdx-elements.ts`), located like a {@link PageLink}: an HTML element
+ * with a JavaScript event handler (`handler`), or a childless built-in given
+ * props it doesn't take (`prop`).
+ */
+export interface ElementUse {
+  /** 1-based column of the element's `<` within the line. */
+  column: number;
+  /** Absolute path of the included partial it was written in, if not the page. */
+  file?: string;
+  kind: "handler" | "prop";
+  /** 1-based line number in the source file. */
+  line: number;
+  /** The handler props, or the props the built-in doesn't take. */
+  props: string[];
+  /** The element's name as written (`button`, `Badge`). */
+  tag: string;
+}
+
+/**
  * Resolved project paths. Computed once per CLI invocation and threaded
  * through the core pipeline.
  */
@@ -223,6 +243,12 @@ export interface PageRecord {
   componentsUsed?: string[];
   /** The string `path` of each `<Component>` example in the body (`.mdx` only). */
   examplesUsed?: ExampleUse[];
+  /**
+   * Childless built-ins given props they don't take (`.mdx` only). Reported
+   * once the project's own components are known, since an override takes
+   * whatever props it declares.
+   */
+  unknownProps?: ElementUse[];
   /** Resolved "last updated" ISO date, when the feature is enabled. */
   lastModified?: string;
   /** Absolute paths of files this page `<include>`s, transitively. Drives the

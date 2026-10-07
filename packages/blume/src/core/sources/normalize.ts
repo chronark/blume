@@ -19,6 +19,7 @@ import {
   rawHeadingTag,
 } from "../heading-markers.ts";
 import { localePlacement, localizeRoute } from "../i18n.ts";
+import { extractElementUses } from "../mdx-elements.ts";
 import { titleWord } from "../navigation.ts";
 import { formerRouteName, stripOrderingPrefix } from "../ordering-prefix.ts";
 import { relatedPageLinks } from "../related.ts";
@@ -31,6 +32,7 @@ import type {
 import { trimChar } from "../trim.ts";
 import type {
   Diagnostic,
+  ElementUse,
   ExampleUse,
   Heading,
   PageLink,
@@ -1556,6 +1558,35 @@ const mdCurlyMarkerDiagnostics = (
       };
     });
 
+const LIST = new Intl.ListFormat("en", { type: "conjunction" });
+
+/**
+ * Diagnostics for JavaScript event handlers on HTML elements in an `.mdx`
+ * page (`<button onClick={() => …}>`). The page is static HTML: Astro writes
+ * the function's source into the attribute, where the browser reads it as a
+ * handler body that only defines a function, so nothing happens. Reported at
+ * the element's line, in the partial that holds it when an `<include>`
+ * brought it in.
+ */
+const eventHandlerDiagnostics = (
+  entry: SourceEntry,
+  handlers: ElementUse[],
+  sourceName: string
+): Diagnostic[] =>
+  handlers.map(({ column, file, line, props, tag }) => {
+    const names = LIST.format(props.map((prop) => `\`${prop}\``));
+    return {
+      code: "BLUME_MDX_EVENT_HANDLER",
+      column,
+      file: file ?? entry.sourcePath ?? `${sourceName}:${entry.ref}`,
+      line,
+      message: `${names} on \`<${tag}>\` ${props.length === 1 ? "is a JavaScript function" : "are JavaScript functions"}, which a static page never runs.`,
+      severity: "warning",
+      suggestion:
+        "Move the interactive markup into an island (islands/Name.tsx), which runs in the browser, and use that component in the page.",
+    };
+  });
+
 const deriveTitle = (
   meta: PageMeta,
   headings: Heading[],
@@ -1941,6 +1972,9 @@ export const normalizeEntry = (
   const bodyText = entry.expanded?.text ?? entry.body.text;
   const { anchors, curlyMarkers, headings } = scanBody(bodyText);
   const { staged } = ctx.source;
+  const elements =
+    format === "mdx" ? entryLinks(entry, extractElementUses) : [];
+  const unknownProps = elements.filter((use) => use.kind === "prop");
 
   const base = {
     anchors,
@@ -1975,6 +2009,7 @@ export const normalizeEntry = (
     sourcePath: entry.sourcePath,
     title: deriveTitle(meta, headings, navPath),
     translationKey: logicalRoute,
+    unknownProps: unknownProps.length > 0 ? unknownProps : undefined,
     version,
     versionKey,
   } satisfies Omit<PageRecord, "locale" | "route">;
@@ -2004,7 +2039,14 @@ export const normalizeEntry = (
   return {
     diagnostics:
       format === "mdx"
-        ? curlyMarkerDiagnostics(entry, curlyMarkers, ctx.source.name)
+        ? [
+            ...curlyMarkerDiagnostics(entry, curlyMarkers, ctx.source.name),
+            ...eventHandlerDiagnostics(
+              entry,
+              elements.filter((use) => use.kind === "handler"),
+              ctx.source.name
+            ),
+          ]
         : mdCurlyMarkerDiagnostics(entry, curlyMarkers, ctx.source.name),
     pages,
   };

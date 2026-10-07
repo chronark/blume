@@ -37,6 +37,7 @@ import { normalizeBasePath, withBasePath } from "../core/base-path.ts";
 import { withChangelogIndexText } from "../core/changelog-index.ts";
 import {
   missingExampleDiagnostics,
+  unknownPropDiagnostics,
   validateUsedComponents,
 } from "../core/component-diagnostics.ts";
 import {
@@ -55,7 +56,11 @@ import type {
   BlumeFavicon,
   BlumeLogo,
 } from "../core/data.ts";
-import { BlumeError } from "../core/diagnostics.ts";
+import {
+  BlumeError,
+  enrichDiagnostic,
+  formatDiagnostic,
+} from "../core/diagnostics.ts";
 import { writeTextAtomic } from "../core/fs-atomic.ts";
 import { gitIgnoredPaths } from "../core/git-ignored.ts";
 import {
@@ -2462,6 +2467,11 @@ export const generateRuntime = async (
       context.root,
       knownComponentTags
     ).map(diagnosticWarning),
+    // Printed whole, like a scan diagnostic, so the line it names shows.
+    ...unknownPropDiagnostics(project.graph.pages, knownComponentTags).map(
+      (diagnostic) =>
+        formatDiagnostic(enrichDiagnostic(diagnostic), context.root)
+    ),
     ...dependencyWarnings
   );
   if (hasScalarReferences(config)) {

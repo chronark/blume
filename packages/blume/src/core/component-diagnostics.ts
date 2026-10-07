@@ -1,6 +1,6 @@
 import { relative } from "pathe";
 
-import { BUILTIN_MDX_TAGS } from "./builtin-tags.ts";
+import { BUILTIN_CHILD_PROPS, BUILTIN_MDX_TAGS } from "./builtin-tags.ts";
 import type { Diagnostic, PageRecord } from "./types.ts";
 
 /** `CardGroup` → `card-group`, matching registry item names. */
@@ -50,6 +50,52 @@ export const validateUsedComponents = (
       suggestion,
     };
   });
+};
+
+const EITHER = new Intl.ListFormat("en", { type: "disjunction" });
+const quoted = (names: readonly string[]): string[] =>
+  names.map((name) => `\`${name}\``);
+
+/**
+ * Warn about each childless built-in in an `.mdx` page given props it doesn't
+ * take (`<Badge type="tip" text="beta" />`, VitePress's Badge). Blume's
+ * components ignore unknown props, so the element renders without the
+ * content those props carried. `extraTags` are the project's own components
+ * (islands + overrides): one that replaces a built-in takes its own props,
+ * so its uses aren't checked. A file shared by several locales is reported
+ * once.
+ */
+export const unknownPropDiagnostics = (
+  pages: readonly PageRecord[],
+  extraTags: ReadonlySet<string>
+): Diagnostic[] => {
+  const diagnostics: Diagnostic[] = [];
+  const seen = new Set<string>();
+  for (const page of pages) {
+    for (const use of page.unknownProps ?? []) {
+      const file = use.file ?? page.sourcePath ?? page.id;
+      const key = `${file}:${use.line}:${use.column}`;
+      if (extraTags.has(use.tag) || seen.has(key)) {
+        continue;
+      }
+      seen.add(key);
+      const accepted = BUILTIN_CHILD_PROPS.get(use.tag) ?? [];
+      const takes =
+        accepted.length > 0
+          ? `, and use the props ${use.tag} takes: ${LIST.format(quoted(accepted))}`
+          : `; ${use.tag} takes no props`;
+      diagnostics.push({
+        code: "BLUME_UNKNOWN_PROP",
+        column: use.column,
+        file,
+        line: use.line,
+        message: `<${use.tag}> in ${page.route} has no children, and ${use.tag} doesn't take ${EITHER.format(quoted(use.props))}, so it renders without what ${use.props.length === 1 ? "that prop" : "those props"} meant to show.`,
+        severity: "warning",
+        suggestion: `Put the content between the tags (<${use.tag}>…</${use.tag}>)${takes}.`,
+      });
+    }
+  }
+  return diagnostics;
 };
 
 /** What example discovery found: where it looked, and each example's key. */

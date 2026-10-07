@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   missingExampleDiagnostics,
+  unknownPropDiagnostics,
   validateUsedComponents,
 } from "../src/core/component-diagnostics.ts";
 import {
@@ -219,5 +220,76 @@ describe("missingExampleDiagnostics", () => {
       new Set(["Component"])
     );
     expect(result).toStrictEqual([]);
+  });
+});
+
+describe("unknownPropDiagnostics", () => {
+  it("warns about a childless built-in given props it doesn't take", () => {
+    const result = unknownPropDiagnostics(
+      [
+        page({
+          route: "/a",
+          sourcePath: "/site/docs/a.mdx",
+          unknownProps: [
+            {
+              column: 1,
+              kind: "prop",
+              line: 7,
+              props: ["type", "text"],
+              tag: "Badge",
+            },
+            {
+              column: 3,
+              file: "/site/docs/_part.mdx",
+              kind: "prop",
+              line: 2,
+              props: ["wide"],
+              tag: "Column",
+            },
+          ],
+        }),
+      ],
+      new Set()
+    );
+    expect(result).toStrictEqual([
+      {
+        code: "BLUME_UNKNOWN_PROP",
+        column: 1,
+        file: "/site/docs/a.mdx",
+        line: 7,
+        message:
+          "<Badge> in /a has no children, and Badge doesn't take `type` or `text`, so it renders without what those props meant to show.",
+        severity: "warning",
+        suggestion:
+          "Put the content between the tags (<Badge>…</Badge>), and use the props Badge takes: `class`, `className`, `color`, `disabled`, `icon`, `shape`, `size`, `stroke`, `tooltip`, and `variant`.",
+      },
+      {
+        code: "BLUME_UNKNOWN_PROP",
+        column: 3,
+        file: "/site/docs/_part.mdx",
+        line: 2,
+        message:
+          "<Column> in /a has no children, and Column doesn't take `wide`, so it renders without what that prop meant to show.",
+        severity: "warning",
+        suggestion:
+          "Put the content between the tags (<Column>…</Column>); Column takes no props.",
+      },
+    ]);
+  });
+
+  it("skips a component the project replaces, and reports a shared file once", () => {
+    const use = {
+      column: 1,
+      kind: "prop" as const,
+      line: 1,
+      props: ["text"],
+      tag: "Badge",
+    };
+    const pages = [
+      page({ id: "a", route: "/a", unknownProps: [use] }),
+      page({ id: "a", route: "/fr/a", unknownProps: [use] }),
+    ];
+    expect(unknownPropDiagnostics(pages, new Set())).toHaveLength(1);
+    expect(unknownPropDiagnostics(pages, new Set(["Badge"]))).toStrictEqual([]);
   });
 });
