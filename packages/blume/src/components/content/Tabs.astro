@@ -110,6 +110,8 @@ const { content: strings } = contentStrings(data, Astro.currentLocale);
 </blume-tabs>
 
 <script>
+  import { languageLabel } from "../code-language.ts";
+
   const TRIGGER_CLASS =
     "-mb-px inline-flex shrink-0 cursor-pointer items-center gap-1.5 border-transparent border-b-2 bg-transparent px-1 py-2.5 font-medium text-muted-foreground text-xs transition-colors hover:text-foreground aria-[selected=true]:border-accent aria-[selected=true]:text-foreground";
   const SELECT_CLASS =
@@ -120,9 +122,20 @@ const { content: strings } = contentStrings(data, Astro.currentLocale);
   // in several <Tabs> instances on one page.
   let instanceCount = 0;
 
-  // An untitled panel is numbered with its group's localized `Tab {n}`.
+  // An untitled code block (a CodeGroup fence) is named by its language, read
+  // from the fence's own id: the docs layout moves that to
+  // `data-blume-language` when it relabels `data-language` for the header.
+  const codeLanguage = (panel: HTMLElement) => {
+    const language = panel.matches("pre")
+      ? (panel.dataset.blumeLanguage ?? panel.dataset.language)
+      : undefined;
+    return language ? languageLabel(language) : undefined;
+  };
+
+  // Any other untitled panel is numbered with its group's localized `Tab {n}`.
   const panelTitle = (panel: HTMLElement, index: number) =>
     panel.dataset.title ??
+    codeLanguage(panel) ??
     (
       panel.closest<HTMLElement>("blume-tabs")?.dataset.i18nTab ?? "Tab {n}"
     ).replace("{n}", String(index + 1));
@@ -160,7 +173,8 @@ const { content: strings } = contentStrings(data, Astro.currentLocale);
       ).filter((panel) => panel.closest("blume-tabs") === this);
       // CodeGroup passes raw code fences instead of <Tab> elements, so adopt
       // the content wrapper's direct code blocks as panels. The tab label comes
-      // from each block's title (the text after the language in the fence).
+      // from each block's title (the text after the language in the fence),
+      // or from its language when it has none.
       // A ts2js fence arrives as its own TypeScript/JavaScript group; it is
       // one panel too, labeled by the fence title both of its blocks carry.
       if (panels.length === 0) {

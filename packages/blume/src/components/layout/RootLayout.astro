@@ -1006,6 +1006,7 @@ const localeRedirect = localeTargets
     <script>
       import type { Zoom } from "medium-zoom";
       import { copyableCode } from "../code-copy.ts";
+      import { languageLabel } from "../code-language.ts";
       import { copyText, createCopyFlash } from "../copy-feedback.ts";
       import { syncDrawerInert } from "./drawer-inert.ts";
       import { chromeIcons as icons } from "../../theme/chrome-icons.ts";
@@ -1080,27 +1081,6 @@ const localeRedirect = localeTargets
           return null;
         }
         return panel.matches("pre") ? panel : panel.querySelector("pre");
-      };
-
-      const languageLabels: Record<string, string> = {
-        astro: "Astro",
-        bash: "Bash",
-        css: "CSS",
-        html: "HTML",
-        js: "JavaScript",
-        json: "JSON",
-        jsx: "JSX",
-        md: "Markdown",
-        mdx: "MDX",
-        plaintext: "Text",
-        sh: "Shell",
-        shell: "Shell",
-        ts: "TypeScript",
-        tsx: "TSX",
-        txt: "Text",
-        yaml: "YAML",
-        yml: "YAML",
-        zsh: "Zsh",
       };
 
       // Per-page setup, run on the initial load and again after every
@@ -1285,10 +1265,7 @@ const localeRedirect = localeTargets
             if (pre instanceof HTMLElement) {
               pre.dataset.blumeLanguage = language;
             }
-            pre.setAttribute(
-              "data-language",
-              languageLabels[language.toLowerCase()] ?? language
-            );
+            pre.setAttribute("data-language", languageLabel(language));
           }
           pre.classList.add("group", "relative");
           // The code element is the scroll container (see the theme entry), but
