@@ -1,6 +1,6 @@
 ---
 title: Rate limiting
-description: Limit how often one reader can call the assistant, the API playground proxy, and server-side search, on by default, with the count kept in memory, Unkey, Upstash, or Cloudflare.
+description: Limit how often one reader can call the assistant, the API playground proxy, and server-side search, on by default, with the count kept in memory, Upstash, Cloudflare, or Unkey.
 ---
 
 The server routes a reader can call cost you something each time: the [assistant](/docs/configuration/assistant) spends model tokens, the [API playground](/docs/references/openapi#cors-and-the-proxy) proxy relays requests to your API, and [Mixedbread search](/docs/configuration/search#mixedbread) runs a paid query. Blume limits how often one reader, identified by IP address, can call each of them. A reader over the limit gets `429 Too Many Requests` with a `Retry-After` header, and the assistant tells them to try again in a few minutes.
@@ -23,9 +23,9 @@ Each route keeps its own count, so a busy playground session doesn't use up the 
 | Adapter | Count kept in | Limit holds |
 | --- | --- | --- |
 | `memory()` | The server's memory (the default) | Exactly on one server; per instance on serverless hosts |
-| `unkey()` | [Unkey](https://unkey.com) | Sliding windows with regional counters that converge across regions |
 | `upstash()` | [Upstash Redis](https://upstash.com) | Exactly, on every host |
 | `cloudflare()` | Cloudflare's Workers rate limiting | Per Cloudflare location |
+| `unkey()` | [Unkey](https://unkey.com) | Sliding windows with regional counters that converge across regions |
 
 ### Memory
 
@@ -36,29 +36,6 @@ import { memory } from "blume/ratelimit";
 
 rateLimit: memory({ requests: 60, window: 600 }),
 ```
-
-### Unkey
-
-`unkey()` counts requests through [Unkey's rate limit API](https://www.unkey.com/docs/api-management/ratelimiting/overview). It works on every deployment host and needs no SDK. Set `UNKEY_ROOT_KEY` on the server to a root key with `ratelimit.*.limit` permission. Creating a namespace on its first request also needs `ratelimit.*.create_namespace` permission.
-
-```ts blume.config.ts lineNumbers
-import { defineConfig } from "blume";
-import { unkey } from "blume/ratelimit";
-
-export default defineConfig({
-  rateLimit: unkey({ namespace: "docs", requests: 30, window: 600 }),
-});
-```
-
-`namespace` is required. `requests` defaults to 30 and `window` to 600 seconds. Blume converts the window to milliseconds for Unkey. Each host, route, and reader has a separate identifier within the namespace.
-
-Use `rootKeyEnv` to name a different server environment variable:
-
-```ts blume.config.ts lineNumbers
-rateLimit: unkey({ namespace: "docs", rootKeyEnv: "DOCS_UNKEY_ROOT_KEY" }),
-```
-
-Without the root key, Blume warns and counts in memory. API failures are logged and requests pass through, like the other shared adapters. Unkey uses sliding windows and regional counters that converge across regions, not one globally exact counter. The `Retry-After` header uses Unkey's window reset time; it does not guarantee that all capacity returns at once.
 
 ### Upstash
 
@@ -91,6 +68,29 @@ export default defineConfig({
 ```
 
 The binding's namespace comes from the Worker's name, so two sites on one account don't share a count. Set `namespaceId` to choose it yourself.
+
+### Unkey
+
+`unkey()` counts requests through [Unkey's rate limit API](https://www.unkey.com/docs/api-management/ratelimiting/overview). It works on every deployment host and needs no SDK. Set `UNKEY_ROOT_KEY` on the server to your Unkey root key.
+
+```ts blume.config.ts lineNumbers
+import { defineConfig } from "blume";
+import { unkey } from "blume/ratelimit";
+
+export default defineConfig({
+  rateLimit: unkey({ namespace: "docs", requests: 30, window: 600 }),
+});
+```
+
+`namespace` is required. `requests` defaults to 30 and `window` to 600 seconds. Blume converts the window to milliseconds for Unkey. Each host, route, and reader has a separate identifier within the namespace.
+
+Use `rootKeyEnv` to name a different server environment variable:
+
+```ts blume.config.ts lineNumbers
+rateLimit: unkey({ namespace: "docs", rootKeyEnv: "DOCS_UNKEY_ROOT_KEY" }),
+```
+
+Without the root key, Blume warns and counts in memory. API failures are logged and requests pass through, like the other shared adapters. Unkey uses sliding windows and regional counters that converge across regions, not one globally exact counter. The `Retry-After` header uses Unkey's window reset time; it does not guarantee that all capacity returns at once.
 
 ## Behind a reverse proxy
 

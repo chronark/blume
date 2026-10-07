@@ -12,8 +12,8 @@ const ADAPTER_HINT =
 export const rateLimitAdapterSchema = z.discriminatedUnion("kind", [
   cloudflareRateLimitAdapterSchema,
   memoryAdapterSchema,
-  unkeyAdapterSchema,
   upstashAdapterSchema,
+  unkeyAdapterSchema,
 ]);
 
 export type RateLimitAdapter = z.output<typeof rateLimitAdapterSchema>;
