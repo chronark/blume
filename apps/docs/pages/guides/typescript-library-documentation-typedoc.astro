@@ -717,17 +717,11 @@ jobs:
       tell them apart, but <code>blume audit</code> reports duplicate titles.
     </li>
     <li>
-      <strong>No llms.txt descriptions.</strong> Reference pages set{" "}
-      <code>seo.description</code>, not <code>description</code>, so their{" "}
-      <code>llms.txt</code> entries are bare links.
-    </li>
-    <li>
-      <strong>Edit links point at generated files.</strong> With{" "}
-      <code>github</code> set, every reference page gets an Edit on GitHub
-      link to its file in <code>docs/reference</code>, which isn't in the
-      repository. Blume has no per-page switch for it. The Defined in link on
-      each page points at the declaration in your source, where its comment
-      lives.
+      <strong>No edit links on reference pages.</strong> Blume leaves the Edit
+      on GitHub link off pages whose file git ignores, and{" "}
+      <code>docs/reference</code> is in <code>.gitignore</code>. The Defined
+      in link on each page points at the declaration in your source, where its
+      comment lives.
     </li>
     <li>
       <strong>URLs follow your symbols.</strong> They keep the symbol's case,
