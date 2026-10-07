@@ -48,6 +48,10 @@
 // unverified. The reference was revised after the run (the shared excerpt
 // script, the missing-anchor advice, the `admonish warn` default, defineMeta
 // outside the project); those revisions weren't rerun on Linera end to end.
+// Blume changed after the run too: a redirect from an index page's
+// `index.html` no longer fails the build with EISDIR, so the guide drops
+// that troubleshooting entry, and a comma-glued fence language now warns
+// BLUME_UNKNOWN_CODE_LANGUAGE.
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
@@ -489,7 +493,7 @@ node check-urls.mjs ../old-urls.txt`}
     name no host or name Netlify or Cloudflare. Add a redirect for each URL it
     prints and run it again until it prints nothing. Don't add one for an
     index page like <code>/guide/index.html</code>: that URL already serves
-    the page, and a redirect from it fails the build.{" "}
+    the page.{" "}
     <code>print.html</code> and <code>toc.html</code> aren't in the list,
     since they have no Blume equivalent.
   </p>
@@ -585,7 +589,8 @@ node check-urls.mjs ../old-urls.txt`}
   <h3>A Rust block isn't highlighted</h3>
   <p>
     Its fence still says <code>```rust,ignore</code> or another attribute
-    after a comma. Blume reads the whole word as the language: keep only{" "}
+    after a comma. Blume reads the whole word as the language and warns
+    about it as <code>BLUME_UNKNOWN_CODE_LANGUAGE</code>: keep only{" "}
     <code>rust</code>.
   </p>
   <h3>The build fails with BLUME_INCLUDE_NOT_FOUND on an excerpt</h3>
@@ -593,10 +598,5 @@ node check-urls.mjs ../old-urls.txt`}
     The excerpts weren't generated. Build with <code>npm run build</code>,
     which runs <code>include-excerpts.mjs</code> first, or run{" "}
     <code>node include-excerpts.mjs</code> yourself.
-  </p>
-  <h3>The build fails with EISDIR on an index.html</h3>
-  <p>
-    A redirect starts at an index URL like <code>/guide/index.html</code>.
-    Remove it: that URL already serves the page.
   </p>
 </GuidePage>

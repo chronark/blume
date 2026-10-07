@@ -83,7 +83,7 @@ It's zero-dependency and idempotent, and reads `version`, `relativePath`, `route
 
 - **Built in:** search, `docsify-copy-code`, `docsify-pagination`, and `zoom-image`. Delete them.
 - **Converted by the codemod:** emoji, `docsify-tabs`, and flexible-alerts.
-- **Prism language packs:** delete them. Shiki highlights the common languages, and a fence in a language it doesn't know (or a misspelled or uppercase one) renders as plain text.
+- **Prism language packs:** delete them. Shiki highlights the common languages in any case (` ```JSON ` works), and a fence in a language it doesn't know, or a misspelled one, renders as plain text and warns `BLUME_UNKNOWN_CODE_LANGUAGE`: fix the name, or write `text`.
 - **Mermaid** plugins or renderers → native ` ```mermaid ` in `.mdx`.
 - **KaTeX** → `$$…$$` in `.mdx`, with inline `$…$` becoming `$$…$$` inside its sentence.
 - **`ga` / `gtag`** → `googleAnalytics({ id })` for a `G-` id. A `UA-` id no longer collects data, so report it. Other analytics → `script()`.
@@ -145,7 +145,7 @@ It's zero-dependency and idempotent, and reads `version`, `relativePath`, `route
 
 **Hash mode (the default).** Every page lived at `/#/<route>`, also reachable as `/#/<route>.md` and `/index.html#/<route>`, with folder indexes at `#/<folder>/` and headings at `?id=<id>`. The server only saw `/`.
 
-**A. Blume takes over the old address** (the usual case). `docsify-routes.json` holds the page moves the codemod made. Add an entry for each alias you turned into a page. Routes that now land on a file in `public/` go in a separate `files` map that only the script reads: a redirect page would sit where the file is. Name the file itself (`/api/index.html`, not `/api/`): `blume preview` serves a `public/` folder's index only at `/api`, and static hosts at `/api/`.
+**A. Blume takes over the old address** (the usual case). `docsify-routes.json` holds the page moves the codemod made. Add an entry for each alias you turned into a page. Routes that now land on a file in `public/` go in a separate `files` map that only the script reads: a redirect page would sit where the file is. Name a `public/` folder with its slash (`/api/`) or name the file itself (`/api/index.html`): static hosts, `blume dev`, and `blume preview` serve its `index.html` at `/api/` (and redirect `/api` there), where its relative links resolve.
 
 ```ts blume.config.ts
 import { defineConfig } from "blume";

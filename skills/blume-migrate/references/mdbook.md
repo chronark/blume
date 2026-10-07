@@ -101,8 +101,8 @@ Keep each chapter's path, so its route is the old URL minus `.html`, and keep a 
 - **A parent chapter beside its children's folder** (`guide.md` + `guide/`): `git mv guide.md guide/index.md`. The route stays `/guide` and the folder row links to it; left in place, `guide.md` is a separate page beside an unlinked "Guide" group. The page moved a level deeper: rewrite its relative links, images, and include paths, and every link to `guide.md`.
 - **Children flat beside their parent** (`ch03-00-concepts.md`, `ch03-01-variables.md`): a `(group)/` folder holding the parent as `index.md` with `slug: ch03-00-concepts`, plus the children. The group adds no URL segment, the `slug` keeps the parent's route, and the group row links to it. Rebase relative paths in every moved file.
 - **The first chapter**, when it isn't the root `README.md`: move it to the content root's `index.md` and redirect its own URL to `/` (`{ from: "/introduction.html", to: "/" }`), since mdBook served it at both.
-- **Ordering prefixes.** Blume drops a leading `\d+[-_.]` from every segment, keeping versions (`1.2.0`) and ISO dates (`2024-01-05`) whole (`00-overview.md` → `/overview`). Every old URL is redirected anyway, so let Blume drop them (they keep ordering the sidebar) and point those redirects at the new routes, or pin `slug` on each page to keep the old path. Say which.
-- **Files `SUMMARY.md` doesn't list** were never published: a contributors' `README.md` beside the chapters, notes, Markdown that `{{#include}}` pulls in. Prefix them with `_`, move them out of the content root, or add them to `content.exclude` next to `"**/_*"` and `"**/.*"` (a set `exclude` replaces those defaults). Report them.
+- **Ordering prefixes.** Blume drops a leading `\d+[-_.]` from every segment, keeping versions (`1.2.0`) and dates (`2024-01-05`, `12-05-2022`, `2024-01`) whole (`00-overview.md` → `/overview`). Every old URL is redirected anyway, so let Blume drop them (they keep ordering the sidebar) and point those redirects at the new routes, or pin `slug` on each page to keep the old path. Say which.
+- **Files `SUMMARY.md` doesn't list** were never published: a contributors' `README.md` beside the chapters, notes, Markdown that `{{#include}}` pulls in. Prefix them with `_`, move them out of the content root, or add them to `content.exclude` (it adds to the defaults `"**/_*"` and `"**/.*"`). Report them.
 - **A chapter whose body is a `<meta http-equiv="refresh" content="0; url=…">`** is a redirect, not a page to keep: add a redirect from its `.html` URL to the target, a `navigation.featured` link in place of its sidebar entry, and delete it (mdBook's `print.html` ran the same tag, so it sent the whole print page away too). Report it.
 - Delete `SUMMARY.md` once folders and `meta.ts` carry its structure: it would publish as a page.
 - **Check that git sees the new files.** A repo `.gitignore` can cover the content root (pages added before the rule stay tracked), and then every `meta.ts` and partial you create is silently left out of `git add`. Run `git check-ignore -v <content root>/meta.ts` after writing the first one; if it prints a rule, fix that rule or report that each new file needs `git add -f`.
@@ -161,7 +161,7 @@ Report each one and what you chose. Code that now fills a formerly empty block m
 
 | mdBook | Blume |
 | --- | --- |
-| ` ```rust,ignore `, `rust,no_run,noplayground`, `rust,should_panic`, `rust,compile_fail`, `rust,edition2021`, `rust,editable`, `rust,mdbook-runnable`, `rust,hidelines=…` | ` ```rust ` (SKILL.md: a comma-glued language doesn't highlight) |
+| ` ```rust,ignore `, `rust,no_run,noplayground`, `rust,should_panic`, `rust,compile_fail`, `rust,edition2021`, `rust,editable`, `rust,mdbook-runnable`, `rust,hidelines=…` | ` ```rust ` (a comma-glued language doesn't highlight, and warns `BLUME_UNKNOWN_CODE_LANGUAGE`) |
 | ` ```ignore `, or no language: rustdoc tests an unlabeled block as Rust, so books label diagrams and shell lines `ignore` | ` ```text `, or the real language |
 | **hidden lines** in a Rust block: first non-space character `#`, then a space or the end of the line | delete the line, and a blank line it leaves at the top of the block: readers saw it only through the eye toggle, which has no equivalent. `##x` shows as `#x`; `#[derive]` and `#!` lines are code. Lines with a `[output.html.code.hidelines]` prefix (`python = "~"`), or a fence's `hidelines=<prefix>`, go the same way |
 | the play button, `editable` | static code (report) |
@@ -187,14 +187,14 @@ Report each one and what you chose. Code that now fills a formerly empty block m
 - Custom directives (`[[preprocessor.admonish.custom]]`) → the closest callout, with the label as title.
 - Each block had an anchor (`#admonition-<title>`, `-1` for repeats). Links to one fail `blume validate --strict`: point them at the nearest heading or drop the fragment.
 
-**GitHub alerts** (`> [!NOTE]`, built into 0.5 and the `alerts` plugin) → `:::note`, `:::tip`, `:::note` for `IMPORTANT`, `:::warning`, `:::danger` for `CAUTION`. Unconverted, Blume renders a plain blockquote with a literal `[!NOTE]`. A 0.4 book without the plugin showed them that way too: converting changes the page (report).
+**GitHub alerts** (`> [!NOTE]`, built into 0.5 and the `alerts` plugin) render as callouts in `.mdx` as written: `NOTE` and `IMPORTANT` as a note, `TIP` a tip, `WARNING` a warning, `CAUTION` a danger callout. In `.md` they stay a blockquote with a literal `[!NOTE]` and warn `BLUME_MD_GITHUB_ALERT`: rename the page to `.mdx`. A 0.4 book without the plugin showed them as plain quotes: rendering them changes the page (report).
 
 ### Other syntax
 
 | mdBook | Blume |
 | --- | --- |
 | `## Heading {#id}` | the same in `.md`; `[#id]` in `.mdx` |
-| `## Heading { #id .class }` | `{#id}` or `[#id]`; classes drop. Left as is, the spaced form stays in the heading text and makes a garbage id |
+| `## Heading { #id .class }` | `{#id}` or `[#id]`; classes drop. Left as is, the spaced form stays in the heading text and makes a garbage id; `BLUME_MD_CURLY_ANCHOR` flags it only when no class follows the id (in `.mdx` it fails the build) |
 | footnotes, tables, strikethrough, task lists | unchanged |
 | definition lists (`term` then `: definition`, on by default in 0.5) | a list or table, or raw `<dl>`; Blume renders them as one paragraph |
 | MathJax (`mathjax-support`): `\\( … \\)`, `\\[ … \\]` | `$$…$$` inside the sentence, or on lines of its own for a block, in `.mdx`. Undo the Markdown escapes mdBook needed inside the math (`\\\\` for a LaTeX `\\`, any `\_` or `\*`): `$$` math is read verbatim |
@@ -218,7 +218,7 @@ Report each one and what you chose. Code that now fills a formerly empty block m
 | the first chapter, `src/intro.md` | `/intro.html` and `/index.html` | `/` once moved to `index.md` |
 | `src/01-basics.md` | `/01-basics.html` | `/basics`, or `slug: 01-basics` |
 
-- **One exact redirect per chapter that isn't an index**, `{ from: "/guide/setup.html", to: "/guide/setup" }`, built from `old-urls.txt` and your table: a pattern can't strip `.html`. Never redirect `/index.html` or `/x/index.html`: static hosts serve Blume's `x/index.html` there, and `from: "/x/index.html"` fails the static build (`EISDIR`).
+- **One exact redirect per chapter that isn't an index**, `{ from: "/guide/setup.html", to: "/guide/setup" }`, built from `old-urls.txt` and your table: a pattern can't strip `.html`. Skip `/index.html` and `/x/index.html`: static hosts serve Blume's `x/index.html` there already.
 - **`[output.html.redirect]`**: each key is a path from the site root, and its value is a URL relative to the key's folder (`"../infra/x.html"`), root-relative, or external. Resolve the value against the key's folder, then map it like a chapter (`.html` → route, `index.html` → its folder); external URLs stay. Check each target against the old build: one that already led to a 404 → the page that replaced it, or drop it, and report.
 - **Fragment redirects** (`"/page.html#old" = "other.html#new"`, 0.4.52 and later): servers never see fragments. A heading renamed on the same page → pin the old id on it (`[#old]`); moved to another page → no server equivalent (report). A deleted page's own entry is its redirect.
 - **No equivalent, no redirect:** `print.html` (the whole book on one page, `noindex`), `toc.html` (the sidebar frame, `noindex`), and `404.html` (Blume writes its own). Mention `export: { pdf: true }` for printing.

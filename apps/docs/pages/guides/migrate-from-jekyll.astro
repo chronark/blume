@@ -36,7 +36,12 @@
 // took each page's next H1 as its title, so it now refuses a folder it
 // already converted. Re-run on Flair after the fixes: the same files as
 // before, except that the home page stays listed (hidden, it left the
-// sitemap and search). The Acme example below is invented: a six-page Just
+// sitemap and search). Blume changed after these runs: a hidden home page
+// now stays in the sitemap and search, so the codemod hides it again when
+// the old sidebar left it out; `content.exclude` adds to its defaults, so
+// the config below no longer lists them; `<YouTube>` embeds playlists; and
+// `blume preview` redirects a slashed URL instead of answering it with a
+// 404. The Acme example below is invented: a six-page Just
 // the Docs site with a `baseurl`, built with Jekyll 4.4.1 and just-the-docs
 // 0.12.0. Its before/after, codemod report, and folders are the codemod's
 // real output, unchanged by the fixes (the YouTube before/after is the
@@ -193,7 +198,7 @@ const config = [
   "  content: {",
   '    root: ".",',
   '    include: ["*.{md,mdx}", "docs/**/*.{md,mdx}"],',
-  '    exclude: ["**/_*", "**/.*", "README.md", "node_modules/**", "vendor/**"],',
+  '    exclude: ["README.md", "node_modules/**", "vendor/**"],',
   "  },",
   "  navigation: {",
   '    sidebar: { display: "group" },',
@@ -500,7 +505,7 @@ const baseConfig = [
       under it. Pages Just the Docs listed under their parent now list there
       too, from <code>directory: "accordion"</code>. Pages your old sidebar
       left out are hidden, which in Blume also takes them out of search and
-      the sitemap. The home page is the exception: it stays listed.
+      the sitemap. The home page is the exception: hidden, it stays in both.
     </li>
     <li>
       <strong>Liquid logic.</strong> <code>{"{% if %}"}</code>,{" "}
@@ -526,9 +531,8 @@ const baseConfig = [
   <CodeBlock code={youtube} lang="md" title="Before" />
   <CodeBlock code={youtubeAfter} lang="mdx" title="After" />
   <p>
-    A YouTube playlist URL (<code>/embed/videoseries?list=…</code>) stays a
-    plain <code>{"<iframe>"}</code>: <code>{"<YouTube>"}</code> doesn't play
-    playlists.
+    A YouTube playlist URL (<code>/embed/videoseries?list=…</code>) works the
+    same way: <code>{"<YouTube>"}</code> embeds the playlist.
   </p>
 
   <h2>Check every old URL</h2>
@@ -549,9 +553,9 @@ const baseConfig = [
     not pages. Add a redirect for each URL it prints and run it again until it
     prints nothing. Index URLs need none: <code>/docs/api/</code> already
     serves the page Blume writes at <code>docs/api/index.html</code>.{" "}
-    <code>npx blume preview</code> serves the build too, but it answers a
-    slashed URL like <code>/docs/install/</code> with a 404, where GitHub
-    Pages serves the page.
+    <code>npx blume preview</code> serves the build too, and redirects a
+    slashed URL like <code>/docs/install/</code> to{" "}
+    <code>/docs/install</code>, where GitHub Pages serves the page as is.
   </p>
 
   <h2>Check the heading anchors</h2>
@@ -633,16 +637,18 @@ const baseConfig = [
   <h3>A page shows <code>{"{: .note }"}</code> or <code>{"{% include %}"}</code> as text</h3>
   <p>
     It's a <code>.md</code> page, which shows leftover Kramdown and Liquid as
-    text without an error. Convert it, and rename the page{" "}
-    <code>.mdx</code> if it now has a callout.
+    text without an error. Liquid gets a <code>BLUME_TEMPLATE_TAG</code>{" "}
+    warning with its line; an attribute list gets none. Convert it, and
+    rename the page <code>.mdx</code> if it now has a callout.
   </p>
   <h3>The build fails with "Could not parse expression"</h3>
   <p>
     An <code>.mdx</code> page, or a partial it includes, still has a{" "}
     <code>{"{"}</code> in its text: leftover Liquid or a Kramdown attribute
     list, or a brace in prose. Convert it, or escape a brace as{" "}
-    <code>{"\\{"}</code>. When the error names only the page, look in the
-    partials it includes.
+    <code>{"\\{"}</code>. A <code>BLUME_MDX_ATTRIBUTE_LIST</code> warning
+    names an attribute list's line; when the error names only the page, look
+    in the partials it includes.
   </p>
   <h3>Validate fails with BLUME_NAV_INDEX_TITLE_MISMATCH</h3>
   <p>

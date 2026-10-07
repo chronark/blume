@@ -96,13 +96,13 @@ One `git mv` per page keeps both the route and the sidebar:
 
 ### `.md` or `.mdx`
 
-Rename to `.mdx` every page with a `{% … %}` block, `$$` math, a mermaid fence, or a component after conversion. Directives, components, math, mermaid, `package-install`, and `ts2js` are MDX-only: in `.md`, a leftover `{% hint %}` or `:::note` is literal text with a green build, and in `.mdx` a leftover `{% … %}` fails it. Plain pages can stay `.md`; tables, footnotes, fence meta, `<include>`, `{{variables}}`, `[#id]`, and raw HTML work in both. An include is spliced as text, so it's parsed in the including page's format.
+Rename to `.mdx` every page with a `{% … %}` block, `$$` math, a mermaid fence, or a component after conversion. Directives, components, math, mermaid, `package-install`, and `ts2js` are MDX-only: in `.md`, a leftover `{% hint %}` or `:::note` is literal text with a green build (each `{% … %}` tag warns `BLUME_TEMPLATE_TAG` at its line; a `:::note` doesn't), and in `.mdx` a leftover `{% … %}` fails it. Plain pages can stay `.md`; tables, footnotes, fence meta, `<include>`, `{{variables}}`, `[#id]`, and raw HTML work in both. An include is spliced as text, so it's parsed in the including page's format.
 
 ### MDX hazards
 
 Each of these fails `blume build` in `.mdx`:
 
-- **Unclosed `<img …>` and `<br>`.** Close them — better, convert images to Markdown.
+- **Unclosed `<img …>` and `<br>`** (`BLUME_MDX_UNCLOSED_ELEMENT` names each). Close them — better, convert images to Markdown.
 - **HTML comments** → `{/* */}`.
 - **A `{` outside code.** GitBook's `\{{x\}}` isn't enough; write `` `{{x}}` `` or `\{\{x\}\}`. Braces inside raw HTML (`<code>CN={{DeviceId}}</code>`, `<td>${EMAIL}</td>`) compile, then crash the render with a `ReferenceError`: turn `<code>`, `<strong>`, `<a>`, `<p>`, and `<br>` inside table cells into Markdown.
 - **Markdown inside JSX** (`<Tab>`, `<Step>`, `<Frame>`) needs blank lines around it.
@@ -114,13 +114,13 @@ GitBook's `\<` and entities (`&#x20;`, `&#x3C;`) are fine (an escaped `\<Name` c
 | GitBook | Blume |
 | --- | --- |
 | `# Title` (the first line) | frontmatter `title`; delete the line |
-| `{% hint style="info" %}` (`success`, `warning`, `danger`) | `:::info` (`:::success`, `:::warning`, `:::danger`); legacy plugin `tip` → `:::tip`, `working` → `:::note`. `icon` drops; inside another directive, give the outer one a longer fence (`::::`) |
+| `{% hint style="info" %}` (`success`, `warning`, `danger`) | `:::info` (`:::success`, `:::warning`, `:::danger`); legacy plugin `tip` → `:::tip`, `working` → `:::note`. A directive takes no `icon`: keep one that matters as `<Callout type="<type>" icon="<lucide>">`, else drop it; inside another directive, give the outer one a longer fence (`::::`) |
 | `{% tabs %}` + `{% tab title="X" icon="y" %}` | `<Tabs>` + `<Tab title="X" icon="<lucide>">`; `fullWidth` drops. Blume switches same-titled tabs together page-wide (`sync={false}` opts a group out) |
-| `{% code title="a.js" lineNumbers="true" overflow="wrap" expandable="true" %}` | fence meta: ` ```js title="a.js" lineNumbers wrap expandable `; `fullWidth` drops. **A fence with no language takes `text`** (` ```text lineNumbers `), or the first option becomes the language |
+| `{% code title="a.js" lineNumbers="true" overflow="wrap" expandable="true" %}` | fence meta: ` ```js title="a.js" lineNumbers wrap expandable `; `fullWidth` drops. **A fence with no language takes `text`** (` ```text lineNumbers `), or the first option becomes the language (`BLUME_UNKNOWN_CODE_LANGUAGE`) |
 | `<pre class="language-x" data-title="…" data-line-numbers data-overflow="wrap"><code>` | a fence built from those attributes (others drop), entities decoded, `<strong>`/`<em>` stripped |
 | `{% stepper %}` + `{% step %}` | `<Steps>` + `<Step>`. **A step that opens with a heading keeps it as the first line inside `<Step>`**: GitBook publishes it as an anchored heading in the outline, and `title` renders a plain paragraph with no anchor. A bold-line opener → `title` |
 | `{% columns %}` + `{% column %}` | `<Columns cols={n}>` + `<Column>`; widths drop |
-| `<details><summary>T</summary>` (`open`) | `<Expandable title="T">` (`defaultOpen`); a run → `<Accordion>` + `<AccordionItem title="T">`. **Titles are plain text**: code formatting flattens and links are lost, so move a summary's link into the body, or keep the raw `<details>` |
+| `<details><summary>T</summary>` (`open`) | `<Expandable title="T">` (`defaultOpen`); a run → `<Accordion>` + `<AccordionItem title="T">`. A title renders inline Markdown, so write a summary's `<code>`, `<strong>`, and `<a>` as Markdown in it: raw HTML there shows as text |
 | `{% content-ref url="x.md" %}`; legacy `{% page-ref page="x.md" %}` | `<Card title="<x's title>" href="<x's route>" />` (the link text is a file name, so look the title up); a run → `<CardGroup>`; links to a parent's own children → `directory: "card"` |
 | `[text](x.md#h "mention")` | a plain link without `"mention"`, its text replaced by the target's title |
 | `{% embed url="…" %}`, often with no `{% endembed %}` | YouTube → `<YouTube url="…" />` (`?t=122` → `start={122}`; `url` ignores `t`); anything else → `<Card title="…" href="…" />`. A caption → `<Frame caption="…">` around it (YouTube's `title` only reaches screen readers) |
@@ -136,7 +136,7 @@ GitBook's `\<` and entities (`&#x20;`, `&#x3C;`) are fine (an escaped `\<Name` c
 | `<i class="fa-x">:x:</i>` | `<Icon icon="<lucide>" />`, or delete it |
 | `<a class="button primary">`, `<button data-action="…">` | a link or a `<Card>` with `cta`; search and ask buttons drop |
 | `<mark style="color:…">` | `<mark>` or bold; report colors that carried meaning |
-| `## Heading <a href="#x" id="x"></a>` | `## Heading [#x]` |
+| `## Heading <a href="#x" id="x"></a>` | works as written: the heading takes `x` as its id. `## Heading [#x]` is the tidier spelling |
 | `[^1]` annotations | unchanged: footnotes at the page's end, not hover popups |
 | `{% updates %}` + `{% update date="…" %}` | `type: changelog` pages (SKILL.md "Changelogs"), or dated `##` sections |
 | `{% prompt description="…" %}` | `<Prompt description="…">` |
@@ -244,7 +244,7 @@ It fetches each old page once (one request at a time, cached in `.pin-heading-id
 
 ### Final check
 
-`blume preview` of a static build doesn't apply pattern redirects (every translated URL 404s there). Request each old URL from `blume dev` with `curl -sL`, or check it against `dist/` and `dist/blume-redirects.json` (written only when no host adapter is set; with one, use `blume dev`), then run `blume audit --only redirects` after the build.
+Request each old URL from `blume dev` or `blume preview` (both apply pattern redirects) with `curl -sL`, or check it against `dist/` and `dist/blume-redirects.json` (written only when no host adapter is set), then run `blume audit --only redirects` after the build.
 
 ## Legacy GitBook CLI (`book.json`)
 
@@ -264,4 +264,4 @@ The old `gitbook-cli` toolchain and its fork HonKit:
 
 ## Dropped — report these
 
-Site themes and styles beyond accent, fonts, and mode; footer group titles, logo, and copyright; page covers; page and update tags; adaptive content and visitor authentication; GitBook Assistant unless the user adds `ai.assistant`; hint icons; button styles and search/ask buttons; `<mark>` colors; `fullWidth` and column widths; formatting and links in `<summary>` titles; non-YouTube embeds as players; dark card covers and theme-aware images; inline image sizing; `{% openapi-schemas %}` and GitBook `x-*` spec extensions; automatic redirects you couldn't recover; case-insensitive URLs; page-group icons; sidebar positions Blume can't match (parent pages among loose pages, `***` dividers, external links); section groups flattened into tabs; spaces and translations not in the repo; integrations with no adapter; site redirects nobody could export; anything set only in the app that the user didn't supply.
+Site themes and styles beyond accent, fonts, and mode; footer group titles, logo, and copyright; page covers; page and update tags; adaptive content and visitor authentication; GitBook Assistant unless the user adds `ai.assistant`; hint icons you didn't keep; button styles and search/ask buttons; `<mark>` colors; `fullWidth` and column widths; non-YouTube embeds as players; dark card covers and theme-aware images; inline image sizing; `{% openapi-schemas %}` and GitBook `x-*` spec extensions; automatic redirects you couldn't recover; case-insensitive URLs; page-group icons; sidebar positions Blume can't match (parent pages among loose pages, `***` dividers, external links); section groups flattened into tabs; spaces and translations not in the repo; integrations with no adapter; site redirects nobody could export; anything set only in the app that the user didn't supply.

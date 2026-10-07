@@ -767,4 +767,33 @@ describe("jekyll-codemod", () => {
     expectRefusedRerun(site, "--old", "../old");
     expect(await meta("docs/(setup)")).toBe(before);
   });
+
+  it("hides a home page the old sidebar never showed", async () => {
+    const nav = [
+      '<nav aria-label="Main" id="site-nav" class="site-nav">',
+      '<ul class="nav-list">',
+      '<li class="nav-list-item"><a href="/docs/install/" class="nav-list-link">Install</a></li>',
+      '<li class="nav-list-item"><a href="/docs/usage/" class="nav-list-link">Usage</a></li>',
+      "</ul></nav>",
+    ].join("\n");
+    const root = await tree("blume-jekyll-codemod-", {
+      "old/docs/install/index.html": html(),
+      "old/docs/usage/index.html": html(),
+      "old/index.html": `<html><body>${nav}<main></main></body></html>\n`,
+      "site/_config.yml": "title: Acme\npermalink: pretty\n",
+      "site/docs/install.md": page("Install"),
+      "site/docs/usage.md": page("Usage"),
+      "site/index.md": page("Home", "nav_exclude: true\n"),
+    });
+    const site = join(root, "site");
+    const out = runCodemod(site, "--old", "../old", "--write", ".");
+
+    // Hidden, the home page stays in search, the sitemap, and llms.txt, so
+    // the note about hidden pages leaving them doesn't count it.
+    expect(await read(site, "index.md")).toBe(
+      "---\ntitle: Home\nsidebar:\n  hidden: true\n---\n\nBody of Home.\n"
+    );
+    expect(out).not.toContain("outside the old sidebar are hidden");
+    expect(await read(site, "docs/meta.ts")).toContain("collapsed: false,");
+  });
 });

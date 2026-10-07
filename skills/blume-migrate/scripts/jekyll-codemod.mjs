@@ -35,10 +35,12 @@
 //     a folder of its own (a `(name)` group folder when its children sit
 //     beside it), a child elsewhere moves under its parent, and a `slug` pins
 //     every URL a move would change. Each section's duplicate index row is
-//     hidden when the titles allow it, pages outside the nav (but the home
-//     page) are hidden, a parent that showed Just the Docs' child list gets
+//     hidden when the titles allow it, pages outside the nav are hidden (a
+//     hidden home page still stays in search, the sitemap, and llms.txt), a
+//     parent that showed Just the Docs' child list gets
 //     `directory: "accordion"`, and a folder the nav never showed gets
-//     `collapsed: false`.
+//     `collapsed: false`: Blume opens a group that's alone at the top of the
+//     sidebar by itself, but not one beside the home page's row or a section.
 //   - A page that now needs MDX (a directive, a component, `$$` math, an
 //     indented include, or a partial that does) is renamed `.mdx`, with void
 //     tags self-closed, HTML comments as `{/* */}`, autolinks as links, and
@@ -2804,6 +2806,9 @@ const planNavigation = (pages, ctx, nav) => {
       entry.directory = "accordion";
     }
   }
+  // Just the Docs listed a wrapper's pages at the top of its nav, open
+  // everywhere; Blume's group display opens one only on its own pages, or
+  // when it's the sidebar's only top-level row.
   for (const [folder, wrapper] of wrappers) {
     if (!meta.has(folder)) {
       meta.set(folder, {
@@ -2817,18 +2822,19 @@ const planNavigation = (pages, ctx, nav) => {
     }
   }
   settleDirectories(meta, sections);
-  // A hidden page leaves search, the sitemap, and llms.txt too (unless a
-  // group row links it), so the home page stays listed.
+  // A hidden page leaves search, the sitemap, and llms.txt too, unless a
+  // group row links it or it's the home page, which the root URL serves.
   const outside = pages.filter(
-    (page) => !(inNav.has(page) || page.redirectOnly || page.oldRoute === "/")
+    (page) => !(inNav.has(page) || page.redirectOnly)
   );
   for (const page of outside) {
     page.hidden = true;
     edit(page.report, "not in the old sidebar → sidebar.hidden");
   }
-  if (outside.length > 0) {
+  const unlisted = outside.filter((page) => page.oldRoute !== "/");
+  if (unlisted.length > 0) {
     notes.push(
-      `${outside.length} page(s) outside the old sidebar are hidden, which also leaves them out of search, the sitemap, and llms.txt, where Just the Docs still searched them: set search: { indexing: { includeHiddenPages: true } } to keep them searchable`
+      `${unlisted.length} page(s) outside the old sidebar are hidden, which also leaves them out of search, the sitemap, and llms.txt, where Just the Docs still searched them: set search: { indexing: { includeHiddenPages: true } } to keep them searchable`
     );
   }
   return { meta, notes };

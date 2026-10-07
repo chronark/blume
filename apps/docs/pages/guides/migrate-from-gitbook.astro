@@ -10,8 +10,11 @@
 // validate --strict` passed, `blume audit --only redirects` passed, 315
 // heading lines got their GitBook id pinned, and all 938 old URLs (134
 // pages, 670 translated pages, 134 Markdown URLs) reached a page from `blume
-// dev` with `curl -sL`; `blume preview` served 268 of them, since it doesn't
-// apply pattern redirects. The skill, the GitBook reference, and the
+// dev` with `curl -sL`; `blume preview` served 268 of them, since it didn't
+// apply pattern redirects then. Blume changed after the run: `blume preview`
+// now applies them, accordion titles render inline Markdown, and a leftover
+// `{% … %}` tag in `.md` warns `BLUME_TEMPLATE_TAG`; the page below says
+// so. The skill, the GitBook reference, and the
 // pin-heading-ids script came from the repository's working tree: blume
 // 2.1.3 on npm ships none of them, nor `gitbook` as a `blume migrate`
 // source. Also checked after the run: `blume migrate` with no agent flag
@@ -380,8 +383,9 @@ const urlCheck = [
     </li>
     <li>
       <strong>No blocks left.</strong> A <code>{"{% … %}"}</code> tag left in a{" "}
-      <code>.md</code> page shows as literal text while the build passes. This
-      search should print only code samples that show the syntax on purpose:
+      <code>.md</code> page shows as literal text while the build passes, with
+      only a <code>BLUME_TEMPLATE_TAG</code> warning. This search should print
+      only code samples that show the syntax on purpose:
     </li>
   </ul>
   <CodeBlock code={leftoverGrep} lang="bash" />
@@ -393,9 +397,10 @@ const urlCheck = [
       names.
     </li>
     <li>
-      <strong>Accordions.</strong> An accordion's title is plain text, so code
-      formatting and links in a <code>&lt;summary&gt;</code> are gone. Links
-      that mattered should have moved into the body.
+      <strong>Accordions.</strong> An accordion's title renders inline
+      Markdown, so code formatting and links from a{" "}
+      <code>&lt;summary&gt;</code> carry over when they're written as Markdown
+      in its <code>title</code>. Raw HTML there shows as text.
     </li>
     <li>
       <strong>Translations.</strong> If you dropped a language, open one of its
@@ -443,11 +448,11 @@ const urlCheck = [
   </p>
   <CodeBlock code={urlCheck} lang="bash" />
   <p>
-    Redirects count as passing, since <code>-L</code> follows them. Use the dev
-    server rather than <code>blume preview</code>: preview serves a static
-    build, which doesn't apply pattern redirects like the translation ones, so
-    those URLs 404 there even when they're right. Add a redirect for each path
-    the loop prints and run it again until it prints nothing.
+    Redirects count as passing, since <code>-L</code> follows them. The loop
+    works against <code>blume preview</code> of a build too, which applies
+    every redirect, pattern ones like the translations included. Add a
+    redirect for each path the loop prints and run it again until it prints
+    nothing.
   </p>
   <p>
     GitBook also redirects the old URL of every page you moved or renamed in
@@ -542,8 +547,9 @@ npx blume audit --only redirects`}
   <p>
     GitBook writes <code>&lt;br&gt;</code> and <code>&lt;img&gt;</code> without
     closing them, which MDX rejects. Inside a <code>&lt;figure&gt;</code>, the
-    error reads "Unexpected closing tag" instead. Write <code>&lt;br /&gt;</code>,
-    or turn the image into Markdown.
+    error reads "Unexpected closing tag" instead. A{" "}
+    <code>BLUME_MDX_UNCLOSED_ELEMENT</code> warning names each one's line.
+    Write <code>&lt;br /&gt;</code>, or turn the image into Markdown.
   </p>
   <h3>The build can't resolve an image from an include</h3>
   <p>
