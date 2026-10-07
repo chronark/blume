@@ -38,6 +38,7 @@ import type {
   SourceEntry,
   SourceLoadResult,
 } from "./sources/types.ts";
+import { indexPageNames, syntaxDiagnostics } from "./syntax-diagnostics.ts";
 import type {
   BlumeManifest,
   ContentGraph,
@@ -196,6 +197,10 @@ const normalizeLoadedEntries = (
 
   const pages: PageRecord[] = [];
   const allDiagnostics: Diagnostic[] = [];
+  // Published entries, checked for other tools' syntax once every page is
+  // known: a wiki link is reported when it names one.
+  const published: { entry: SourceEntry; locale: string; source: string }[] =
+    [];
   let droppedPages = 0;
   for (const { source, entries, diagnostics } of loaded) {
     allDiagnostics.push(...diagnostics);
@@ -220,14 +225,20 @@ const normalizeLoadedEntries = (
       }
       pages.push(...normalized.pages);
       allDiagnostics.push(...normalized.diagnostics);
-      if (normalized.pages.length > 0) {
+      const [page] = normalized.pages;
+      if (page) {
         allDiagnostics.push(
           ...directiveDiagnostics(entry, source.name),
           ...codeFenceDiagnostics(entry, source.name),
           ...alertDiagnostics(entry, source.name)
         );
+        published.push({ entry, locale: page.locale, source: source.name });
       }
     }
+  }
+  const names = indexPageNames(pages);
+  for (const { entry, locale, source } of published) {
+    allDiagnostics.push(...syntaxDiagnostics(entry, source, names, locale));
   }
   return { diagnostics: allDiagnostics, droppedPages, pages };
 };

@@ -77,6 +77,8 @@ Targets must live inside your content root: a file outside it would be silently 
 
 Broken links inside a partial are reported against the partial file, not the pages that splice it, so you fix them where they live.
 
+A partial is read in the including page's format, so a `.md` partial that an `.mdx` page includes is read as MDX. HTML there has to be valid JSX: an `<img …>` or `<br>` without a closing slash takes in everything after it in the partial, with no error. Blume warns about it as `BLUME_MDX_UNCLOSED_ELEMENT` at the partial's line; close it as `<br />`.
+
 :::note
 Partials are shared across locales and are not translated by `blume translate` — keep partials language-neutral (code, tables, diagrams), or create per-locale partials and include them from each locale's pages.
 :::

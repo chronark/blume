@@ -285,7 +285,7 @@ const PROMPT_CLOSE = /<\/Prompt>/u;
 // (`{#id} [toc]`), nothing else. The spaced `{ #id }` and kramdown's
 // `{: #id }` (MkDocs `attr_list` writes both) fail the compile the same way,
 // so they match too, though neither is an anchor in `.md`.
-const BARE_CURLY_MARKER =
+export const BARE_CURLY_MARKER =
   /(?<!\\)(?<marker>\{:?\s*#(?<id>[^\s}]+)\s*\})(?:\s*\[(?:#[^\s\]]+|!?toc)\])*\s*$/u;
 
 // A raw HTML element carrying an `id` — `<a id="…">`, `<section id='…'>`,

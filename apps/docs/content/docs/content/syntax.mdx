@@ -766,3 +766,13 @@ Blume converts straight quotes and dashes to typographic equivalents as you writ
 ```md
 "Quotes" become curly, -- becomes an en dash, --- an em dash, and ... an ellipsis.
 ```
+
+## Syntax from other tools
+
+Blume reads the syntax on this page and nothing else. Syntax another docs tool reads shows on the page as written, or breaks an `.mdx` page when it renders, so `blume dev`, `blume build`, and `blume check` warn about it at its line. Code blocks, inline code, and comments are skipped, so wrap an example in inline code to show it as text.
+
+- `BLUME_TEMPLATE_TAG`: a Liquid or Markdoc tag (`{% include note.html %}`, `{% /callout %}`) or a Liquid output (`{{ site.title }}`) in a `.md` page. Blume runs no template language, so replace the tag with what it produced, and a site-wide value with a [variable](/docs/content/variables). A `{{name}}` that could be a variable isn't reported here.
+- `BLUME_WIKILINK_UNSUPPORTED`: a wiki link (`[[Home]]`, `[[Text|Page]]`) that names one of the site's pages by its file name or title, or any wiki link with a `|`. Only an [Obsidian vault](/docs/content/sources/obsidian) source reads wiki links. The warning gives the Markdown link that replaces it.
+- `BLUME_MDC_SYNTAX`: a Nuxt Content (MDC) block component (`::callout` … `::`) or inline component (`:badge[New]{color="primary"}`). Use the matching [component](/docs/content/components) or a `:::` callout instead.
+- `BLUME_MDX_ATTRIBUTE_LIST`: an attribute list (`{ width="300" }`, `{: .note }`) in an `.mdx` page. MDX reads the braces as JavaScript, so the page fails to build. Set the attributes on a JSX element instead (`<img src="…" width="300" />`), and pin a heading's anchor with `[#id]`.
+- `BLUME_MDX_UNCLOSED_ELEMENT`: an HTML void element without a closing slash (`<img …>`, `<br>`) in an `.mdx` page, or in a partial an `.mdx` page [includes](/docs/content/includes). MDX reads it as an unclosed JSX element, so close it: `<br />`.

@@ -28,6 +28,7 @@ const DOCS_CONTENT_SOURCES_OBSIDIAN = "/docs/content/sources/obsidian";
 const DOCS_CONTENT_NAVIGATION = "/docs/content/navigation";
 const DOCS_CONTENT_INCLUDES = "/docs/content/includes";
 const DOCS_OPENAPI_WARNINGS = "/docs/references/openapi#spec-warnings";
+const DOCS_OTHER_TOOLS_SYNTAX = "/docs/content/syntax#syntax-from-other-tools";
 
 /** Diagnostic code → the docs page that explains it. */
 const DOCS_PATHS = new Map(
@@ -57,7 +58,10 @@ const DOCS_PATHS = new Map(
     BLUME_INCLUDE_MALFORMED: DOCS_CONTENT_INCLUDES,
     BLUME_INCLUDE_NOT_FOUND: DOCS_CONTENT_INCLUDES,
     BLUME_INCLUDE_OUTSIDE_ROOT: DOCS_CONTENT_INCLUDES,
+    BLUME_MDC_SYNTAX: DOCS_OTHER_TOOLS_SYNTAX,
+    BLUME_MDX_ATTRIBUTE_LIST: DOCS_OTHER_TOOLS_SYNTAX,
     BLUME_MDX_CURLY_ANCHOR: "/docs/content/syntax",
+    BLUME_MDX_UNCLOSED_ELEMENT: DOCS_OTHER_TOOLS_SYNTAX,
     BLUME_MD_CURLY_ANCHOR: "/docs/content/syntax",
     BLUME_MD_GITHUB_ALERT: "/docs/content/syntax",
 
@@ -88,6 +92,7 @@ const DOCS_PATHS = new Map(
     BLUME_SOURCE_UNAVAILABLE: DOCS_CONTENT_SOURCES,
     BLUME_SOURCE_UNRESOLVED_LINK: "/docs/content/sources/contentful",
     BLUME_SOURCE_UNSUPPORTED_NODE: "/docs/content/sources/payload",
+    BLUME_TEMPLATE_TAG: DOCS_OTHER_TOOLS_SYNTAX,
     BLUME_THEME_COLOR_INVALID: "/docs/configuration/theming",
     BLUME_TRANSLATE_MISSING: "/docs/cli/translate",
     BLUME_TRANSLATE_STALE: "/docs/cli/translate",
@@ -100,6 +105,7 @@ const DOCS_PATHS = new Map(
     BLUME_UNSUPPORTED_LINK_SCHEME: DOCS_CLI_VALIDATE,
     BLUME_WIKILINK_AMBIGUOUS: DOCS_CONTENT_SOURCES_OBSIDIAN,
     BLUME_WIKILINK_UNRESOLVED: DOCS_CONTENT_SOURCES_OBSIDIAN,
+    BLUME_WIKILINK_UNSUPPORTED: DOCS_OTHER_TOOLS_SYNTAX,
     BLUME_YARN_PNP: "/docs/quickstart",
   })
 );

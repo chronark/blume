@@ -39,3 +39,5 @@ A `{{name}}` that isn't defined in prose is a build error, `BLUME_UNDEFINED_VARI
 To show a reference in prose without defining it, put it in inline code: `` `{{name}}` ``.
 
 A site that defines no variables is unaffected: `{{…}}` in its pages stays as written.
+
+A `{{…}}` that holds more than a name, like Liquid's `{{ site.title }}` or `{{ page.url | relative_url }}`, is never a variable. Blume warns about one in a `.md` page as `BLUME_TEMPLATE_TAG`, since the page would show it as written.
