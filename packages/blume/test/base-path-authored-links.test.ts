@@ -11,7 +11,10 @@ import {
   withBasePath,
   withComposedBasePath,
 } from "../src/core/base-path.ts";
-import { blumeMarkdownProcessor } from "../src/markdown/index.ts";
+import {
+  blumeMarkdownProcessor,
+  blumeMdxProcessor,
+} from "../src/markdown/index.ts";
 
 // Authored links under the two bases. `basePath` mounts the docs routes, while
 // `deployment.base` moves the whole site — `public/` included — so a public
@@ -167,5 +170,57 @@ describe("markdown base-links under deployment.base", () => {
     });
     expect(html).toContain('src="/logo.png"');
     expect(html).toContain('href="/spec.pdf"');
+  });
+});
+
+describe("raw HTML URLs under deployment.base", () => {
+  const RAW = [
+    'Go <a href="/guide">home</a> or <a href="/sub/done">done</a>.',
+    "",
+    '<div><img src="/logo.png" alt="Logo"><iframe src="/demo/"></iframe></div>',
+    "",
+    '<a href="https://x.dev">x</a> <a href="//cdn.dev/a.js">c</a> <a href="#top">t</a> <img src="./a.png">',
+  ].join("\n");
+
+  it("gains the deployment base in a .md page, and no basePath", async () => {
+    publishRoutes(["/docs/guide"]);
+    const html = await render(RAW, { basePath: "/docs", deployBase: "/sub" });
+    expect(html).toContain('<a href="/sub/guide">home</a>');
+    expect(html).toContain('<a href="/sub/done">done</a>');
+    expect(html).toContain('<img src="/sub/logo.png" alt="Logo">');
+    expect(html).toContain('<iframe src="/sub/demo/">');
+    expect(html).toContain(
+      '<a href="https://x.dev">x</a> <a href="//cdn.dev/a.js">c</a> <a href="#top">t</a> <img src="./a.png">'
+    );
+
+    // With basePath alone, a raw URL ships as written.
+    expect(await render(RAW, { basePath: "/docs" })).toContain(
+      '<a href="/guide">home</a>'
+    );
+  });
+
+  it("gains it on an .mdx element, leaving components to their own base", async () => {
+    publishRoutes([]);
+    const processor = blumeMdxProcessor({ deployBase: "/sub" });
+    if (!processor.createMdxRenderer) {
+      throw new Error("The satteri processor has no MDX renderer.");
+    }
+    const renderer = await processor.createMdxRenderer({}, { optimize: false });
+    const { code } = await renderer.process(
+      [
+        '<a href="/guide">Guide</a> <img src="/logo.png" />',
+        '<a href="#top" title="/x">Top</a> <a href={href}>E</a>',
+        '<Card href="/guide" />',
+      ].join("\n\n"),
+      "/site/docs/index.mdx",
+      {}
+    );
+    expect(code).toContain('href: "/sub/guide"');
+    expect(code).toContain('src: "/sub/logo.png"');
+    expect(code).toContain('href: "#top"');
+    expect(code).toContain('title: "/x"');
+    expect(code).toMatch(/\bhref,\s/u);
+    // `components/content/base-href.ts` bases a component's href.
+    expect(code).toContain('href: "/guide"');
   });
 });

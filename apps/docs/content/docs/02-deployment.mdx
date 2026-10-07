@@ -77,7 +77,7 @@ On a static build, `blume preview` also answers what the host would, beyond the 
 
 ## Subpath deploys
 
-Serving docs under a path like `example.com/docs`? Set `base` — common for GitHub Pages project sites. The whole site, root included, moves under the base, and internal links and assets are rewritten to include it.
+Serving docs under a path like `example.com/docs`? Set `base` — common for GitHub Pages project sites. The whole site, root included, moves under the base, and internal links and assets are rewritten to include it, along with a root-relative `href` or `src` in raw HTML (`<a href="/guide">`, `<img src="/logo.png">`).
 
 ```ts blume.config.ts lineNumbers
 deployment: {

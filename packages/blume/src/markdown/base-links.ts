@@ -4,11 +4,32 @@ import {
   withBasePath,
 } from "../core/base-path.ts";
 import { servesRoute } from "../core/locale-links.ts";
-import type { MdastNode } from "./mdast.ts";
+import { rewriteElementUrls } from "../core/sources/normalize.ts";
+import type { MdastNode, MdastValue } from "./mdast.ts";
 import { routeSnapshotReader } from "./route-snapshot.ts";
 
 interface UrlNode extends MdastNode {
   url?: string | null;
+}
+
+/** Raw HTML in a `.md` page. */
+interface HtmlNode extends MdastNode {
+  value: string;
+}
+
+/** An MDX JSX attribute, as the plugin reads it. */
+interface JsxAttribute {
+  [key: string]: MdastValue;
+  name?: string;
+  type?: string;
+  value?: MdastValue;
+}
+
+/** An MDX JSX element (`<a href="/guide">`), as the plugin reads it. */
+interface JsxNode extends MdastNode {
+  attributes?: JsxAttribute[];
+  children?: MdastValue[];
+  name?: string | null;
 }
 
 /**
@@ -17,8 +38,16 @@ interface UrlNode extends MdastNode {
  * `setProperty`, not by mutating the node object.
  */
 interface MdastUrlContext {
-  setProperty: (node: MdastNode, key: "url", value: string) => void;
+  replaceNode: (node: MdastNode, replacement: MdastNode) => void;
+  setProperty: (node: MdastNode, key: "url" | "value", value: string) => void;
 }
+
+/** An HTML element's name, as opposed to a component's (`Card`). */
+const HTML_ELEMENT = /^[a-z]/u;
+
+/** A plain string attribute value; an expression value isn't a URL. */
+const isStringValue = (value: MdastValue): value is string =>
+  typeof value === "string";
 
 /** Only a string URL can be rebased; MDAST allows null or absent urls. */
 const isUrl = (url: string | null | undefined): url is string =>
@@ -53,10 +82,14 @@ export interface BaseLinksPluginOptions {
  * gains `deployment.base` layered over the site-wide `basePath` (`[x](/guide)`
  * -> `/base/docs/guide`); a public asset — an image, or a link to a file like
  * `/spec.pdf` (see `withAuthoredBasePath`) — gains `deployment.base` alone,
- * since Astro serves `public/` under it but never under `basePath`.
- * Idempotent per layer (a hand-written `/docs/x` isn't double-prefixed) and
- * inert for external URLs, fragments, and relative paths. Only constructed
- * when a base is set (see `markdown/index.ts`).
+ * since Astro serves `public/` under it but never under `basePath`. A raw
+ * HTML element's `href` or `src` (`<a href="/guide">`, `<img src="/x.png">`,
+ * in a `.md` page or as an `.mdx` element) gains `deployment.base` alone: the
+ * whole site moves under it, but a raw `href` keeps no `basePath`, as
+ * `blume validate` reads it. Idempotent per layer (a hand-written `/docs/x`
+ * isn't double-prefixed) and inert for external URLs, fragments, and
+ * relative paths. Only constructed when a base is set (see
+ * `markdown/index.ts`).
  */
 export const baseLinksPlugin = (
   deployBase: string,
@@ -95,12 +128,60 @@ export const baseLinksPlugin = (
   // endpoint), served under the deployment base but not `basePath`.
   const rebaseImage = (node: UrlNode, ctx: MdastUrlContext): void =>
     rebase(node, ctx, (url) => withBasePath(deployBase, url));
+
+  /** A raw element's root-relative URL under the deployment base, if it moves. */
+  const based = (url: string): string | null => {
+    const next = withBasePath(deployBase, url);
+    return next === url ? null : next;
+  };
+
+  const rebaseHtml = (node: HtmlNode, ctx: MdastUrlContext): void => {
+    const next = rewriteElementUrls(node.value, ({ value }) => based(value));
+    if (next !== node.value) {
+      ctx.setProperty(node, "value", next);
+    }
+  };
+
+  const rebaseElement = (node: JsxNode, ctx: MdastUrlContext): void => {
+    if (!(node.name && HTML_ELEMENT.test(node.name))) {
+      return;
+    }
+    let changed = false;
+    const attributes = (node.attributes ?? []).map((attribute) => {
+      const { name, value } = attribute;
+      const next =
+        attribute.type === "mdxJsxAttribute" &&
+        (name === "href" || name === "src") &&
+        isStringValue(value)
+          ? based(value)
+          : null;
+      if (next === null) {
+        return attribute;
+      }
+      changed = true;
+      return { name, type: attribute.type, value: next };
+    });
+    if (changed) {
+      // Sätteri can't set a JSX element's attributes in place, so the element
+      // is swapped for a copy; its children carry over and are still visited.
+      ctx.replaceNode(node, {
+        attributes,
+        children: node.children ?? [],
+        name: node.name,
+        type: node.type,
+      });
+    }
+  };
+
   // `link` covers inline links; `definition` covers reference-style
   // definitions (`[x]: /guide`), which a link or an image may cite.
   return {
     definition: rebaseLink,
+    html: rebaseHtml,
     image: rebaseImage,
     link: rebaseLink,
+    mdxJsxFlowElement: rebaseElement,
+    mdxJsxTextElement: rebaseElement,
     name: "blume-base-links",
   };
 };
