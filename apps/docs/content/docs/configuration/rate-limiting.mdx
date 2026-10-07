@@ -25,7 +25,7 @@ Each route keeps its own count, so a busy playground session doesn't use up the 
 | `memory()` | The server's memory (the default) | Exactly on one server; per instance on serverless hosts |
 | `upstash()` | [Upstash Redis](https://upstash.com) | Exactly, on every host |
 | `cloudflare()` | Cloudflare's Workers rate limiting | Per Cloudflare location |
-| `unkey()` | [Unkey](https://unkey.com) | Sliding windows with regional counters that converge across regions |
+| `unkey()` | [Unkey](https://unkey.com) | Global |
 
 ### Memory
 
