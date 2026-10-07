@@ -83,7 +83,7 @@ Starlight content is full of Expressive Code fence meta; Blume understands some 
 
 - `title="file.js"` → works as-is (or use the space-title shorthand). Line ranges `{2-3}` → work as-is.
 - `ins=`/`del=` line marks → `// [!code ++]` / `// [!code --]` comments; `mark=` → `{ranges}` or `// [!code highlight]`.
-- `showLineNumbers` → `lineNumbers`.
+- `showLineNumbers` → `lineNumbers` (`BLUME_CODE_FENCE_OPTION` flags any left).
 - `wrap` / `wrap=true` → a bare `wrap` (that block's long lines wrap); a site-wide `expressiveCode.defaultProps.wrap: true` → `markdown.code.wrap: true`.
 - **Drop:** `frame="terminal"`, `collapse=`, `wrap=false`, `preserveIndent`/`hangingIndent`, `"string"` and `/regex/` text markers (report if they carried meaning).
 - ` ```diff lang="js" ` → a normal ` ```js ` fence with `[!code ++]`/`[!code --]` markers.

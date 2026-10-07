@@ -309,7 +309,8 @@ import { guideById } from "../_guides/guides.ts";
   <CodeBlock code={`grep -rl '^:::' --include='*.md' docs`} lang="bash" />
   <p>
     On Docusaurus 2, admonition titles follow a space instead of brackets. Blume
-    drops a title written that way without an error:
+    drops a title written that way, with a{" "}
+    <code>BLUME_DIRECTIVE_OPENING_TEXT</code> warning but no error:
   </p>
   <CodeBlock
     code={`:::tip Before you deploy
@@ -386,8 +387,8 @@ done < ../old-urls.txt`}
     <a href="/guides/documentation-url-migration-redirects">Move documentation URLs while preserving old links</a>.
   </p>
   <p>
-    The dev server answers a slashed URL with a 404, which is why the list has
-    no trailing slashes. If your Docusaurus config set{" "}
+    The dev server redirects a slashed URL to the page without the slash, so
+    the list needs no trailing slashes. If your Docusaurus config set{" "}
     <code>trailingSlash: true</code>, links elsewhere on the web point at the
     slashed form, so check a few of them on the deployed site too. Hosts
     differ in what they do with the extra slash.

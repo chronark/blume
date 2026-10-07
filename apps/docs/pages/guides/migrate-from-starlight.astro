@@ -760,10 +760,10 @@ done < ../old-urls.txt`}
     </li>
   </ul>
   <p>
-    The list has no trailing slashes because <code>blume dev</code> answers a
-    slashed URL with a 404. Links around the web still carry the slash, so
-    check a few on the deployed site: a <code>vercel()</code> server build
-    redirects them, and other hosts differ. For status codes, patterns, and what each host
+    The list has no trailing slashes because <code>blume dev</code> redirects
+    a slashed URL to the page without it. Links around the web still carry the
+    slash, so check a few on the deployed site: a <code>vercel()</code> server
+    build redirects them, and other hosts differ. For status codes, patterns, and what each host
     does with them, see{" "}
     <a href="/guides/documentation-url-migration-redirects">Move documentation URLs while preserving old links</a>.
   </p>
@@ -817,10 +817,11 @@ npx blume validate --strict`}
   </p>
   <h3>A code block's header reads showLineNumbers</h3>
   <p>
-    Blume titles a fence with the first bare word after the language, so a
+    Blume titles a fence with every bare word after the language, so a
     leftover <code>showLineNumbers</code>, <code>"text"</code> marker, or{" "}
-    <code>/regex/</code> marker on an untitled fence becomes its header. Convert
-    or remove it.
+    <code>/regex/</code> marker joins its header. Blume warns about a{" "}
+    <code>showLineNumbers</code> as <code>BLUME_CODE_FENCE_OPTION</code>, but
+    not about the markers. Convert or remove each one.
   </p>
   <h3>A page warns BLUME_UNKNOWN_COMPONENT</h3>
   <p>

@@ -35,12 +35,12 @@ export default defineConfig({
       "getting-started/**/*.{md,mdx}",
       "guides/**/*.{md,mdx}",
     ],
-    exclude: ["**/node_modules/**", "**/_*", "**/.*"],
+    exclude: ["**/node_modules/**"], // added to the default "**/_*" and "**/.*"
   },
 });
 ```
 
-Schema field names, exactly: **`content.root`** (string, relative to the project/cwd), **`content.include`** (array of globs, relative to `content.root`, default `["**/*.{md,mdx}"]`), **`content.exclude`** (array of globs, relative to `content.root`, default `["**/_*", "**/.*"]`). Singular `include`/`exclude`, both arrays.
+Schema field names, exactly: **`content.root`** (string, relative to the project/cwd), **`content.include`** (array of globs, relative to `content.root`, default `["**/*.{md,mdx}"]`), **`content.exclude`** (array of globs, relative to `content.root`, added to the default `["**/_*", "**/.*"]`; a `!`-prefixed default, `"!**/_*"`, takes it back out). Singular `include`/`exclude`, both arrays. A folder `meta.ts` outside every `include` glob is never read (`BLUME_META_OUTSIDE_INCLUDE` names it), so a folder that holds only a `meta.ts`, like an API reference's tag folder, needs a glob of its own (`"api-reference/**/*.{md,mdx}"`).
 
 Report to the user: the detected content root, the folders you scoped `include` to, and anything Markdown you deliberately left out (a top-level `README.md`, a `CHANGELOG.md`) so they can confirm it isn't content.
 

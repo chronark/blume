@@ -583,7 +583,7 @@ sidebar:
       </tr>
       <tr>
         <td><code>&gt; [!NOTE]</code> alerts</td>
-        <td><code>:::note</code> and the other directives</td>
+        <td>The same alerts, which render as callouts</td>
       </tr>
       <tr>
         <td>
@@ -622,8 +622,8 @@ sidebar:
     </tbody>
   </table>
   <p>
-    Directives and these fences only work in <code>.mdx</code> pages, so the
-    agent renames any <code>.md</code> page that gains one. Line ranges like{" "}
+    Directives, alerts, and these fences only work in <code>.mdx</code> pages,
+    so the agent renames any <code>.md</code> page that has one. Line ranges like{" "}
     <code>{"{1,4-5}"}</code> carry over unchanged. Inline math takes two
     dollar signs in Blume, since a single <code>$</code> stays literal text,
     so check that each <code>$x$</code> now reads <code>$$x$$</code>, still
@@ -677,9 +677,8 @@ Carriers split long texts into segments. Type a message to count them:
 Some countries require a registered sender ID before you can send.
 :::
 
-:::note
-Replies to your number arrive as \`message.received\` webhook events.
-:::`}
+> [!NOTE]
+> Replies to your number arrive as \`message.received\` webhook events.`}
     lang="mdx"
     title="content/guides/send-sms.mdx"
   />
@@ -811,15 +810,19 @@ export default defineConfig({
   </p>
   <h3>A code block's title reads showLineNumbers, copy, or npm2yarn</h3>
   <p>
-    Blume titles a code block with the first plain word after the language
-    and skips <code>key="value"</code> options, so leftover Nextra options
-    become titles and <code>filename="…"</code> is lost. Rewrite the fence as
-    the table above shows.
+    Blume titles a code block with every plain word after the language and
+    skips <code>key="value"</code> options, so leftover Nextra options join
+    the title and <code>filename="…"</code> is lost. Blume warns about{" "}
+    <code>showLineNumbers</code> and <code>filename</code> as{" "}
+    <code>BLUME_CODE_FENCE_OPTION</code>. Rewrite the fence as the table above
+    shows.
   </p>
   <h3>A page shows its title twice</h3>
   <p>
-    The body still starts with the <code>#</code> heading Nextra used as its
-    title. Delete it. After a build, <code>blume audit</code> reports these
+    The page sets a <code>title</code>, and its body still starts with the{" "}
+    <code>#</code> heading Nextra used as its title. Delete the heading. (A
+    page without a <code>title</code> takes it from that heading and shows it
+    once.) After a build, <code>blume audit</code> reports these
     pages as <code>BLUME_AUDIT_H1_MULTIPLE</code>.
   </p>
   <h3>npm run build fails after Blume finishes</h3>

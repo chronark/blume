@@ -54,12 +54,12 @@ Most Nextra pages have **no frontmatter**. Nextra keeps two titles apart: the **
 - **`<Steps>`:** Nextra's wraps **Markdown headings (h2–h6)**, one step per heading. Convert each heading to a `<Step title="…">` child (Blume `<Steps>`/`<Step>`) and delete the heading — this also keeps step titles out of the TOC, matching Nextra's behavior.
 - **`<FileTree>`/`<FileTree.Folder>`/`<FileTree.File>`** → `<Tree>`/`<Tree.Folder>`/`<Tree.File>` (or a list-driven `<FileTree>`).
 - **`<Bleed>`** (full-bleed) → no equivalent; drop the wrapper and report. **`<Table>`** → a plain Markdown table. **`<Banner>`** (v4, in layout) → the `banner` config.
-- **GitHub alert blockquotes** (v4 renders them): `> [!NOTE]`/`[!TIP]`/`[!WARNING]`/`[!IMPORTANT]`/`[!CAUTION]` → `:::note`/`:::tip`/`:::warning`/`:::note`/`:::warning` directives — Blume renders them as plain blockquotes otherwise.
+- **GitHub alert blockquotes** (v4 renders them): `> [!NOTE]`/`[!TIP]`/`[!WARNING]`/`[!IMPORTANT]`/`[!CAUTION]` pass through in `.mdx`, where Blume renders them as note/tip/warning/note/danger callouts. In a `.md` page they stay plain quotes (`BLUME_MD_GITHUB_ALERT`): rename it to `.mdx`.
 - **Strip or convert every import:** `nextra`, `nextra/*`, `nextra-theme-docs`, `nextra-theme-blog`, plus `next/image` (→ Markdown image or `<Frame>`), `next/link` (→ plain link), and local components (port or inline; report).
 
 ## Code fences
 
-Nextra's fence meta differs from Blume's — rewrite it: `filename="app.js"` → a space-separated title (` ```js app.js `); `showLineNumbers` → `lineNumbers`; line highlighting `{1,4-5}` carries over unchanged; **drop** word-highlight `/word/` and `copy`/`copy=false`. **Keep** inline-code `{:lang}` suffixes (`` `useState(){:js}` ``) — Blume highlights them natively. ` ```sh npm2yarn ` fences → ` ```package-install `.
+Nextra's fence meta differs from Blume's — rewrite it: `filename="app.js"` → a space-separated title (` ```js app.js `); `showLineNumbers` → `lineNumbers` (`BLUME_CODE_FENCE_OPTION` flags either one left); line highlighting `{1,4-5}` carries over unchanged; **drop** word-highlight `/word/` and `copy`/`copy=false`. **Keep** inline-code `{:lang}` suffixes (`` `useState(){:js}` ``) — Blume highlights them natively. ` ```sh npm2yarn ` fences → ` ```package-install `.
 
 ## Math
 
