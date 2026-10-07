@@ -1,10 +1,11 @@
 /**
  * Repository URL derivation for `config.github`.
  *
- * Every repo-derived link — the header mark, per-page edit links, the agent
- * manifest's `repository` — is built from `host`, which defaults to github.com
- * but accepts a GitHub Enterprise origin so self-hosted and data-resident
- * installations get working links instead of ones pointing at the public site.
+ * Every repo-derived link — the footer's repository link, per-page edit links,
+ * the agent manifest's `repository` — is built from `host`, which defaults to
+ * github.com but accepts a GitHub Enterprise origin so self-hosted and
+ * data-resident installations get working links instead of ones pointing at the
+ * public site.
  *
  * The REST base is derived from the host unless `api` is set explicitly, since
  * the two Enterprise flavors expose it differently: Enterprise Cloud with data
