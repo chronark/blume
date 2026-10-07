@@ -205,6 +205,8 @@ A redirect that moves one page to another moves the page's [raw Markdown](/docs/
 
 A redirect from a page's own `index.html` URL, like `/guide/index.html` to `/guide`, gets no redirect page in a static build, because the page itself is written to that file. Hosts that read the redirect files answer it with the redirect. Any other host serves the page at that URL.
 
+Blume adds one kind of redirect itself: a date-named page that an earlier version published under a shorter URL, like `changelog/12-05-2022.mdx` at `/changelog/05-2022`, redirects from that URL to its own (see [ordering with numeric prefixes](/docs/content#ordering-with-numeric-prefixes)). It adds none where another page lives at the old URL or a redirect you configured already starts there.
+
 Two hosts need more than the file:
 
 - **Netlify** serves a file that exists ahead of a redirect rule unless the rule is forced, and a static build has a redirect page at every `from`. The `_redirects` for `netlify()` forces its rules (`/old /new 301!`). Cloudflare rejects that flag, so the file a build for no named host writes leaves it off, and on Netlify that build answers with the redirect page instead; name the host with `netlify({ output: "static" })` to get the HTTP redirect.

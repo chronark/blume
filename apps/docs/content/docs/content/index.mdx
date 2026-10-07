@@ -40,7 +40,13 @@ Prefix a file or folder with a number and a `-`, `_`, or `.` to control its orde
 02-installation.mdx  ->  /installation
 ```
 
-A version or an ISO date at the start of a name is part of the name, not an order: `1.2.0.mdx` routes to `/1.2.0`, and `2024-01-05-launch.mdx` to `/2024-01-05-launch`. Only file and folder names lose a prefix (an Obsidian vault's notes count as files). A frontmatter `slug`, and a page from a [content source](/docs/content/sources) such as a CMS or GitHub Releases, keep the name they were given.
+A version or a date at the start of a name is part of the name, not an order: `1.2.0.mdx` routes to `/1.2.0`, and `2024-01-05-launch.mdx` to `/2024-01-05-launch`. Blume reads these as dates:
+
+- An ISO date, `YYYY-MM-DD`: `2024-01-05.mdx` routes to `/2024-01-05`.
+- A day or month first, then a four-digit year, `D-M-YYYY` or `M-D-YYYY` with one or two digits for the day and month: `12-05-2022.mdx` routes to `/12-05-2022`.
+- A year and a month, `YYYY-MM`: `2024-01.mdx` routes to `/2024-01`.
+
+A date ends the name or is followed by a `-`, `_`, or `.`, like the rest of a name (`2024-01-recap.mdx`). Earlier Blume versions read the first number of the last two forms as an ordering prefix, so `12-05-2022.mdx` published at `/05-2022` and `2024-01.mdx` at `/01`. Those old URLs now redirect to the new ones, unless another page lives there. Only file and folder names lose a prefix (an Obsidian vault's notes count as files). A frontmatter `slug`, and a page from a [content source](/docs/content/sources) such as a CMS or GitHub Releases, keep the name they were given.
 
 Ordering has several layers — see [Navigation](/docs/content/navigation) for the full precedence rules.
 

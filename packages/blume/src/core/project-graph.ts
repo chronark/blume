@@ -7,6 +7,7 @@ import { codeFenceDiagnostics } from "./code-fence-diagnostics.ts";
 import { loadConfig } from "./config.ts";
 import { customStaticRoutes, discoverPages } from "./custom-pages.ts";
 import { directiveDiagnostics } from "./directive-diagnostics.ts";
+import { formerRouteRedirects } from "./former-routes.ts";
 import { buildContentGraph } from "./graph.ts";
 import { i18nDiagnostics } from "./i18n.ts";
 import { expandIncludes, hasIncludeStatements } from "./includes.ts";
@@ -624,8 +625,22 @@ export const scanProject = async (
     ? versionsDiagnostics(pages, config.versions)
     : [];
 
+  const servedPaths = [
+    ...manifest.routes.map((route) => route.path),
+    ...extraRoutes,
+  ];
+  // A date-named page's old URL, from before its name was kept whole,
+  // redirects to its new one, beside the redirects the config lists.
+  const redirects = [
+    ...config.redirects,
+    ...formerRouteRedirects(pages, new Set(servedPaths), config),
+  ];
+
   return {
-    config,
+    config:
+      redirects.length === config.redirects.length
+        ? config
+        : { ...config, redirects },
     context,
     diagnostics: [
       ...configResult.diagnostics,
@@ -644,7 +659,7 @@ export const scanProject = async (
       ...lastModifiedWarnings,
       ...redirectPageDiagnostics(
         config,
-        [...manifest.routes.map((route) => route.path), ...extraRoutes],
+        servedPaths,
         routeSetFor(manifest.routes),
         context.configFile
       ),

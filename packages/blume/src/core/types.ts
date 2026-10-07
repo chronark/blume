@@ -176,6 +176,12 @@ export interface PageRecord {
    */
   fallback?: boolean;
   /**
+   * The route an earlier Blume published the page at, when it differs from
+   * `route`: a date-named file or folder (`12-05-2022`) lost its first number
+   * as an ordering prefix. The scan redirects it to `route`.
+   */
+  formerRoute?: string;
+  /**
    * True for pages from a source that publishes one language only (GitHub
    * Releases): they render without a language switcher.
    */

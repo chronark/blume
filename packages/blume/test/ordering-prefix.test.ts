@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { buildNavigation } from "../src/core/navigation.ts";
 import {
+  formerRouteName,
   orderingPrefix,
   stripOrderingPrefix,
 } from "../src/core/ordering-prefix.ts";
@@ -60,6 +61,34 @@ describe("orderingPrefix", () => {
     }
   });
 
+  it("keeps a day- or month-first date and a year-month whole", () => {
+    for (const name of [
+      "12-05-2022",
+      "12-05-2022.md",
+      "1-5-2022-launch",
+      "31-12-1999_notes",
+      "2024-01",
+      "2024-12.mdx",
+      "2024-01-recap",
+    ]) {
+      expect(orderingPrefix(name)).toBeUndefined();
+      expect(stripOrderingPrefix(name)).toBe(name);
+    }
+    // Not dates: no four-digit year last, a month past 12, or a word.
+    expect(stripOrderingPrefix("12-05-intro")).toBe("05-intro");
+    expect(stripOrderingPrefix("2024-13")).toBe("13");
+    expect(stripOrderingPrefix("01-2024-roadmap")).toBe("2024-roadmap");
+  });
+
+  it("names the route an earlier Blume gave a date name", () => {
+    expect(formerRouteName("12-05-2022")).toBe("05-2022");
+    expect(formerRouteName("2024-01")).toBe("01");
+    // Names whose route never changed have no former one.
+    expect(formerRouteName("2024-01-05")).toBeUndefined();
+    expect(formerRouteName("01-intro")).toBeUndefined();
+    expect(formerRouteName("intro")).toBeUndefined();
+  });
+
   it("strips the prefix and its separator", () => {
     expect(stripOrderingPrefix("01-intro")).toBe("intro");
     expect(stripOrderingPrefix("10_guides")).toBe("guides");
@@ -89,6 +118,34 @@ describe("route mapping of ordering prefixes", () => {
       "/changelog/1.2.0",
       "/changelog/2.2.0",
       "/blog/2024-01-05-first-post",
+    ]);
+  });
+
+  it("keeps a date-named file or folder whole and records its former route", () => {
+    const pages = pagesOf(filesystem, [
+      entry("changelog/12-05-2022.md"),
+      entry("changelog/2024-01/notes.md"),
+      entry("changelog/2024-01-05.md"),
+      entry("changelog/01-intro.md"),
+    ]);
+    expect(pages.map((page) => [page.route, page.formerRoute])).toStrictEqual([
+      ["/changelog/12-05-2022", "/changelog/05-2022"],
+      ["/changelog/2024-01/notes", "/changelog/01/notes"],
+      ["/changelog/2024-01-05", undefined],
+      ["/changelog/intro", undefined],
+    ]);
+  });
+
+  it("records no former route for a slug or a staged source's name", () => {
+    const pages = [
+      ...pagesOf(filesystem, [
+        entry("a.md", { slug: "news/12-05-2022", title: "A" }),
+      ]),
+      ...pagesOf(staged("changelog", "changelog"), [entry("2024-01.md")]),
+    ];
+    expect(pages.map((page) => [page.route, page.formerRoute])).toStrictEqual([
+      ["/news/12-05-2022", undefined],
+      ["/changelog/2024-01", undefined],
     ]);
   });
 

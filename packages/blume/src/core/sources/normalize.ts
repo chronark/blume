@@ -20,7 +20,7 @@ import {
 } from "../heading-markers.ts";
 import { localePlacement, localizeRoute } from "../i18n.ts";
 import { titleWord } from "../navigation.ts";
-import { stripOrderingPrefix } from "../ordering-prefix.ts";
+import { formerRouteName, stripOrderingPrefix } from "../ordering-prefix.ts";
 import { relatedPageLinks } from "../related.ts";
 import { pageMetaSchema } from "../schema.ts";
 import type {
@@ -164,6 +164,14 @@ export const frontmatterYamlDiagnostic = (
 });
 
 /**
+ * A file or folder name as its route segment spells it: without its ordering
+ * prefix, or — for the `former` route — as an earlier Blume dropped one (see
+ * {@link formerRouteName}).
+ */
+const cleanName = (part: string, former: boolean): string =>
+  (former ? formerRouteName(part) : undefined) ?? stripNumericPrefix(part);
+
+/**
  * Fold one raw path part into the accumulating route segments/groups.
  * `ordered` parts are file or folder names, whose ordering prefix is dropped.
  */
@@ -171,7 +179,8 @@ const addRouteSegment = (
   part: string,
   segments: string[],
   groups: string[],
-  ordered: boolean
+  ordered: boolean,
+  former: boolean
 ): void => {
   // A leading/trailing/double slash yields an empty part; keeping it would
   // produce a malformed route (`//foo`, `/foo/`) that nothing can link to.
@@ -183,7 +192,7 @@ const addRouteSegment = (
     groups.push(group);
     return;
   }
-  const clean = ordered ? stripNumericPrefix(part) : part;
+  const clean = ordered ? cleanName(part, former) : part;
   if (clean === "index") {
     return;
   }
@@ -208,12 +217,14 @@ interface MappedRoute {
  * `ordered` says they are file and folder names: the route prefix, a slug,
  * a release tag, or a CMS slug is a route spelled out, kept as written. Not
  * exported: a source that needs to predict a route goes through
- * {@link resolveEntryRoute}, so there is exactly one derivation.
+ * {@link resolveEntryRoute}, so there is exactly one derivation. `former`
+ * maps the route an earlier Blume gave the path instead.
  */
 const mapRoute = (
   prefix: string | undefined,
   relativePath: string,
-  ordered: boolean
+  ordered: boolean,
+  former = false
 ): MappedRoute => {
   const withoutExt = relativePath.slice(
     0,
@@ -224,10 +235,10 @@ const mapRoute = (
   const groups: string[] = [];
 
   for (const part of prefix ? prefix.split("/") : []) {
-    addRouteSegment(part, segments, groups, false);
+    addRouteSegment(part, segments, groups, false, false);
   }
   for (const part of withoutExt.split("/")) {
-    addRouteSegment(part, segments, groups, ordered);
+    addRouteSegment(part, segments, groups, ordered, former);
   }
 
   const route = segments.length === 0 ? "/" : `/${segments.join("/")}`;
@@ -1645,6 +1656,12 @@ export interface EntryRoute extends Pick<
    * through {@link localizedRoute} for the route one locale publishes at.
    */
   logicalRoute: string;
+  /**
+   * The logical route an earlier Blume published the entry at, when it
+   * differs: a date-named file or folder (`12-05-2022`) lost its first number
+   * as an ordering prefix. Its old URL redirects to the new one.
+   */
+  formerLogicalRoute?: string;
   /** The prefixed, locale- and version-stripped nav path. */
   navPath: string;
   segments: string[];
@@ -1683,16 +1700,21 @@ export const resolveEntryRoute = (
   // A frontmatter slug is a route spelled out; an adapter's `entry.slug` is
   // one too unless the source's names are ordered file names (a vault note's
   // path), which lose their prefixes like the ref does.
-  const ordered =
-    ctx.orderingPrefixes === true && frontmatterSlug === undefined;
+  const ordered = slug
+    ? ctx.orderingPrefixes === true && frontmatterSlug === undefined
+    : ctx.orderingPrefixes === true;
+  const input = slug ? `${slug}${ext}` : navPath;
   const {
     segments,
     groups,
     route: versionKey,
-  } = slug
-    ? mapRoute(ctx.prefix, `${slug}${ext}`, ordered)
-    : mapRoute(ctx.prefix, navPath, ctx.orderingPrefixes === true);
+  } = mapRoute(ctx.prefix, input, ordered);
+  const former = ordered
+    ? mapRoute(ctx.prefix, input, true, true).route
+    : versionKey;
   return {
+    formerLogicalRoute:
+      former === versionKey ? undefined : versionizeRoute(former, version),
     groups,
     locales,
     logicalRoute: versionizeRoute(versionKey, version),
@@ -1899,6 +1921,7 @@ export const normalizeEntry = (
   const { meta } = parsed;
 
   const {
+    formerLogicalRoute,
     groups,
     locales,
     logicalRoute,
@@ -1963,13 +1986,19 @@ export const normalizeEntry = (
   // stay base-less so the nav tree and translation matching are unaffected.
   // The base is mounted unconditionally: a `docs/` folder under a `/docs`
   // base is a real `/docs/docs/…` route, not an already-based one.
+  const routeIn = (logical: string, locale: string): string =>
+    mountBasePath(
+      ctx.basePath ?? "",
+      localizedRoute(logical, locale, ctx.i18n)
+    );
   const pages = locales.map((locale) => ({
     ...base,
+    formerRoute:
+      formerLogicalRoute === undefined
+        ? undefined
+        : routeIn(formerLogicalRoute, locale),
     locale,
-    route: mountBasePath(
-      ctx.basePath ?? "",
-      localizedRoute(logicalRoute, locale, ctx.i18n)
-    ),
+    route: routeIn(logicalRoute, locale),
   }));
 
   return {
