@@ -212,11 +212,11 @@ export default defineConfig({
 ```
 ````
 
-The title is every word after the language, so ` ```js Install the client ` titles the block "Install the client". Keywords like `lineNumbers` and `wrap`, line ranges like `{1,4-5}`, and `key="value"` options aren't part of it, and `title="..."` sets the title explicitly. A title in brackets, like ` ```ts [blume.config.ts] `, shows without them.
+The title is every word after the language, so ` ```js Install the client ` titles the block "Install the client". Keywords like `lineNumbers` and `wrap`, line ranges like `{1,4-5}`, and `key="value"` options aren't part of it, and `title="..."` sets the title explicitly. A title in brackets, like ` ```ts [blume.config.ts] `, shows without them, and a line range written against the brackets, as in ` ```ts [blume.config.ts]{2} `, still highlights its lines.
 
 The language is any [Shiki language](https://shiki.style/languages) id or alias, in any case: ` ```JSON ` highlights like ` ```json `. A block in a language Shiki doesn't know renders as plain text, and Blume warns about its fence as `BLUME_UNKNOWN_CODE_LANGUAGE`; write `text` for a block that's plain on purpose.
 
-Options other docs tools read do nothing here, and Blume warns about each as `BLUME_CODE_FENCE_OPTION` with the spelling to use instead: MkDocs' `hl_lines="2 3"` (a `{2,3}` range here) and `linenums="1"` (`lineNumbers`), `showLineNumbers` (`lineNumbers`), Fern's `wordWrap` (`wrap`), and `filename="app.js"` (`title="app.js"`).
+Options other docs tools read do nothing here, and Blume warns about each as `BLUME_CODE_FENCE_OPTION` with the spelling to use instead: MkDocs' `hl_lines="2 3"` (a `{2,3}` range here) and `linenums="1"` (`lineNumbers`), `showLineNumbers` (`lineNumbers`), Mintlify's `lines` (`lineNumbers`), Fern's `wordWrap` (`wrap`), and `filename="app.js"` (`title="app.js"`). On a Rust block, rustdoc's and mdBook's `ignore`, `no_run`, `should_panic`, `compile_fail`, `edition2015` through `edition2024`, `noplayground`, and `editable` warn too: Blume never compiles, tests, or runs a code block, so remove them. `lines` and the Rust keywords never become part of the title.
 
 A `console` (or `shellsession`) block is a terminal session: commands after a prompt like `$`, with their output. Its copy button copies only the commands, without their prompts, so the copy pastes straight into a terminal. A command that ends in `\` keeps its continuation lines.
 

@@ -67,11 +67,12 @@ type MetaPreNode = Parameters<
 /** Run the code-meta transformer over a fence's meta and return the <pre> attrs. */
 const metaAttrs = (
   raw?: string,
-  source?: string
+  source?: string,
+  lang?: string
 ): MetaPreNode["properties"] => {
   const node: MetaPreNode = { properties: {} };
   codeTitleTransformer().pre.call(
-    { options: { meta: { __raw: raw } }, source },
+    { options: { lang, meta: { __raw: raw } }, source },
     node
   );
   return node.properties;
@@ -273,6 +274,23 @@ describe(codeTitleTransformer, () => {
     expect(metaAttrs("[a] [b]").dataTitle).toBe("[a] [b]");
     expect(metaAttrs("[]").dataTitle).toBe("[]");
     expect(metaAttrs('title="[file.ts]"').dataTitle).toBe("[file.ts]");
+  });
+
+  it("keeps other tools' keywords out of the title", () => {
+    // Mintlify's `lines`, on any fence.
+    expect(metaAttrs("app.py lines", undefined, "py").dataTitle).toBe("app.py");
+    // rustdoc's and mdBook's, on a Rust fence only.
+    expect(
+      metaAttrs(
+        "main.rs ignore no_run should_panic compile_fail edition2021 noplayground editable",
+        undefined,
+        "rust"
+      ).dataTitle
+    ).toBe("main.rs");
+    expect(metaAttrs("ignore", undefined, "rs").dataTitle).toBeUndefined();
+    expect(metaAttrs("Files to ignore", undefined, "sh").dataTitle).toBe(
+      "Files to ignore"
+    );
   });
 
   it("reads an explicit title attribute", () => {

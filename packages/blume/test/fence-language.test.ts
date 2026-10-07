@@ -65,6 +65,20 @@ describe(normalizeFence, () => {
     });
   });
 
+  it("splits a line range glued to a bracketed title", () => {
+    // ```ts [file.ts]{2}, the Docus spelling.
+    expect(normalizeFence("ts", "[file.ts]{2}")).toStrictEqual({
+      lang: "ts",
+      meta: "[file.ts] {2}",
+    });
+    expect(normalizeFence("ts", "[my file.ts]{1,3} lineNumbers")).toStrictEqual(
+      { lang: "ts", meta: "[my file.ts] {1,3} lineNumbers" }
+    );
+    // Brackets and a range glued to something else stay as written.
+    expect(normalizeFence("ts", "x[file.ts]{2}")).toBeNull();
+    expect(normalizeFence("ts", "[file.ts]{2}x")).toBeNull();
+  });
+
   it("splits only a range that ends the language", () => {
     // A brace that opens the info string (a Pandoc attribute list) or trails
     // more text is no glued range.
@@ -138,6 +152,15 @@ describe("normalized fences through the processors", () => {
       );
       expect(html).toContain('data-language="js"');
       expect(html).toContain('data-title="app.js"');
+      expect(html.match(/class="line highlighted"/gu)).toHaveLength(1);
+    });
+
+    it(`titles a fence by its bracketed title alone in .${name}`, async () => {
+      const html = await render(
+        processor,
+        "```ts [app.ts]{2}\nconst a = 1;\nconst b = 2;\n```"
+      );
+      expect(html).toContain('data-title="app.ts"');
       expect(html.match(/class="line highlighted"/gu)).toHaveLength(1);
     });
   }

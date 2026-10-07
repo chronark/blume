@@ -29,6 +29,7 @@ import {
   MARKDOWN_BODY_FEATURES,
   MDX_BODY_FEATURES,
 } from "../markdown/features.ts";
+import { normalizeFence } from "../markdown/fence-language.ts";
 import { pageFacets } from "./facets.ts";
 
 /** A document indexed by the client-side search providers (Orama, FlexSearch). */
@@ -177,7 +178,13 @@ const collectCode = (
   if (!walk.includeCodeBlocks) {
     return;
   }
-  const title = parseCodeTitle(node.meta ?? undefined);
+  // The fence as the page renders it (`[file.ts]{2}` splits, `JSON`
+  // lowercases), so the indexed title is the one the page shows.
+  const fence = normalizeFence(node.lang, node.meta) ?? node;
+  const title = parseCodeTitle(
+    fence.meta ?? undefined,
+    fence.lang ?? undefined
+  );
   if (title) {
     out.push(title, " ");
   }

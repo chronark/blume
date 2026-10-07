@@ -7,7 +7,11 @@ import {
   MDX_BODY_FEATURES,
 } from "../markdown/features.ts";
 import { isKnownLanguage, normalizeFence } from "../markdown/fence-language.ts";
-import { metaTokens } from "../markdown/fence-meta.ts";
+import {
+  metaTokens,
+  RUST_LANGUAGES,
+  RUST_META_KEYWORDS,
+} from "../markdown/fence-meta.ts";
 import { strippedLineOffset } from "./sources/normalize.ts";
 import type { SourceEntry } from "./sources/types.ts";
 import type { Diagnostic } from "./types.ts";
@@ -36,7 +40,9 @@ interface Finding {
 interface ForeignOption {
   /** Matches the option's token in the fence's info string. */
   pattern: RegExp;
-  /** What the block doesn't do because Blume ignores the option. */
+  /** The fence languages the option belongs to; any language when unset. */
+  languages?: ReadonlySet<string>;
+  /** What comes of the option, since Blume ignores it. */
   effect: string;
   /** The Blume spelling, given the option's quoted value. */
   instead: (value: string) => string;
@@ -51,13 +57,13 @@ const lineRange = (value: string): string =>
 
 const FOREIGN_OPTIONS: readonly ForeignOption[] = [
   {
-    effect: "highlights no lines",
+    effect: "the block highlights no lines",
     instead: (value) =>
       `Put the lines in braces after the language instead: \`${lineRange(value)}\`.`,
     pattern: /^hl_lines=["'](?<value>[^"']*)["']$/u,
   },
   {
-    effect: "shows no line numbers",
+    effect: "the block shows no line numbers",
     instead: (value) =>
       `Write \`lineNumbers\` after the language instead.${
         value.trim() === "1" ? "" : " Blume numbers every block from 1."
@@ -65,28 +71,45 @@ const FOREIGN_OPTIONS: readonly ForeignOption[] = [
     pattern: /^linenums=["'](?<value>[^"']*)["']$/u,
   },
   {
-    effect: "shows no line numbers",
+    effect: "the block shows no line numbers",
     instead: () => "Write `lineNumbers` after the language instead.",
     pattern: /^showLineNumbers(?:\{\d*\})?$/u,
   },
   {
-    effect: "doesn't wrap its long lines",
+    // Mintlify's. It never joins the title (see `markdown/fence-meta.ts`).
+    effect: "the block shows no line numbers",
+    instead: () =>
+      'Write `lineNumbers` after the language instead. To keep the word in the block\'s title, set the title with `title="…"`.',
+    pattern: /^lines$/u,
+  },
+  {
+    effect: "the block doesn't wrap its long lines",
     instead: () => "Write `wrap` after the language instead.",
     pattern: /^wordWrap$/u,
   },
   {
-    effect: "has no title",
+    effect: "the block has no title",
     instead: (value) => `Write \`title="${value}"\` instead.`,
     pattern: /^filename=["'](?<value>[^"']*)["']$/u,
   },
+  {
+    // rustdoc's and mdBook's, on a Rust fence. They never join the title.
+    effect:
+      "it does nothing: Blume shows a code block as static text, and never compiles, tests, or runs it",
+    instead: () => "Remove it.",
+    languages: RUST_LANGUAGES,
+    pattern: new RegExp(`^(?:${[...RUST_META_KEYWORDS].join("|")})$`, "u"),
+  },
 ];
 
+/** The option `token` is in a fence whose language is `lang`, if any. */
 const foreignOption = (
-  token: string
+  token: string,
+  lang: string
 ): { option: ForeignOption; value: string } | null => {
   for (const option of FOREIGN_OPTIONS) {
     const match = option.pattern.exec(token);
-    if (match) {
+    if (match && (option.languages?.has(lang) ?? true)) {
       return { option, value: match.groups?.value ?? "" };
     }
   }
@@ -126,12 +149,12 @@ const unknownLanguage = (node: Code, line: number): Finding[] => {
 };
 
 const foreignOptions = (node: Code, line: number): Finding[] => {
-  const { meta, tokens } = fenceParts(node.lang, node.meta);
-  const title = parseCodeTitle(meta ?? undefined)?.split(" ") ?? [];
+  const { lang, meta, tokens } = fenceParts(node.lang, node.meta);
+  const title = parseCodeTitle(meta ?? undefined, lang)?.split(" ") ?? [];
   // A fence with options and no language reads its first option as the
   // language, so that token counts too.
   return [node.lang ?? "", ...tokens].flatMap((token) => {
-    const found = foreignOption(token);
+    const found = foreignOption(token, lang);
     if (!found) {
       return [];
     }
@@ -142,7 +165,7 @@ const foreignOptions = (node: Code, line: number): Finding[] => {
       {
         code: "BLUME_CODE_FENCE_OPTION",
         line,
-        message: `\`${token}\` isn't a Blume code block option, so the block ${found.option.effect}${shown}.`,
+        message: `\`${token}\` isn't a Blume code block option, so ${found.option.effect}${shown}.`,
         suggestion: found.option.instead(found.value),
       },
     ];
@@ -164,7 +187,9 @@ const suspectInfo = (info: string): boolean => {
   const parts = fenceParts(lang, rest.join(" ") || null);
   return (
     !rendersLanguage(parts.lang) ||
-    [lang, ...parts.tokens].some((token) => foreignOption(token) !== null)
+    [lang, ...parts.tokens].some(
+      (token) => foreignOption(token, parts.lang) !== null
+    )
   );
 };
 
@@ -216,9 +241,10 @@ const fenceFindings = (text: string, format: "md" | "mdx"): Finding[] => {
  *   renders as plain text. Shiki itself only logs a console line naming the
  *   language, with no page or line.
  * - `BLUME_CODE_FENCE_OPTION`: an option another docs tool reads, like MkDocs'
- *   `hl_lines="2 3"` or Docusaurus' `showLineNumbers`, which Blume ignores (a
- *   bare word becomes part of the block's title). The suggestion gives the
- *   Blume spelling.
+ *   `hl_lines="2 3"`, Docusaurus' `showLineNumbers`, Mintlify's `lines`, or
+ *   rustdoc's `no_run`, which Blume ignores (`showLineNumbers` and `wordWrap`
+ *   become part of the block's title). The suggestion gives the Blume
+ *   spelling, or says to remove an option Blume has no use for.
  *
  * Lines point into the file the author wrote, a partial's own file for a
  * fence an `<include>` brought in.

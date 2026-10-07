@@ -129,6 +129,50 @@ describe(codeFenceDiagnostics, () => {
     ]);
   });
 
+  it("reports Mintlify's lines and rustdoc's keywords, which stay out of the title", () => {
+    const diagnostics = codeFenceDiagnostics(
+      entry(
+        "```py app.py lines\nx\n```\n\n```rust main.rs no_run edition2021\nx\n```\n"
+      ),
+      "docs"
+    );
+    expect(
+      diagnostics.map(({ line, message, suggestion }) => ({
+        line,
+        message,
+        suggestion,
+      }))
+    ).toStrictEqual([
+      {
+        line: 1,
+        message:
+          "`lines` isn't a Blume code block option, so the block shows no line numbers.",
+        suggestion:
+          'Write `lineNumbers` after the language instead. To keep the word in the block\'s title, set the title with `title="…"`.',
+      },
+      {
+        line: 5,
+        message:
+          "`no_run` isn't a Blume code block option, so it does nothing: Blume shows a code block as static text, and never compiles, tests, or runs it.",
+        suggestion: "Remove it.",
+      },
+      {
+        line: 5,
+        message:
+          "`edition2021` isn't a Blume code block option, so it does nothing: Blume shows a code block as static text, and never compiles, tests, or runs it.",
+        suggestion: "Remove it.",
+      },
+    ]);
+  });
+
+  it("reads rustdoc's keywords on a Rust fence only", () => {
+    expect(
+      codes(
+        "```Rust ignore\nx\n```\n\n```rs editable\nx\n```\n\n```sh Files to ignore\nx\n```\n"
+      )
+    ).toStrictEqual(["BLUME_CODE_FENCE_OPTION", "BLUME_CODE_FENCE_OPTION"]);
+  });
+
   it("gives the title spelling for a filename option", () => {
     const [diagnostic] = codeFenceDiagnostics(
       entry('```js filename="app.js"\nx\n```\n'),

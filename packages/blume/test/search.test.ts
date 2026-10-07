@@ -120,6 +120,10 @@ const CODE_BODY = [
   "export const retryPolicy = 1;",
   "```",
   "",
+  "```Rust [src/main.rs]{2} no_run",
+  "fn main() {}",
+  "```",
+  "",
   "<Steps>",
   '  <Step title="Install">',
   "    Run the installer with npm.",
@@ -615,6 +619,11 @@ describe("buildSearchDocuments", () => {
       // fence markers are not.
       expect(doc?.content).toContain("blume.config.ts");
       expect(doc?.content).not.toContain("lineNumbers");
+      // The title the page shows: no brackets, glued range, or rustdoc
+      // keyword.
+      expect(doc?.content).toContain("src/main.rs fn main() {}");
+      expect(doc?.content).not.toContain("[src/main.rs]");
+      expect(doc?.content).not.toContain("no_run");
       expect(doc?.content).not.toContain("```");
       expect(doc?.content).not.toMatch(/(?:^|\s)ts(?:\s|$)/u);
       // An indented fence inside a component (blank line and all) is one
