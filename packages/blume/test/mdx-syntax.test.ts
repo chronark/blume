@@ -3,6 +3,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
 import { dirname, join } from "pathe";
+import { mdxToMdast } from "satteri";
 
 import {
   locateMdxFailure,
@@ -10,6 +11,7 @@ import {
   mdxSyntaxError,
 } from "../src/core/mdx-syntax.ts";
 import type { SourceEntry } from "../src/core/sources/types.ts";
+import { MDX_BODY_FEATURES } from "../src/markdown/features.ts";
 
 const dirs: string[] = [];
 
@@ -48,6 +50,16 @@ const mdxEntry = (
   ...fields,
 });
 
+/** What parsing `text` into a full tree throws, or null when it parses. */
+const fullParse = (text: string): string | null => {
+  try {
+    mdxToMdast(text, { features: MDX_BODY_FEATURES });
+    return null;
+  } catch (error) {
+    return error instanceof Error ? error.message : String(error);
+  }
+};
+
 describe("mdxSyntaxError", () => {
   it("is null for a body that parses", () => {
     expect(mdxSyntaxError("Hello {props.name}\n\n<Card title={x} />\n")).toBe(
@@ -61,6 +73,30 @@ describe("mdxSyntaxError", () => {
       line: 2,
       reason: "Could not parse expression with oxc: Unexpected token",
     });
+  });
+
+  it("gives the verdict the full tree parse gives, without building the tree", () => {
+    const texts = [
+      "Plain prose, with x < y and a `{brace}`.\n",
+      "Hello {props.name}\n\n<Card title={x} />\n",
+      '# Title\n\n<img src="a.png">\n\nMore.\n',
+      "Text {oops\n",
+      "## Heading {#id}\n",
+      "<!-- a comment -->\n",
+      "See <https://example.com>.\n",
+      "<div>\n\n</span>\n",
+      "a\n\n<Foo bar={1 +}>x</Foo>\n",
+    ];
+    for (const text of texts) {
+      const message = fullParse(text);
+      const error = mdxSyntaxError(text);
+      expect(error === null).toBe(message === null);
+      if (error) {
+        expect(message).toStartWith(
+          `${error.line}:${error.column}: ${error.reason}`
+        );
+      }
+    }
   });
 });
 

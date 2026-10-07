@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 
 import type { Nodes } from "mdast";
-import { mdxToMdast } from "satteri";
+import { createMdxMdastHandle, dropHandle, mdxToMdast } from "satteri";
 
 import { MDX_BODY_FEATURES } from "../markdown/features.ts";
 import matter from "./frontmatter.ts";
@@ -51,10 +51,15 @@ const INNER_POSITION = / \((?<line>\d+):(?<column>\d+)\)/gu;
 /**
  * The first MDX syntax error in `text`, a page body with its front matter
  * off, or null when it parses.
+ *
+ * Only the verdict is needed, so the parse stays native: Sätteri's tree is
+ * dropped unread rather than built as JavaScript objects, which costs as much
+ * again as the parse itself on every page. A parse error carries its own
+ * position, so node positions aren't tracked either.
  */
 export const mdxSyntaxError = (text: string): MdxSyntaxError | null => {
   try {
-    mdxToMdast(text, { features: MDX_BODY_FEATURES });
+    dropHandle(createMdxMdastHandle(text, MDX_BODY_FEATURES, false));
     return null;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -166,9 +171,15 @@ export const mdxSyntaxCheck = (
   if (entry.body.format !== "mdx") {
     return { diagnostics: [], unparsable: false };
   }
-  const page = entry.sourcePath ?? `${sourceName}:${entry.ref}`;
-  const offset =
-    entry.bodyLineOffset ?? strippedLineOffset(entry.raw, entry.body.text);
+  // Where the parsed text's lines sit in the files, worked out only for a
+  // page that fails: counting the lines of its front matter means splitting
+  // its whole file, which every page that parses would pay for.
+  const siteOf = (origins?: readonly LineOrigin[]): SiteOf =>
+    sitesIn(
+      entry.sourcePath ?? `${sourceName}:${entry.ref}`,
+      entry.bodyLineOffset ?? strippedLineOffset(entry.raw, entry.body.text),
+      origins
+    );
   const { expanded } = entry;
   const body = expanded
     ? substituteVariables(entry.body.text, variables)
@@ -176,11 +187,7 @@ export const mdxSyntaxCheck = (
   const own = mdxSyntaxError(body);
   if (own) {
     return {
-      diagnostics: [
-        mdxSyntaxDiagnostic(own, sitesIn(page, offset), {
-          severity: "error",
-        }),
-      ],
+      diagnostics: [mdxSyntaxDiagnostic(own, siteOf(), { severity: "error" })],
       unparsable: true,
     };
   }
@@ -190,7 +197,7 @@ export const mdxSyntaxCheck = (
   }
   return {
     diagnostics: [
-      mdxSyntaxDiagnostic(spliced, sitesIn(page, offset, expanded.origins), {
+      mdxSyntaxDiagnostic(spliced, siteOf(expanded.origins), {
         includedIn: entry.ref,
         severity: "warning",
       }),
