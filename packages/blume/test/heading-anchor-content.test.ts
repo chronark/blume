@@ -147,8 +147,11 @@ describe("a heading holding its own empty anchor", () => {
     const renderer = await blumeMarkdownProcessor({
       headingAnchors: false,
     }).createRenderer({});
+    // A titled page keeps its opening h1 (an untitled one renders it as the
+    // page title instead).
     const { code } = await renderer.render(
-      '# Page <a id="top"></a>\n\n## Part <a id="part"></a>'
+      '# Page <a id="top"></a>\n\n## Part <a id="part"></a>',
+      { frontmatter: { title: "Page" } }
     );
     expect(code.trim()).toBe(
       '<h1 id="top">Page </h1>\n<h2 id="part">Part </h2>'
