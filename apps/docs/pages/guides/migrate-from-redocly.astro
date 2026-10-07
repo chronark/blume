@@ -29,6 +29,12 @@
 // the reviewer: a fresh migration, a build, or the curl URL check. So the
 // entry sets no `tested`: the guide's command and the revised reference
 // haven't run end to end.
+// Blume changed after the run: it reads x-displayName and keeps operations
+// in spec order, a tag folder's meta.ts merges over the generated one, `blume
+// dev` and `blume preview` redirect a slashed URL, page dates follow a rename
+// that leaves the file unchanged, and an unconverted Markdoc tag in a `.md`
+// page warns as BLUME_TEMPLATE_TAG. The text was revised for those changes
+// without a rerun.
 // The example project and snippets below are invented (Acme): the run's
 // content is under Redocly's template license.
 import Callout from "blume/components/content/Callout.astro";
@@ -115,8 +121,8 @@ const referenceConfig = [
 const tagMeta = [
   'import { defineMeta } from "blume";',
   "",
-  "// The tag's x-displayName, and its place in the spec's tag order.",
-  'export default defineMeta({ title: "Search & lookup", order: 0 });',
+  "// The tag's place in the spec's x-tagGroups, which Blume doesn't read.",
+  "export default defineMeta({ order: 0 });",
 ].join("\n");
 
 const operationRoutesCommand = [
@@ -232,7 +238,7 @@ const corsProbe = [
         </td>
       </tr>
       <tr>
-        <td>Tag labels from <code>x-displayName</code></td>
+        <td>Tag order from <code>x-tagGroups</code></td>
         <td>A small <code>meta.ts</code> per tag</td>
       </tr>
       <tr>
@@ -264,8 +270,7 @@ const corsProbe = [
     Pages that end up with no directive, component, or Mermaid diagram stay{" "}
     <code>.md</code>.
     If you turn on Blume's "last updated" dates, expect nearly every page to
-    show the migration commit's date: moving each H1 edits the page, and Blume
-    doesn't follow renames back through git history.
+    show the migration commit's date: moving each H1 edits the page.
   </p>
 
   <h2>Before you start</h2>
@@ -348,8 +353,8 @@ const corsProbe = [
   <ul>
     <li>
       <strong>No Markdoc left.</strong> Blume doesn't read <code>{"{% … %}"}</code>{" "}
-      tags, so one the agent missed shows up as literal text while the build
-      still passes. The search below should print only code samples that show
+      tags, so one the agent missed shows up as literal text, and the build
+      only warns about it as <code>BLUME_TEMPLATE_TAG</code>. The search below should print only code samples that show
       Markdoc on purpose, files the migration left out of the site, and any
       old operation links, covered next.
     </li>
@@ -367,9 +372,10 @@ const corsProbe = [
     </li>
     <li>
       <strong>API references.</strong> Each API should show its tags under their
-      display names. Operations within a tag sort alphabetically rather than in
-      spec order, and tags your <code>x-tagGroups</code> left out, which Realm
-      hid, now appear.
+      display names, with each tag's operations in spec order. Tags follow the
+      spec's <code>tags</code> list rather than its <code>x-tagGroups</code>,
+      and tags your <code>x-tagGroups</code> left out, which Realm hid, now
+      appear.
     </li>
     <li>
       <strong>Old operation links.</strong> Realm resolved links like{" "}
@@ -399,10 +405,11 @@ const corsProbe = [
   </ul>
   <CodeBlock code={hashLinkGrep} lang="bash" />
   <p>
-    If an API lost its display names, add a <code>meta.ts</code> in the tag's
+    If an API's <code>x-tagGroups</code> put its tags in another order than
+    its <code>tags</code> list, add a <code>meta.ts</code> in each tag's
     folder under the reference route, for example{" "}
-    <code>apis/orders/openapi/search/meta.ts</code>. Include <code>order</code>,
-    or the group moves to the end:
+    <code>apis/orders/openapi/search/meta.ts</code>, with the tag's position.
+    Blume keeps the tag's label:
   </p>
   <CodeBlock code={tagMeta} lang="ts" title="apis/orders/openapi/search/meta.ts" />
 
@@ -469,9 +476,10 @@ const corsProbe = [
   </p>
   <p>
     Old links with a trailing slash need one more check. Realm redirected{" "}
-    <code>/page/</code> to <code>/page</code>; Blume's static build doesn't
-    answer the slashed form itself, so whether it works depends on your host.
-    Try one on your preview deployment.
+    <code>/page/</code> to <code>/page</code>, and so do{" "}
+    <code>blume dev</code> and <code>blume preview</code>, but Blume's static
+    build doesn't answer the slashed form itself, so in production it depends
+    on your host. Try one on your preview deployment.
   </p>
 
   <h2>Deploy and switch over</h2>

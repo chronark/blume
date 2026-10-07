@@ -37,6 +37,10 @@
 // Not run: `npx blume migrate readme --claude` itself (the readme source
 // isn't in 2.1.3, so the entry sets no `tested`), an agent following the
 // revised reference end to end, a deploy, or the lockfile regeneration.
+// Blume changed after the run: date-named files keep their whole name in
+// their URL, `blume preview` answers pattern redirects, and inline event
+// handlers warn as BLUME_MDX_EVENT_HANDLER. The text was revised for those
+// changes without a rerun.
 // The example project and snippets below are invented (Acme).
 import Callout from "blume/components/content/Callout.astro";
 import CodeBlock from "blume/components/content/CodeBlock.astro";
@@ -340,8 +344,9 @@ const corsProbe = [
   <ul>
     <li>
       <strong>Interactive widgets.</strong> A button with an{" "}
-      <code>onClick</code> pasted into a page builds fine in Blume and does
-      nothing. Hubs often paste the same one, such as a "contact support" box,
+      <code>onClick</code> pasted into a page does nothing in Blume, which
+      warns about it as <code>BLUME_MDX_EVENT_HANDLER</code>. Hubs often paste
+      the same one, such as a "contact support" box,
       into many pages. Each should now be one React island. The search below
       should print nothing outside code samples.
     </li>
@@ -419,7 +424,7 @@ const corsProbe = [
       </tr>
       <tr>
         <td><code>/changelog/12-05-2022</code></td>
-        <td>The same entry; its URL is pinned so the date stays whole</td>
+        <td>The same entry, with the date whole in its URL</td>
       </tr>
       <tr>
         <td><code>/reference/getorder</code></td>
@@ -457,9 +462,9 @@ const corsProbe = [
   <p>
     Redirects count as passing, since <code>-L</code> follows them. Add a
     redirect for each path it prints and run it again until it prints nothing.
-    Run it against <code>blume dev</code> rather than{" "}
-    <code>blume preview</code>, which skips pattern redirects like the version
-    prefixes. For status codes and how each host serves redirects, see{" "}
+    <code>blume preview</code> works too, after a build: both answer pattern
+    redirects like the version prefixes. For status codes and how each host
+    serves redirects, see{" "}
     <a href="/guides/documentation-url-migration-redirects">Move documentation URLs while preserving old links</a>.
   </p>
 

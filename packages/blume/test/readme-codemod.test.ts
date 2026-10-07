@@ -181,7 +181,7 @@ describe("readme-codemod", () => {
     );
     expect(existsSync(join(root, "docs/_order.yaml"))).toBe(false);
 
-    // A date-named changelog entry would lose "12-" as an ordering prefix.
+    // A digit-led stem is pinned, a date like this one included.
     expect(front(root, "changelog/12-05-2022.mdx")).toEqual({
       authors: "Jo",
       changelog: { category: "Added" },
@@ -763,7 +763,7 @@ describe("readme-codemod", () => {
       status: 302,
       to: "/reference/pets-api/pets/get-pet",
     });
-    // ReadMe's endpoint order, which the generated sidebar would sort by title.
+    // ReadMe's endpoint order, which can differ from the spec's.
     expect(read(root, "reference/pets-api/pets/meta.ts")).toBe(
       [
         'import { defineMeta } from "blume";',
@@ -784,7 +784,9 @@ describe("readme-codemod", () => {
       '-H "Referer: /reference/getpet"'
     );
     expect(report).toContain("anchor #response dropped");
-    expect(report).toContain("reference/pets-api/meta.ts: defineMeta({ title:");
+    expect(report).toContain(
+      "reference/pets-api/meta.ts: defineMeta({ order: 0 })"
+    );
     expect(
       run(
         "--routes",

@@ -82,6 +82,13 @@
 // (BLUME_OPENAPI_UNAVAILABLE, exit 1); and the template's spec with no
 // servers (samples call a bare /weatherforecast, rows read
 // "integer | string").
+//
+// Blume changed after the run and the review: a duplicate operationId warns
+// BLUME_OPENAPI_DUPLICATE_OPERATION_ID (and adds the method to the URL only
+// when the two share a tag); a property's own description beside a $ref wins
+// over the enum's; a tag's operations follow the spec's order; and a tag
+// folder's meta.ts merges over the generated one instead of replacing it. The
+// text was revised for those changes without a rerun.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -1241,8 +1248,8 @@ export default defineConfig({
 
   <h3>Order the operations</h3>
   <p>
-    Inside a tag's group, the sidebar sorts operations by their URL, which
-    would put Cancel a scheduled message first. To set the order, add a{" "}
+    Inside a tag's group, the sidebar lists operations in the spec's order,
+    path by path. To set your own order, add a{" "}
     <code>meta.ts</code> in the folder that matches the tag's route:
   </p>
   <CodeBlock
@@ -1257,8 +1264,9 @@ export default defineMeta({
     title="docs-site/docs/api/messages/meta.ts"
   />
   <p>
-    A <code>meta.ts</code> you write replaces the one Blume derives from the
-    spec, so it repeats the tag's name and its place in the tags list.
+    A <code>meta.ts</code> you write changes only the fields it sets, and
+    Blume fills in the rest from the spec, so the tag's name and its place in
+    the tags list could be left out.
   </p>
 
   <h3>Build and preview</h3>

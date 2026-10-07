@@ -50,6 +50,14 @@
 // --strict on the empty spec (exit 1); a build without the spec
 // (BLUME_OPENAPI_UNAVAILABLE, exit 1); and a build without tabs, where the
 // operations join the guides' sidebar (so with tabs they get their own).
+//
+// Blume changed after the run: Try it and the code samples send an Accept
+// header naming the operation's JSON type; an operation without a summary is
+// labeled by its method and path, so missing summaries no longer warn
+// BLUME_NAV_DUPLICATE_LABEL; a tag's operations follow the spec's order; the
+// Markdown copy carries request bodies and responses; and a localhost server
+// warns BLUME_OPENAPI_LOCAL_SERVER. The text was revised for those changes
+// without a rerun.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -1357,12 +1365,6 @@ curl http://127.0.0.1:8000/api/tokens \\
     the old URLs are already public, add a{" "}
     <a href="/docs/deployment#redirects">redirect</a> for each in{" "}
     <code>blume.config.ts</code>.
-  </p>
-  <h3>validate --strict fails with BLUME_NAV_DUPLICATE_LABEL</h3>
-  <p>
-    Two operations on the same path have no PHPDoc summary, so both sidebar
-    entries are labeled with the path, like <code>/messages</code>. Give each
-    method a first line in its PHPDoc.
   </p>
   <h3>The export warns MD001 Cannot read database schema</h3>
   <p>

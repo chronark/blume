@@ -65,6 +65,14 @@
 // @example on a path parameter not being emitted. tspconfig.yaml now keeps
 // the template's `kind: project` line, which the e2e run didn't have; a
 // compile with it wrote byte-identical output.
+//
+// Blume changed after the run and the review: an operation without a
+// summary is labeled by its method and path, so the template spec no longer
+// warns BLUME_NAV_DUPLICATE_LABEL; a tag's operations follow the spec's
+// order in the sidebar too; a tag folder's meta.ts merges over the generated
+// one instead of replacing it; and request samples leave out read-only
+// properties from a model-level example. The text was revised for those
+// changes without a rerun.
 import CodeBlock from "blume/components/content/CodeBlock.astro";
 import GuidePage from "../_guides/GuidePage.astro";
 import { guideById } from "../_guides/guides.ts";
@@ -762,11 +770,11 @@ export default defineConfig({
     the reference.
   </p>
   <p>
-    Inside a tag's group, the sidebar sorts operations alphabetically by their
-    summaries, so Create a widget comes first, and the overview page lists
-    them path by path. Neither follows the order of your interface. To set the sidebar
-    order yourself, add a <code>meta.ts</code> in the folder that matches the
-    tag's route:
+    Inside a tag's group, the sidebar and the overview page list operations
+    in the spec's order, which is path by path, so Create a widget comes
+    before Get a widget. Neither follows the order of your interface. To set
+    the sidebar order yourself, add a <code>meta.ts</code> in the folder that
+    matches the tag's route:
   </p>
   <CodeBlock
     code={`import { defineMeta } from "blume";
@@ -786,10 +794,10 @@ export default defineMeta({
     title="docs/api/widgets/meta.ts"
   />
   <p>
-    A <code>meta.ts</code> you write replaces the one Blume derives from the
-    spec, so it repeats the tag's <code>title</code> and its position in the
-    tag list. Without <code>order: 0</code>, the Widgets group moves below
-    Analysis.
+    A <code>meta.ts</code> you write changes only the fields it sets, and
+    Blume fills in the rest from the spec, so the tag's <code>title</code>{" "}
+    and its position in the tag list could be left out. It reorders only the
+    sidebar: the overview keeps the spec's order.
   </p>
 
   <h2>Build and preview</h2>
@@ -818,9 +826,8 @@ npx blume preview`}
     lang="bash"
   />
   <p>
-    <code>--strict</code> fails on warnings as well as broken links, which
-    includes the duplicate sidebar labels a missing <code>@summary</code>{" "}
-    causes. Open <code>http://localhost:4321/api</code>. The overview lists
+    <code>--strict</code> fails on warnings as well as broken links. Open{" "}
+    <code>http://localhost:4321/api</code>. The overview lists
     both tags with their descriptions, and each operation has its own page:
   </p>
   <table>
@@ -1143,11 +1150,6 @@ export default defineMeta({
     <code>Widgets_list</code>. Add one, and if the old URLs are already
     public, add a redirect for each in <code>blume.config.ts</code>.
   </p>
-  <h3>validate --strict fails with BLUME_NAV_DUPLICATE_LABEL</h3>
-  <p>
-    Two operations on the same path have no <code>@summary</code>, so both
-    sidebar entries are labeled with the path. Add a summary to each.
-  </p>
   <h3>The code samples call /widgets/string</h3>
   <p>
     The path parameter has no example. Add an <code>@opExample</code> with the
@@ -1166,8 +1168,7 @@ export default defineMeta({
   <h3>The Analysis group comes before Widgets</h3>
   <p>
     The tags are declared with one <code>@tagMetadata</code> each, which
-    writes them in reverse. Use the array form. If a <code>meta.ts</code>{" "}
-    sits in the tag's folder, give it the tag's <code>order</code> as well.
+    writes them in reverse. Use the array form.
   </p>
   <h3>The build fails with BLUME_OPENAPI_UNAVAILABLE</h3>
   <p>

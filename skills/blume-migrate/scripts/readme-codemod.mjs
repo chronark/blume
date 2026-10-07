@@ -3282,7 +3282,8 @@ const destination = (project, absolute) => {
 
 // Pin `slug` when Blume's own route would differ from ReadMe's URL: groups add
 // nothing, `index` is its folder, and a leading digit can be read as an
-// ordering prefix.
+// ordering prefix (`1-setup`). Blume keeps dates (`12-05-2022`, `2024-01`)
+// and versions whole, so pinning every digit-led segment is only cautious.
 const slugPin = (project, page) => {
   if (!project.syncLayout || !page.url || page.moveTo) {
     return;
@@ -3802,8 +3803,8 @@ const groupByDirectory = (endpoints) => {
   return bySource;
 };
 
-// Tag-level meta.ts: ReadMe's endpoint order inside each tag, which the
-// generated sidebar would otherwise sort by title.
+// Tag-level meta.ts: ReadMe's endpoint order inside each tag, where it can
+// differ from the spec's order, which the generated sidebar follows.
 const writeTagMetas = (state) => {
   const routed = state.inventory.endpoints.filter((endpoint) => endpoint.route);
   for (const [source, directories] of sortedEntries(groupByDirectory(routed))) {
@@ -3837,7 +3838,7 @@ const writeTagMetas = (state) => {
     const [[, [{ category }]]] = sorted;
     const position = state.inventory.referenceOrder.indexOf(category);
     todo(
-      `${source.slice(1)}/meta.ts: defineMeta({ title: "<the source's label>", order: ${position === -1 ? "<n>" : position} }) puts it where ReadMe listed "${category}" (a meta.ts there replaces the generated title, so set it)`
+      `${source.slice(1)}/meta.ts: defineMeta({ order: ${position === -1 ? "<n>" : position} }) puts it where ReadMe listed "${category}" (the source's label stays its title)`
     );
   }
 };
