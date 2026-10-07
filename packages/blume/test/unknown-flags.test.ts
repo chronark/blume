@@ -3,11 +3,11 @@ import { describe, expect, it } from "bun:test";
 import type { ArgsDef } from "citty";
 
 import {
-  closestMatch,
   COMMAND_HANDLED_FLAGS,
   unknownFlags,
   unknownFlagsDiagnostic,
 } from "../src/cli/unknown-flags.ts";
+import { closestMatch } from "../src/core/closest-match.ts";
 
 const args = {
   "budget-js": { description: "", type: "string" },

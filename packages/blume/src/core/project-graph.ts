@@ -21,6 +21,7 @@ import { routeSetFor } from "./locale-links.ts";
 import type { RouteSet } from "./locale-links.ts";
 import { buildManifest } from "./manifest.ts";
 import { mirroredPage } from "./markdown-mirrors.ts";
+import { folderMetaDiagnostics } from "./meta-diagnostics.ts";
 import { discoverFolderMeta, withGeneratedFolderMeta } from "./meta.ts";
 import type { FolderMetaSource } from "./meta.ts";
 import { resolveProjectContext } from "./project.ts";
@@ -537,6 +538,13 @@ export const scanProject = async (
     pages: allPages,
   } = normalizeLoadedEntries(loaded, config);
 
+  // Checked against every page, drafts included: a `pages` entry naming a
+  // draft still orders it wherever the draft renders.
+  const metaDiagnostics = await folderMetaDiagnostics(folderMeta, allPages, {
+    localeDirs,
+    versionDirs: config.versions?.archived.map((version) => version.id),
+  });
+
   // Drafts render in dev and in preview, but are excluded from production builds.
   const pages =
     mode === "build" && !preview
@@ -625,6 +633,7 @@ export const scanProject = async (
       ...includeDiagnostics,
       ...variableDiagnostics,
       ...folderMeta.diagnostics,
+      ...metaDiagnostics,
       ...entryIdDiagnostics(
         pages,
         resolveDocsCollection(config, context.root).base

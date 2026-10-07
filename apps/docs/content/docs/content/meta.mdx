@@ -25,6 +25,8 @@ Every field is optional — set only what you want to override.
 
 Blume only reads `meta.ts` files from folders your content covers: one under a folder your content `exclude` globs skip, or outside every `include` glob, is never imported. With `root: "."` and `exclude: ["**/_*", "**/.*", "src/**"]`, an unrelated `src/lib/meta.ts` is left alone. An `exclude` replaces the default `["**/_*", "**/.*"]` rather than adding to it, so list those two as well to keep `_`-prefixed partials and dot-files unpublished.
 
+A `meta.ts` outside every `include` glob is still ignored when its folder is a sidebar group, like a reference's [tag folder](#generated-groups) on a site whose `include` lists only `guides/**`. Blume warns about that one as `BLUME_META_OUTSIDE_INCLUDE`: add an `include` glob that reaches the folder, such as `"api/**/*.{md,mdx}"`, so Blume reads it.
+
 ## Fields
 
 | Field | Type | Description |
@@ -37,7 +39,7 @@ Blume only reads `meta.ts` files from folders your content covers: one under a f
 | `directory` | `"card" \| "accordion" \| "none"` | List the group's pages below its `index` page's content. Nested folders inherit it. See [directory listings](/docs/content/navigation#directory-listings). |
 | `pages` | `string[]` | Explicit order for the group's children, by slug. |
 
-The `pages` array lists children by slug — the folder or file name with its numeric prefix and any parentheses stripped (so `01-quickstart.mdx` is `"quickstart"`). Each listed child takes its position in the array as its order (`0`, `1`, `2`, …). Children you leave out still appear, sorted by their own order: an `index` page stays first, a child with a `sidebar.order`, a numeric prefix, or its own `meta.ts` `order` sorts by that number among the listed ones, and a child with none of these goes after them. List every child when the array should be the whole order.
+The `pages` array lists children by slug — the folder or file name with its numeric prefix and any parentheses stripped (so `01-quickstart.mdx` is `"quickstart"`). Each listed child takes its position in the array as its order (`0`, `1`, `2`, …). Children you leave out still appear, sorted by their own order: an `index` page stays first, a child with a `sidebar.order`, a numeric prefix, or its own `meta.ts` `order` sorts by that number among the listed ones, and a child with none of these goes after them. List every child when the array should be the whole order. An entry that names no page or folder in the group orders nothing, so Blume warns about it as `BLUME_META_UNKNOWN_PAGE`, at its line in `meta.ts`, and suggests the slug it most likely means.
 
 The array orders pages among pages and groups among groups, but it doesn't interleave the two where loose pages list above groups: at the top of the sidebar (and of each [tab](/docs/content/navigation#tabs) section), and in any group with a [`flat`](/docs/content/navigation#display-modes) subgroup, whose header would otherwise seem to own the pages after it. There, `pages: ["advanced", "intro"]` still lists the `intro` page above the `advanced` group.
 

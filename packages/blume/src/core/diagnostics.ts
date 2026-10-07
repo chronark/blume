@@ -60,6 +60,8 @@ const DOCS_PATHS = new Map(
 
     BLUME_META_INVALID: "/docs/content/meta",
     BLUME_META_LOAD_FAILED: "/docs/content/meta",
+    BLUME_META_OUTSIDE_INCLUDE: "/docs/content/meta",
+    BLUME_META_UNKNOWN_PAGE: "/docs/content/meta",
     BLUME_MISSING_SECRET: DOCS_DEPLOYMENT,
     BLUME_NAV_DUPLICATE_LABEL: DOCS_CONTENT_NAVIGATION,
     BLUME_NAV_HIDDEN_IN_SIDEBAR: DOCS_CONTENT_NAVIGATION,
@@ -325,7 +327,7 @@ const findElement = (scope: Scope, position: number): Step | undefined => {
  * Returns 1-based line/column, or undefined when not even the first segment
  * matches.
  */
-const locatePath = (
+export const locatePath = (
   source: string,
   path: readonly (string | number)[]
 ): { column: number; line: number } | undefined => {

@@ -161,6 +161,40 @@ const stemOf = (filename: string): string =>
 const navStem = (navPath: string): string =>
   stemOf(navPath.split("/").at(-1) ?? navPath);
 
+/**
+ * A page's key in its folder meta `pages` list: its file name without the
+ * extension, ordering prefix, or parentheses (`01-quickstart.mdx` is
+ * `quickstart`).
+ */
+export const pageKey = (filename: string): string =>
+  segmentKey(stemOf(filename));
+
+/**
+ * The keys a folder meta `pages` list can name, by group path: each folder's
+ * pages and subfolders, keyed as `buildFileSystemSidebar` keys its nodes (the
+ * name without its extension, ordering prefix, or parentheses). Read off nav
+ * paths, so it covers pages the sidebar leaves out, like hidden ones.
+ */
+export const folderChildKeys = (
+  navPaths: Iterable<string>
+): Map<string, Set<string>> => {
+  const keys = new Map<string, Set<string>>();
+  const add = (group: string, key: string): void => {
+    const children = keys.get(group) ?? new Set<string>();
+    children.add(key);
+    keys.set(group, children);
+  };
+  for (const navPath of navPaths) {
+    const dirs = navPath.split("/");
+    const filename = dirs.pop() ?? navPath;
+    for (const [depth, dir] of dirs.entries()) {
+      add(dirs.slice(0, depth).join("/"), segmentKey(dir));
+    }
+    add(dirs.join("/"), pageKey(filename));
+  }
+  return keys;
+};
+
 interface MutablePage {
   kind: "page";
   key: string;

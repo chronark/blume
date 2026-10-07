@@ -12,6 +12,7 @@ import { NoBuildError, runAudit } from "../../audit/run.ts";
 import type { AuditResult } from "../../audit/run.ts";
 import { checkTerms, unknownCheckTerms } from "../../audit/terms.ts";
 import { isHttpUrl } from "../../audit/url.ts";
+import { closestMatch } from "../../core/closest-match.ts";
 import { BlumeError } from "../../core/diagnostics.ts";
 import { scanProject } from "../../core/project-graph.ts";
 import type { DiagnosticSeverity } from "../../core/types.ts";
@@ -19,7 +20,6 @@ import { parseIgnoreFlag } from "../args.ts";
 import { commandMeta } from "../command-meta.ts";
 import { reportInternalError } from "../internal-error.ts";
 import { flushStdout, logger, reportDiagnostics } from "../log.ts";
-import { closestMatch } from "../unknown-flags.ts";
 
 const SEVERITIES: DiagnosticSeverity[] = ["error", "warning", "info"];
 

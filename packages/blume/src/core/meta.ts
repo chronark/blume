@@ -90,17 +90,16 @@ const withinInclude = (
   );
 
 /**
- * The folder-meta files a filesystem source contributes: `patterns` (every
- * meta module name, shared `meta.$.*` included, by default) under the source's
- * root, minus its `exclude` globs, dependencies, and build output, and only in
- * folders its `include` globs reach. `blume translate` finds the meta files it
- * translates through this too, so it covers exactly the ones the scan reads.
+ * Every folder-meta file under a filesystem source's root: `patterns` (every
+ * meta module name, shared `meta.$.*` included, by default), minus the
+ * source's `exclude` globs, dependencies, and build output — whether or not
+ * its `include` globs reach the file's folder.
  */
-export const findFolderMetaFiles = async (
+const globFolderMetaFiles = (
   source: FolderMetaSource,
-  patterns: readonly string[] = META_FILES
-): Promise<string[]> => {
-  const found = await glob([...patterns], {
+  patterns: readonly string[]
+): Promise<string[]> =>
+  glob([...patterns], {
     absolute: true,
     cwd: source.root,
     // Never descend into dependencies or build output — relevant when the
@@ -116,9 +115,24 @@ export const findFolderMetaFiles = async (
     ],
     onlyFiles: true,
   });
-  return found.filter((file) =>
-    withinInclude(relative(source.root, dirname(file)), source.include)
-  );
+
+/** Whether the source's `include` globs reach a meta file's folder. */
+const isReadMetaFile = (source: FolderMetaSource, file: string): boolean =>
+  withinInclude(relative(source.root, dirname(file)), source.include);
+
+/**
+ * The folder-meta files a filesystem source contributes: `patterns` (every
+ * meta module name, shared `meta.$.*` included, by default) under the source's
+ * root, minus its `exclude` globs, dependencies, and build output, and only in
+ * folders its `include` globs reach. `blume translate` finds the meta files it
+ * translates through this too, so it covers exactly the ones the scan reads.
+ */
+export const findFolderMetaFiles = async (
+  source: FolderMetaSource,
+  patterns: readonly string[] = META_FILES
+): Promise<string[]> => {
+  const found = await globFolderMetaFiles(source, patterns);
+  return found.filter((file) => isReadMetaFile(source, file));
 };
 
 /**
@@ -134,6 +148,29 @@ const metaKeyFor = (prefix: string | undefined, dir: string): string => {
   }
   return dir ? `${clean}/${dir}` : clean;
 };
+
+/** Folder meta by key: per-locale `meta.*` files, and shared `meta.$.*` ones. */
+export interface FolderMetaMaps {
+  meta: Map<string, FolderMeta>;
+  shared: Map<string, FolderMeta>;
+}
+
+/** A folder-meta file Blume found but doesn't read, and the key it would have. */
+export interface UnreadFolderMeta {
+  /** Its folder, relative to the source root. */
+  dir: string;
+  file: string;
+  key: string;
+}
+
+/** What {@link discoverFolderMeta} found across the sources. */
+export interface DiscoveredFolderMeta extends FolderMetaMaps {
+  diagnostics: Diagnostic[];
+  /** The file each meta in `meta` and `shared` was read from. */
+  files: Map<FolderMeta, string>;
+  /** Meta files under a source root that its `include` globs don't reach. */
+  unread: UnreadFolderMeta[];
+}
 
 /**
  * Discover `meta.{ts,js,mjs}` files across the given filesystem sources. Keys are
@@ -162,11 +199,7 @@ export const discoverFolderMeta = async (
     localeDirs?: readonly string[];
     versionDirs?: readonly string[];
   } = {}
-): Promise<{
-  meta: Map<string, FolderMeta>;
-  shared: Map<string, FolderMeta>;
-  diagnostics: Diagnostic[];
-}> => {
+): Promise<DiscoveredFolderMeta> => {
   const list: FolderMetaSource[] = Array.isArray(sources)
     ? sources
     : [{ root: sources }];
@@ -181,34 +214,67 @@ export const discoverFolderMeta = async (
   const load = createModuleLoader();
   const meta = new Map<string, FolderMeta>();
   const shared = new Map<string, FolderMeta>();
+  const files = new Map<FolderMeta, string>();
+  const unread: UnreadFolderMeta[] = [];
   const diagnostics: Diagnostic[] = [];
+
+  // A version snapshot dir is outermost, with a locale dir one level deeper;
+  // both are hoisted in front of the (prefixed) group path, in that order —
+  // the lookup key reads `version/locale/prefix/dir`.
+  const keyOf = (source: FolderMetaSource, file: string): string => {
+    const dir = relative(source.root, dirname(file));
+    const [head, ...tail] = dir.split("/");
+    const version = head && versionDirs.has(head) ? head : "";
+    const afterVersion = version ? tail : [head ?? "", ...tail];
+    const [localeHead, ...localeTail] = afterVersion;
+    const locale = localeHead
+      ? (localeDirs.get(localeHead.toLowerCase()) ?? "")
+      : "";
+    const rest = (locale ? localeTail : afterVersion).filter(Boolean).join("/");
+    return [version, locale, metaKeyFor(source.prefix, rest)]
+      .filter(Boolean)
+      .join("/");
+  };
 
   // Scan every source under its own root so a source rooted outside
   // `content.root` still contributes its folder meta.
   const perSource = await Promise.all(
     list.map(async (source) => {
-      const files = await findFolderMetaFiles(source);
+      const found = await globFolderMetaFiles(source, META_FILES);
+      // Files outside every `include` glob are never imported; they're kept
+      // by key so a scan that finds pages in their group can say so.
+      for (const file of found) {
+        if (!isReadMetaFile(source, file)) {
+          unread.push({
+            dir: relative(source.root, dirname(file)),
+            file,
+            key: keyOf(source, file),
+          });
+        }
+      }
       const loaded = await Promise.all(
-        files.map(
-          async (
-            file
-          ): Promise<
-            | { ok: true; file: string; value: unknown }
-            | { ok: false; file: string; error: Error }
-          > => {
-            try {
-              return {
-                file,
-                ok: true,
-                value: await resolveMeta(await load(file)),
-              };
-            } catch (error) {
-              // SAFETY: jiti surfaces load/evaluate failures as Error
-              // instances, and only `message` is read downstream.
-              return { error: error as Error, file, ok: false };
+        found
+          .filter((file) => isReadMetaFile(source, file))
+          .map(
+            async (
+              file
+            ): Promise<
+              | { ok: true; file: string; value: unknown }
+              | { ok: false; file: string; error: Error }
+            > => {
+              try {
+                return {
+                  file,
+                  ok: true,
+                  value: await resolveMeta(await load(file)),
+                };
+              } catch (error) {
+                // SAFETY: jiti surfaces load/evaluate failures as Error
+                // instances, and only `message` is read downstream.
+                return { error: error as Error, file, ok: false };
+              }
             }
-          }
-        )
+          )
       );
       return { loaded, source };
     })
@@ -216,23 +282,7 @@ export const discoverFolderMeta = async (
 
   for (const { loaded, source } of perSource) {
     for (const entry of loaded) {
-      const dir = relative(source.root, dirname(entry.file));
-      // A version snapshot dir is outermost, with a locale dir one level
-      // deeper; both are hoisted in front of the (prefixed) group path, in
-      // that order — the lookup key reads `version/locale/prefix/dir`.
-      const [head, ...tail] = dir.split("/");
-      const version = head && versionDirs.has(head) ? head : "";
-      const afterVersion = version ? tail : [head ?? "", ...tail];
-      const [localeHead, ...localeTail] = afterVersion;
-      const locale = localeHead
-        ? (localeDirs.get(localeHead.toLowerCase()) ?? "")
-        : "";
-      const rest = (locale ? localeTail : afterVersion)
-        .filter(Boolean)
-        .join("/");
-      const key = [version, locale, metaKeyFor(source.prefix, rest)]
-        .filter(Boolean)
-        .join("/");
+      const key = keyOf(source, entry.file);
 
       if (!entry.ok) {
         diagnostics.push({
@@ -250,6 +300,7 @@ export const discoverFolderMeta = async (
           ? shared
           : meta;
         target.set(key, result.data);
+        files.set(result.data, entry.file);
       } else {
         diagnostics.push(
           ...diagnosticsFromZod(result.error, {
@@ -261,14 +312,8 @@ export const discoverFolderMeta = async (
     }
   }
 
-  return { diagnostics, meta, shared };
+  return { diagnostics, files, meta, shared, unread };
 };
-
-/** Folder meta by key: per-locale `meta.*` files, and shared `meta.$.*` ones. */
-export interface FolderMetaMaps {
-  meta: Map<string, FolderMeta>;
-  shared: Map<string, FolderMeta>;
-}
 
 /**
  * Lay the folder meta content sources derive (the OpenAPI source's tag
