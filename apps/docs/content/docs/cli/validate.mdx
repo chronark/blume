@@ -30,7 +30,7 @@ Links resolve against everything the built site serves, not just Markdown pages:
 
 | Code | Severity | Meaning |
 | --- | --- | --- |
-| `BLUME_BROKEN_LINK` | error | An internal link points at a route no page serves. |
+| `BLUME_BROKEN_LINK` | error | An internal link points at a route no page serves. When it's a relative link to a file that exists but whose name, or a folder's, starts with `_`, the fix says so: that file is a [partial](/docs/content/includes#partials), which isn't published. |
 | `BLUME_BROKEN_ANCHOR` | warning | The page exists but has no anchor matching the fragment. |
 | `BLUME_BROKEN_ASSET` | warning | An absolute path isn't in `public/`, or a relative image embed isn't beside the page. |
 | `BLUME_UNSUPPORTED_LINK_SCHEME` | warning | A link uses one of ReadMe's link schemes (`doc:`, `ref:`, `page:`, `changelog:`, `blog:`), which browsers can't follow. |

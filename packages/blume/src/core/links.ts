@@ -316,6 +316,30 @@ const servedRoute = (
       })
     : authored;
 
+/**
+ * The fix for a relative link to a content file that exists but is a
+ * partial: a name starting with `_`, or a file under such a folder, which
+ * the default `content.exclude` leaves unpublished. Undefined for any other
+ * link, whose file is missing or was left out for another reason.
+ */
+const partialLinkHint = (
+  link: PageLink,
+  page: PageRecord
+): string | undefined => {
+  const path = decodePercent(link.target.split(/[?#]/u)[0] ?? "");
+  if (
+    link.raw ||
+    !page.sourcePath ||
+    path.startsWith("/") ||
+    !DOC_EXT.test(path) ||
+    !path.split("/").some((segment) => segment.startsWith("_")) ||
+    !existsSync(resolve(dirname(page.sourcePath), path))
+  ) {
+    return undefined;
+  }
+  return `${path} exists, but a name starting with "_" marks a partial, which isn't published as a page. Splice it in with <include> instead, rename it to publish it, or add "!**/_*" to content.exclude to publish every underscore file.`;
+};
+
 /** Validate a resolved internal path: asset, route, then optional anchor. */
 const checkPathLink = (
   resolved: string,
@@ -409,7 +433,9 @@ const checkPathLink = (
     code: "BLUME_BROKEN_LINK",
     message: `Broken link to ${link.target}${via}: no page resolves to ${route}.`,
     severity: "error",
-    suggestion: "Check the path, or create the target page.",
+    suggestion:
+      partialLinkHint(link, page) ??
+      "Check the path, or create the target page.",
   };
 };
 

@@ -678,6 +678,10 @@ describe("validateLinks — assets against a public dir", () => {
     await writeFile(join(contentDir, "guides", "screenshot.png"), "binary");
     await writeFile(join(contentDir, "guides", "my photo.png"), "binary");
     await writeFile(join(contentDir, "images", "diagram.png"), "binary");
+    // Partials: published as no page, so a link to one is broken.
+    await writeFile(join(contentDir, "guides", "_draft.md"), "# Draft\n");
+    await mkdir(join(contentDir, "_snippets"), { recursive: true });
+    await writeFile(join(contentDir, "_snippets", "setup.mdx"), "# Setup\n");
   });
 
   afterAll(async () => {
@@ -791,6 +795,26 @@ describe("validateLinks — assets against a public dir", () => {
       "BLUME_BROKEN_ASSET",
     ]);
     expect(diagnostics[0]?.message).toContain("./my%2520photo.png");
+  });
+
+  it("says why a link to an existing partial is broken", async () => {
+    const diagnostics = await validateWithPublic([
+      guidePage([
+        link("./_draft.md"),
+        { ...link("../_snippets/setup.mdx#steps"), line: 2 },
+        { ...link("./_missing.md"), line: 3 },
+        { ...link("./draft.md"), line: 4 },
+      ]),
+    ]);
+    expect(
+      diagnostics.map((d) => [d.code, d.suggestion?.split(",")[0]])
+    ).toStrictEqual([
+      ["BLUME_BROKEN_LINK", "./_draft.md exists"],
+      ["BLUME_BROKEN_LINK", "../_snippets/setup.mdx exists"],
+      ["BLUME_BROKEN_LINK", "Check the path"],
+      ["BLUME_BROKEN_LINK", "Check the path"],
+    ]);
+    expect(diagnostics[0]?.suggestion).toContain('"!**/_*"');
   });
 
   it("rejects a case-mismatched or directory-shaped colocated reference", async () => {
