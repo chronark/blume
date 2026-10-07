@@ -337,3 +337,16 @@ describe("page dates", () => {
     expect(page).toContain("modified: lastModified,");
   });
 });
+
+describe("page end", () => {
+  it("renders on API operation pages too, beside their request column", async () => {
+    const layout = await source("components/layout/RootLayout.astro");
+    // Only `custom` and `frame` pages, which drop the page's own chrome, go
+    // without it; an operation page keeps the rating and the PageFooter slot.
+    expect(layout).not.toContain("!isApiOperation && showChrome");
+    expect(layout).toContain('isApiLayout && "xl:pe-[30.5rem]"');
+    const end = layout.slice(layout.indexOf("data-blume-page-end"));
+    expect(end).toContain("<PageFooterSlot");
+    expect(end).toContain("<FeedbackSlot");
+  });
+});

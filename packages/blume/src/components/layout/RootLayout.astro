@@ -910,14 +910,16 @@ const localeRedirect = localeTargets
           <slot />
         </article>
         {
-          !isApiOperation && showChrome && (
+          showChrome && (
             <div
               class:list={[
                 // Aligned with the content column, not centered under the
-                // prose measure: a rail page's, a wide page's, or a center
-                // page's wider one.
-                apiRail && "xl:pe-[30.5rem]",
-                (apiRail || modeLayout.width === "full") && "[&>*]:max-w-none",
+                // prose measure: an API page's (beside its example or
+                // request column), a wide page's, or a center page's wider
+                // one.
+                isApiLayout && "xl:pe-[30.5rem]",
+                (isApiLayout || modeLayout.width === "full") &&
+                  "[&>*]:max-w-none",
                 modeLayout.width === "center" && "[&>*]:max-w-[54rem]",
               ]}
               data-blume-page-end
