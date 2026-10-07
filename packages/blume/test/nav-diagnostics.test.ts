@@ -203,6 +203,24 @@ describe("validateNavTargets", () => {
     expect(result).toEqual([]);
   });
 
+  it("checks a tab's href, not its path, when it has one", () => {
+    // A root tab with no root index links to its href (declared, or the
+    // section's first page navigation resolved), so `/` itself needn't exist.
+    expect(
+      validateNavTargets(
+        nav({ tabs: [{ href: "/welcome", label: "Docs", path: "/" }] }),
+        new Set(["/welcome", "/guides/setup"])
+      )
+    ).toEqual([]);
+    const result = validateNavTargets(
+      nav({ tabs: [{ href: "/gone", label: "Docs", path: "/docs" }] }),
+      new Set(["/docs/intro"])
+    );
+    expect(result.map((d) => d.message)).toEqual([
+      expect.stringContaining("points to /gone"),
+    ]);
+  });
+
   it("warns when a selector item points at a route with no pages", () => {
     const result = validateNavTargets(
       nav({

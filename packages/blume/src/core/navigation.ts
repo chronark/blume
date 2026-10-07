@@ -1077,10 +1077,12 @@ const resolveTabHref = (
       if (route === section) {
         return true;
       }
+      // `isUnderPath`, not a `${section}/` prefix: a root tab's section is
+      // `/`, which every route sits under but none starts `//`.
       if (
         first === undefined &&
         route !== undefined &&
-        route.startsWith(`${section}/`)
+        isUnderPath(route, section)
       ) {
         first = route;
       }

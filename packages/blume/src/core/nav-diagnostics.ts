@@ -109,13 +109,20 @@ const resolvesToPages = (routes: Set<string>, path: string): boolean =>
  * must be the full set of servable routes — content, custom `.astro` pages, and
  * generated routes — so this runs where all three are known (`generateRuntime`),
  * not in the content-only graph build.
+ *
+ * A tab is checked where it links: its `href` — the author's, or the
+ * section's first page that navigation resolved for a `path` with no page of
+ * its own — and its `path` only when it links there.
  */
 export const validateNavTargets = (
   navigation: Navigation,
   routes: Set<string>
 ): Diagnostic[] => {
   const targets: { label: string; path: string }[] = [
-    ...navigation.tabs.map((tab) => ({ label: tab.label, path: tab.path })),
+    ...navigation.tabs.map((tab) => ({
+      label: tab.label,
+      path: tab.href ?? tab.path,
+    })),
     ...navigation.selectors.flatMap((selector) =>
       selector.items.map((item) => ({ label: item.label, path: item.path }))
     ),

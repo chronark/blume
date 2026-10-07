@@ -341,6 +341,19 @@ describe("buildNavigation — filesystem sidebar", () => {
     expect(nav.tabs[0]?.href).toBe("/changelog");
   });
 
+  it("resolves a root tab with no root index to the first page", () => {
+    // Every route sits under `/`, but none starts with `//`: the root tab's
+    // section must still find its first page instead of linking to a 404.
+    const nav = buildNavigation(
+      [
+        page("welcome.mdx", "/welcome", "Welcome", { order: 0 }),
+        page("guides/setup.mdx", "/guides/setup", "Setup"),
+      ],
+      { folderMeta: empty, tabs: [{ label: "Docs", path: "/" }] }
+    );
+    expect(nav.tabs[0]?.href).toBe("/welcome");
+  });
+
   it("links a based tab to an outside route served without the basePath", () => {
     // Outside routes (the generated changelog index, custom pages) are served
     // at their own path, while the tab path is rebased under `/docs`.

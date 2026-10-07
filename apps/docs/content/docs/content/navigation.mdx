@@ -188,7 +188,7 @@ navigation: {
 }
 ```
 
-A tab's `path` is its section prefix, and it doubles as the link target. A section whose `path` isn't a page of its own — a folder with no `index.mdx` — would link to a 404, so the tab falls back to the first page in the section instead. A static [custom page](/docs/advanced/custom-pages) at the tab's `path` counts as the section's own page: with `pages/guides.astro`, a `/guides` tab lands on that page while the `guides/` folder fills its sidebar. So does the generated [changelog](/docs/advanced/changelog) index, so a `/changelog` tab opens the timeline rather than the newest entry.
+A tab's `path` is its section prefix, and it doubles as the link target. A section whose `path` isn't a page of its own — a folder with no `index.mdx` — would link to a 404, so the tab falls back to the first page in the section instead. That includes a tab at `path: "/"` on a site with no root `index.mdx`: it links to the first page in the sidebar. A static [custom page](/docs/advanced/custom-pages) at the tab's `path` counts as the section's own page: with `pages/guides.astro`, a `/guides` tab lands on that page while the `guides/` folder fills its sidebar. So does the generated [changelog](/docs/advanced/changelog) index, so a `/changelog` tab opens the timeline rather than the newest entry.
 
 Set `href` when you want a tab to land somewhere else — a particular page in the section, say:
 
