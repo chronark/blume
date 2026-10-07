@@ -14,6 +14,7 @@ export const BUILTIN_MDX_TAGS = new Set<string>([
   "Callout",
   "Card",
   "CardGroup",
+  "Changelog",
   "CodeBlock",
   "CodeGroup",
   "Color",

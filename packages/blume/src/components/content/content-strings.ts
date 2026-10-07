@@ -9,7 +9,10 @@ export interface ContentStringsData {
 }
 
 /** The UI string groups a content component's chrome reads. */
-export type ContentStrings = Pick<UIStrings, "actions" | "content">;
+export type ContentStrings = Pick<
+  UIStrings,
+  "actions" | "changelog" | "content"
+>;
 
 /**
  * Labels for a component rendered inside page content (MDX), which gets no
@@ -29,6 +32,7 @@ export const contentStrings = (
       : data.ui;
   return {
     actions: { ...EN_UI.actions, ...dictionary.actions },
+    changelog: { ...EN_UI.changelog, ...dictionary.changelog },
     content: { ...EN_UI.content, ...dictionary.content },
   };
 };

@@ -2308,7 +2308,6 @@ export const generateRuntime = async (
         exportEpub,
         exportPdf,
         needsReact,
-        staged: hasStaged,
       })
     );
   }

@@ -692,7 +692,14 @@ describe("generateRuntime with a staged changelog source", () => {
     const changelog = join(project.context.outDir, "src/pages/changelog.astro");
     expect(existsSync(changelog)).toBe(true);
     const source = await readFile(changelog, "utf-8");
-    expect(source).toContain('...(await getCollection("staged")),');
+    // The page renders `<Changelog />`, which folds the staged collection in
+    // off the route manifest rather than a generation-time flag — so an
+    // authored `/changelog` page, which no such flag reaches, lists these
+    // releases too instead of silently dropping them.
+    expect(source).toContain("<Changelog />");
+    expect(source).not.toContain("getCollection");
+    const data = buildRuntimeData(project);
+    expect(data).toContain('"collection": "staged"');
   });
 
   it("still generates the /changelog page when the releases source yields nothing", async () => {

@@ -563,7 +563,7 @@ const componentMapOf = (source: string) =>
 
 describe("changelogIndexTemplate", () => {
   it("imports layout overrides and passes them to RootLayout", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
+    const out = changelogIndexTemplate(changelogOpts);
     // Only the layout slots: no entry body renders, so no MDX component map.
     expect(out).toContain(
       'import { layoutOverrides } from "../generated/components.ts"'
@@ -572,64 +572,47 @@ describe("changelogIndexTemplate", () => {
     expect(out).toContain("layout={layoutOverrides}");
   });
 
-  it("lists each release as a linked row without rendering its body", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
+  it("delegates the release list to the Changelog component", () => {
+    const out = changelogIndexTemplate(changelogOpts);
+    // The list is `<Changelog />`, the same component an authored `/changelog`
+    // page places to put prose above it, so both routes to an index render one
+    // implementation. The generated page keeps only the chrome around it.
+    expect(out).toContain(
+      'import Changelog from "blume/components/content/Changelog.astro";'
+    );
+    expect(out).toContain("<Changelog />");
+    // None of the list building is left behind: no collection reads, no route
+    // map, no sorting, no year grouping, no anchor dedupe. This is what stops
+    // the generated page and an authored one from drifting apart.
+    expect(out).not.toContain("getCollection");
+    expect(out).not.toContain("routeByEntry");
+    expect(out).not.toContain("toSorted");
+    expect(out).not.toContain("seenIds");
+    expect(out).not.toContain("groups");
     // The index is title, tag, and date only: a body per release would grow
     // the page past what an agent can read in one context window, and every
     // entry has its own page. So neither the component map nor MDX rendering
     // is wired in.
-    expect(out).not.toContain("import { getCollection, render }");
     expect(out).not.toContain("Update.astro");
     expect(componentMapOf(out)).toBeUndefined();
     expect(out).not.toContain("<Content");
-    expect(out).toContain('href={item.href ?? "#" + item.id}');
-    expect(out).toContain("{item.label}");
-    expect(out).toContain("tag: entry.data.changelog?.category ?? null,");
-    expect(out).toContain("datetime={item.dateTime}");
     // The layout gets no outline: the bare layout has no TOC to feed.
     expect(out).toContain("headings={[]}");
   });
 
-  it("groups the rows by year in the configured date format's zone", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
-    expect(out).toContain("last.year === item.year");
-    expect(out).toContain("timeZone: dateFormatOptions.timeZone,");
-    expect(out).toContain('year: "numeric",');
-    // A row drops the year its group already shows: a preset style keeps its
-    // month wording, a component format just loses the `year` key.
-    expect(out).toContain(
-      "const { dateStyle, year: _year, ...dateComponents } = dateFormatOptions;"
-    );
-    expect(out).toContain('month: dateStyle === "medium" ? "short" : "long",');
-    expect(out).toContain("<h2 class=");
-    expect(out).toContain("{group.year}");
-  });
-
-  it("reads only the docs collection when no staged sources exist", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
-    expect(out).toContain('...(await getCollection("docs")),');
-    expect(out).not.toContain('getCollection("staged")');
-  });
-
-  it("folds in the staged collection when staged sources exist", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: true });
-    expect(out).toContain('...(await getCollection("docs")),');
-    expect(out).toContain('...(await getCollection("staged")),');
-  });
-
   it("leaves the assistant trigger to the header", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
+    const out = changelogIndexTemplate(changelogOpts);
     expect(out).not.toContain("Assistant");
     expect(out).not.toContain("assistantEnabled");
   });
 
   it("renders through the sidebar-less, TOC-less bare layout", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
+    const out = changelogIndexTemplate(changelogOpts);
     expect(out).toContain('contentLayout="bare"');
   });
 
   it("canonicalizes under the deployment base, like the catch-all", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
+    const out = changelogIndexTemplate(changelogOpts);
     expect(out).toContain(
       'import { withMountedBase } from "blume/components/islands/base-path.ts"'
     );
@@ -638,7 +621,7 @@ describe("changelogIndexTemplate", () => {
   });
 
   it("wires the generated OG card, gated on og.enabled", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
+    const out = changelogIndexTemplate(changelogOpts);
     expect(out).toContain(
       'const ogPath = data.config.og.enabled ? withMountedBase("/og/changelog.png") : null;'
     );
@@ -650,63 +633,13 @@ describe("changelogIndexTemplate", () => {
   it("leaves the site-title suffix to the layout", () => {
     // Prefixing config.title here doubled the brand in the document title
     // ("Acme Changelog - Acme").
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
+    const out = changelogIndexTemplate(changelogOpts);
     expect(out).toContain("const pageTitle = changelogTitle;");
     expect(out).not.toContain('data.config.title + " " + changelogTitle');
   });
 
-  it("links each row to its own generated page, under the deployment base", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
-    // Route lookup keyed by the collection entry id (matches the manifest);
-    // the manifest route is base-less, so the row rebases it like the
-    // catch-all's canonical does, and falls back to the row's own anchor.
-    // Every locale's route for an entry shares its id (translations and
-    // fallback copies alike), so only the default locale's routes fill the
-    // map — a map over all of them kept the last locale's permalink — and an
-    // entry with no default-locale page (a translated changelog file) is
-    // left off the unlocalized index rather than listed twice.
-    expect(out).toContain(
-      "const defaultLocale = i18n ? i18n.defaultLocale : null;"
-    );
-    expect(out).toContain(
-      "if (defaultLocale === null || route.locale === defaultLocale) {"
-    );
-    expect(out).toContain("routeByEntry.set(route.entryId, route.path);");
-    expect(out).toContain(
-      "(defaultLocale === null || routeByEntry.has(entry.id))"
-    );
-    expect(out).toContain("const route = routeByEntry.get(entry.id);");
-    expect(out).toContain("href: route ? withMountedBase(route) : null,");
-    expect(out).toContain('href={item.href ?? "#" + item.id}');
-  });
-
-  it("suffixes repeated heading slugs so each entry keeps its own anchor", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
-    const start = out.indexOf("const seenIds");
-    const end = out.indexOf("// Consecutive releases from the same year");
-    expect(start).toBeGreaterThan(-1);
-    expect(end).toBeGreaterThan(start);
-    // Run the generated dedupe pass to pin its behavior.
-    // SAFETY: the generated snippet sliced above maps heading items to their
-    // deduplicated id strings — the exact signature asserted below.
-    // oxlint-disable-next-line no-new-func -- evaluating our own generated output
-    const dedupe = new Function(
-      "items",
-      `${out.slice(start, end)}\nreturn items.map((item) => item.id);`
-    ) as (items: { id: string }[]) => string[];
-    const ids = (...slugs: string[]) => dedupe(slugs.map((id) => ({ id })));
-    expect(ids("v1", "v2")).toEqual(["v1", "v2"]);
-    expect(ids("update", "update", "update")).toEqual([
-      "update",
-      "update-2",
-      "update-3",
-    ]);
-    // A generated suffix never collides with a later natural slug.
-    expect(ids("v1", "v1", "v1-2")).toEqual(["v1", "v1-2", "v1-2-2"]);
-  });
-
   it("passes the resolved UI dictionary and default-locale lang/dir to the layout", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
+    const out = changelogIndexTemplate(changelogOpts);
     // Mirrors the catch-all: default locale under i18n, English baseline
     // otherwise, so /changelog chrome doesn't revert to EN_UI / dir="ltr".
     expect(out).toContain('const htmlLang = i18n ? i18n.defaultLocale : "en";');
@@ -717,7 +650,7 @@ describe("changelogIndexTemplate", () => {
   });
 
   it("localizes the changelog heading, page title, and description", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
+    const out = changelogIndexTemplate(changelogOpts);
     // The chrome comes from the same translatable `changelog` group as the
     // reveal button, with English fallback for a stale data snapshot.
     expect(out).toContain(
@@ -730,17 +663,14 @@ describe("changelogIndexTemplate", () => {
     expect(out).toContain("<h1>{changelogTitle}</h1>");
     expect(out).toContain("description: changelogDescription,");
     expect(out).not.toContain("<h1>Changelog</h1>");
-    // So is the line an index with no entries shows.
-    expect(out).toContain(
-      'const changelogEmpty = data.ui.changelog?.empty ?? "No changelog entries yet.";'
-    );
-    expect(out).toContain("<p>{changelogEmpty}</p>");
-    expect(out).not.toContain("<p>No changelog entries yet.</p>");
+    // The empty-state line belongs to the list, so it moved into
+    // `<Changelog />` with it — an authored page gets the same wording
+    // without copying it.
+    expect(out).not.toContain("changelogEmpty");
     // The island-hooks snapshot reuses the same localized page title.
     const reactOut = changelogIndexTemplate({
       ...changelogOpts,
       needsReact: true,
-      staged: false,
     });
     expect(reactOut).toContain(
       'page: { route: "/changelog", title: pageTitle }'
@@ -748,7 +678,7 @@ describe("changelogIndexTemplate", () => {
   });
 
   it("shows the whole history at once, with no major-version reveal", () => {
-    const out = changelogIndexTemplate({ ...changelogOpts, staged: false });
+    const out = changelogIndexTemplate(changelogOpts);
     // Rows are small enough that collapsing older majors buys nothing, so the
     // progressive-reveal element and its localized button are gone.
     expect(out).not.toContain("blume-changelog");

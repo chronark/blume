@@ -813,7 +813,6 @@ export const eject = async (
     exportEpub,
     exportPdf,
     needsReact,
-    staged: hasStaged,
   });
 
   if (config.seo.og.enabled) {
