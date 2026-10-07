@@ -6,10 +6,11 @@ import { MARKDOWN_BODY_FEATURES } from "../markdown/features.ts";
 import { nextFenceState } from "./code-fences.ts";
 import type { FenceState } from "./code-fences.ts";
 import {
-  BARE_CURLY_MARKER,
+  ATTRIBUTE,
   HTML_COMMENT,
   INLINE_CODE,
   strippedLineOffset,
+  trailingCurlyMarker,
 } from "./sources/normalize.ts";
 import type { SourceEntry } from "./sources/types.ts";
 import type { Diagnostic, PageRecord } from "./types.ts";
@@ -32,6 +33,9 @@ import type { Diagnostic, PageRecord } from "./types.ts";
  *   inline component (`:badge[New]{color="primary"}`).
  * - `BLUME_MDX_ATTRIBUTE_LIST`: an attribute list (`{ width="300" }`,
  *   `{ .class }`) in `.mdx`, which MDX reads as JavaScript.
+ * - `BLUME_MD_ATTRIBUTE_LIST`: an attribute list in `.md`, kramdown's IAL
+ *   (`{: .note }`) or MkDocs' `attr_list`, which shows as written. A heading's
+ *   `{#id}` marker is left to `BLUME_MD_CURLY_ANCHOR`.
  * - `BLUME_MDX_UNCLOSED_ELEMENT`: a void element written as HTML (`<img …>`)
  *   in `.mdx`, which MDX reads as an unclosed JSX element.
  */
@@ -91,8 +95,6 @@ const MDC_BLOCK =
 const MDC_INLINE =
   /(?<![\w:\\])(?<written>:{1,2}(?<name>[a-z][\w-]*)(?:\[[^\]\n]*\](?:\{[^}\n]*\})?|\{[^}\n]*\}))/giu;
 
-// One attribute in a list: `#id`, `.class`, or `key=value` (quoted or not).
-const ATTRIBUTE = String.raw`(?:#[\w-]+|\.[A-Za-z_-][\w-]*|[\w-]+=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'{}]+))`;
 // A brace-wrapped attribute list (`{ width="300" }`, kramdown's `{: .note }`).
 // After `=` it's a JSX attribute's value (`style={…}`).
 const ATTRIBUTE_LIST = new RegExp(
@@ -118,6 +120,12 @@ const SUSPECT_MDC = /(?:^|[^\w:]):{1,2}[a-z][\w-]*[[{]|^[\t ]*::[a-z]/imu;
 
 // An MDX comment, `{/* … */}`, which renders nothing.
 const MDX_COMMENT = /\{\s*\/\*[\s\S]*?\*\/\s*\}/gu;
+
+// A link or image destination in angle brackets, after `](` or a reference
+// definition's `]:` (`![shot](<img/a b.png>)`, `[ref]: <br/x.png>`). Both
+// formats read it as a URL, never as HTML, though it can open with a tag name.
+const ANGLE_DESTINATION =
+  /(?<=\]\([\t ]*|^ {0,3}\[[^\]\n]+\]:[\t ]*)<[^<>\n]*>/gmu;
 
 /** `text` with every character but line breaks turned into a space. */
 const blank = (text: string): string => text.replaceAll(/[^\n]/gu, " ");
@@ -158,9 +166,10 @@ const maskMarkdown = (text: string): string => {
 };
 
 /**
- * An `.mdx` body with fenced code, inline code, and comments blanked, line by
- * line rather than parsed: the problems this looks for are what keeps MDX
- * from parsing a page. MDX has no indented code blocks.
+ * An `.mdx` body with fenced code, inline code, comments, and angle-bracket
+ * link destinations blanked, line by line rather than parsed: the problems
+ * this looks for are what keeps MDX from parsing a page. MDX has no indented
+ * code blocks.
  */
 const maskMdx = (text: string): string => {
   let fence: FenceState = null;
@@ -174,7 +183,8 @@ const maskMdx = (text: string): string => {
     })
     .join("\n")
     .replaceAll(MDX_COMMENT, blank)
-    .replaceAll(HTML_COMMENT, blank);
+    .replaceAll(HTML_COMMENT, blank)
+    .replaceAll(ANGLE_DESTINATION, blank);
 };
 
 /** Where each line of `text` starts. */
@@ -311,38 +321,75 @@ const mdcFindings = ({ starts, text }: Scan): Finding[] => {
 
 /**
  * Whether the list at `column` of `line` is a heading's trailing `{#id}`
- * marker, which `BLUME_MDX_CURLY_ANCHOR` already reports.
+ * marker, which `BLUME_MDX_CURLY_ANCHOR` or `BLUME_MD_CURLY_ANCHOR` already
+ * reports (an unspaced `{#id}` pins the anchor in `.md`). In `.mdx`, one that
+ * also sets classes or attributes (`{#id .wide}`) is reported here instead.
  */
 const isHeadingMarker = (
   lines: readonly string[],
   site: Site,
-  written: string
+  written: string,
+  format: "md" | "mdx"
 ): boolean => {
   const line = lines[site.line - 1] ?? "";
   const heading =
     ATX_HEADING.test(line) || SETEXT_UNDERLINE.test(lines[site.line] ?? "");
-  const marker = BARE_CURLY_MARKER.exec(line);
+  const marker = trailingCurlyMarker(line);
   return (
     heading &&
-    marker?.groups?.marker === written &&
-    marker.index === site.column - 1
+    marker?.marker === written &&
+    marker.index === site.column - 1 &&
+    (format === "md" || !marker.attributes)
   );
 };
 
-const attributeListFindings = ({ starts, text }: Scan): Finding[] => {
-  const scanned = text.replaceAll(DIRECTIVE_ATTRIBUTES, blank);
-  const lines = text.split("\n");
-  return [...scanned.matchAll(ATTRIBUTE_LIST)]
-    .map((match) => ({ site: siteOf(starts, match.index), written: match[0] }))
-    .filter(({ site, written }) => !isHeadingMarker(lines, site, written))
-    .map(({ site, written }) => ({
-      ...site,
-      code: "BLUME_MDX_ATTRIBUTE_LIST",
-      message: `\`${written}\` is an attribute list, which MDX reads as a JavaScript expression, so the page fails to build.`,
-      suggestion:
-        'Remove it. To keep the attributes, write the element as JSX (`<img src="…" width="300" />`), or pin a heading\'s anchor with `[#id]`. To show the braces as text, escape them: `\\{…\\}`.',
-    }));
-};
+/** What an attribute list does to a page in each format, and the way out. */
+const ATTRIBUTE_LIST_PROBLEMS = {
+  md: {
+    code: "BLUME_MD_ATTRIBUTE_LIST",
+    effect: "which Blume doesn't read, so the page shows it as written",
+    suggestion:
+      'Remove it. To keep the attributes, write the element as HTML (`<img src="…" width="300">`), or pin a heading\'s anchor with `[#id]`. To show the braces as text, put them in inline code.',
+  },
+  mdx: {
+    code: "BLUME_MDX_ATTRIBUTE_LIST",
+    effect:
+      "which MDX reads as a JavaScript expression, so the page fails to build",
+    suggestion:
+      'Remove it. To keep the attributes, write the element as JSX (`<img src="…" width="300" />`), or pin a heading\'s anchor with `[#id]`. To show the braces as text, escape them: `\\{…\\}`.',
+  },
+} as const;
+
+/**
+ * The attribute lists in a body in `format`. A directive's own attributes and
+ * a `{{ }}` variable or Liquid output aren't one.
+ */
+const attributeListFindings =
+  (format: "md" | "mdx") =>
+  ({ starts, text }: Scan): Finding[] => {
+    const { code, effect, suggestion } = ATTRIBUTE_LIST_PROBLEMS[format];
+    const scanned = text
+      .replaceAll(DIRECTIVE_ATTRIBUTES, blank)
+      .replaceAll(TEMPLATE_OUTPUT, blank);
+    const lines = text.split("\n");
+    return [...scanned.matchAll(ATTRIBUTE_LIST)]
+      .map((match) => ({
+        site: siteOf(starts, match.index),
+        written: match[0],
+      }))
+      .filter(
+        ({ site, written }) => !isHeadingMarker(lines, site, written, format)
+      )
+      .map(({ site, written }) => ({
+        ...site,
+        code,
+        message: `\`${written}\` is an attribute list, ${effect}.`,
+        suggestion,
+      }));
+  };
+
+// An attribute list's opening brace and first attribute.
+const SUSPECT_ATTRIBUTE_LIST = /\{:?[\t ]*(?:[#.][A-Za-z_-]|[\w-]+=)/u;
 
 const voidElementFindings = ({ starts, text }: Scan): Finding[] =>
   [...text.matchAll(VOID_ELEMENT)]
@@ -372,14 +419,12 @@ const CHECKS: Record<"md" | "mdx", Check[]> = {
     { find: templateFindings, suspect: /\{[%{]/u },
     { find: wikilinkFindings, suspect: SUSPECT_WIKILINK },
     { find: mdcFindings, suspect: SUSPECT_MDC },
+    { find: attributeListFindings("md"), suspect: SUSPECT_ATTRIBUTE_LIST },
   ],
   mdx: [
     { find: wikilinkFindings, suspect: SUSPECT_WIKILINK },
     { find: mdcFindings, suspect: SUSPECT_MDC },
-    {
-      find: attributeListFindings,
-      suspect: /\{:?[\t ]*(?:[#.][A-Za-z_-]|[\w-]+=)/u,
-    },
+    { find: attributeListFindings("mdx"), suspect: SUSPECT_ATTRIBUTE_LIST },
     {
       find: voidElementFindings,
       suspect:

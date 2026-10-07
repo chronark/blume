@@ -467,6 +467,67 @@ describe("normalizeEntry", () => {
     ]);
   });
 
+  it("warns about an attribute list that sets a heading's id beside classes in .md", () => {
+    const text =
+      "## A { #a .wide }\n\n## B {: .wide #b }\n\nC {#c data-x=1}\n===\n\n## D { .wide }\n";
+    const md = normalizeEntry(
+      { body: { format: "md", text }, data: {}, ref: "a.md" },
+      { defaultType: "doc", source: { name: "s", staged: false } }
+    );
+    // The list stays heading text, slugged into the id, as `{ #id }` does.
+    expect(md.pages[0]?.headings.map((heading) => heading.slug)).toStrictEqual([
+      "a--a-wide",
+      "b--wide-b",
+      "c-c-data-x1",
+      "d--wide",
+    ]);
+    expect(
+      md.diagnostics.map(({ code, line, message, suggestion }) => ({
+        code,
+        line,
+        message,
+        suggestion,
+      }))
+    ).toStrictEqual([
+      {
+        code: "BLUME_MD_CURLY_ANCHOR",
+        line: 1,
+        message:
+          "`{ #a .wide }` doesn't pin an anchor: only the unspaced `{#a}` does, so this one shows in the heading and its id is slugged from it.",
+        suggestion:
+          "Write `{#a}` or `[#a]` to pin the anchor `#a`. Blume sets no classes or other attributes on a heading.",
+      },
+      {
+        code: "BLUME_MD_CURLY_ANCHOR",
+        line: 3,
+        message:
+          "`{: .wide #b }` doesn't pin an anchor: only the unspaced `{#b}` does, so this one shows in the heading and its id is slugged from it.",
+        suggestion:
+          "Write `{#b}` or `[#b]` to pin the anchor `#b`. Blume sets no classes or other attributes on a heading.",
+      },
+      {
+        code: "BLUME_MD_CURLY_ANCHOR",
+        line: 5,
+        message:
+          "`{#c data-x=1}` doesn't pin an anchor: only the unspaced `{#c}` does, so this one shows in the heading and its id is slugged from it.",
+        suggestion:
+          "Write `{#c}` or `[#c]` to pin the anchor `#c`. Blume sets no classes or other attributes on a heading.",
+      },
+    ]);
+  });
+
+  it("leaves an .mdx heading's attribute list to the attribute-list warning", () => {
+    const mdx = normalizeEntry(
+      {
+        body: { format: "mdx", text: "## A { #a .wide }\n" },
+        data: {},
+        ref: "a.mdx",
+      },
+      { defaultType: "doc", source: { name: "s", staged: false } }
+    );
+    expect(mdx.diagnostics).toStrictEqual([]);
+  });
+
   it("names a path-less remote .md entry by source and ref in the {#id} warning", () => {
     const { diagnostics } = normalizeEntry(
       { body: { format: "md", text: "## A { #a }\n" }, data: {}, ref: "a.md" },

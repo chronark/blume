@@ -287,8 +287,61 @@ const PROMPT_CLOSE = /<\/Prompt>/u;
 // (`{#id} [toc]`), nothing else. The spaced `{ #id }` and kramdown's
 // `{: #id }` (MkDocs `attr_list` writes both) fail the compile the same way,
 // so they match too, though neither is an anchor in `.md`.
-export const BARE_CURLY_MARKER =
+const BARE_CURLY_MARKER =
   /(?<!\\)(?<marker>\{:?\s*#(?<id>[^\s}]+)\s*\})(?:\s*\[(?:#[^\s\]]+|!?toc)\])*\s*$/u;
+
+// One attribute in a brace-wrapped attribute list (MkDocs' `attr_list`,
+// kramdown's IAL): `#id`, `.class`, or `key=value`, quoted or not.
+export const ATTRIBUTE = String.raw`(?:#[\w-]+|\.[A-Za-z_-][\w-]*|[\w-]+=(?:"[^"\n]*"|'[^'\n]*'|[^\s"'{}]+))`;
+const ATTRIBUTES = new RegExp(ATTRIBUTE, "gu");
+
+// A heading's trailing attribute list of more than one attribute, in the
+// place `BARE_CURLY_MARKER` reads (`## Setup { #setup .wide }`, `{: .wide
+// #setup }`). Neither format reads it: it stays in an `.md` heading's text,
+// and `.mdx` reads it as a JSX expression. One that sets an id is reported
+// with the `{#id}` markers, since pinning that id is what it was for.
+const HEADING_ATTRIBUTE_LIST = new RegExp(
+  String.raw`(?<!\\)(?<marker>\{:?[\t ]*${ATTRIBUTE}(?:[\t ]+${ATTRIBUTE})+[\t ]*\})(?:\s*\[(?:#[^\s\]]+|!?toc)\])*\s*$`,
+  "u"
+);
+
+/** A heading's trailing `{#id}` marker, where its text holds one. */
+export interface TrailingCurlyMarker {
+  /** Whether the braces also set classes or attributes (`{ #id .wide }`). */
+  attributes: boolean;
+  id: string;
+  /** Where the marker starts in the text. */
+  index: number;
+  /** The braces as written. */
+  marker: string;
+}
+
+/**
+ * The `{#id}` marker a heading's text ends with: one of the spellings
+ * `BARE_CURLY_MARKER` matches, or an attribute list that sets an id among
+ * other attributes (see `HEADING_ATTRIBUTE_LIST`).
+ */
+export const trailingCurlyMarker = (
+  text: string
+): TrailingCurlyMarker | undefined => {
+  const bare = BARE_CURLY_MARKER.exec(text);
+  if (bare?.groups?.id !== undefined && bare.groups.marker !== undefined) {
+    return {
+      attributes: false,
+      id: bare.groups.id,
+      index: bare.index,
+      marker: bare.groups.marker,
+    };
+  }
+  const list = HEADING_ATTRIBUTE_LIST.exec(text);
+  const marker = list?.groups?.marker ?? "";
+  const id = [...marker.matchAll(ATTRIBUTES)]
+    .find(([attribute]) => attribute.startsWith("#"))?.[0]
+    .slice(1);
+  return list && id !== undefined
+    ? { attributes: true, id, index: list.index, marker }
+    : undefined;
+};
 
 // A raw HTML element carrying an `id` — `<a id="…">`, `<section id='…'>`,
 // the unquoted `<a id=plain>`, or the JSX spelling `<div id={"…"}>` — whose
@@ -317,8 +370,10 @@ const HTML_A_NAME =
 export const HTML_COMMENT = /<!--[\s\S]*?-->/gu;
 export const INLINE_CODE = /`[^`]*`/gu;
 
-/** A heading whose trailing `{#id}` marker is unescaped — see `BARE_CURLY_MARKER`. */
+/** A heading whose trailing `{#id}` marker is unescaped — see `trailingCurlyMarker`. */
 export interface CurlyMarker {
+  /** Whether the braces also set classes or attributes (`{ #id .wide }`). */
+  attributes: boolean;
   id: string;
   /** 1-based line of the heading (a setext heading's first text line) in the body. */
   line: number;
@@ -760,9 +815,10 @@ const noteCurlyMarker = (
   line: number,
   state: HeadingScanState
 ): void => {
-  const groups = text.match(BARE_CURLY_MARKER)?.groups;
-  if (groups?.id !== undefined && groups.marker !== undefined) {
-    state.curlyMarkers.push({ id: groups.id, line, marker: groups.marker });
+  const found = trailingCurlyMarker(text);
+  if (found) {
+    const { attributes, id, marker } = found;
+    state.curlyMarkers.push({ attributes, id, line, marker });
   }
 };
 
@@ -1600,35 +1656,42 @@ const entryLinks = <T extends Located>(
  * page and parsed in *its* format (see `markdown/include.ts`), so a partial's
  * markers count too and are reported against the partial via the expansion's
  * origins. `.md` pages pin the unspaced `{#id}` and are warned about the
- * other spellings instead (see {@link mdCurlyMarkerDiagnostics}).
+ * other spellings instead (see {@link mdCurlyMarkerDiagnostics}). A marker
+ * that also sets classes or attributes is an attribute list, which
+ * `BLUME_MDX_ATTRIBUTE_LIST` reports (see `core/syntax-diagnostics.ts`).
  */
 const curlyMarkerDiagnostics = (
   entry: SourceEntry,
   markers: CurlyMarker[],
   sourceName: string
 ): Diagnostic[] =>
-  markers.map(({ id, line, marker }) => {
-    const origin = entry.expanded?.origins[line - 1];
-    const page = entry.sourcePath ?? `${sourceName}:${entry.ref}`;
-    const inPartial = origin !== undefined && origin.file !== entry.sourcePath;
-    return {
-      code: "BLUME_MDX_CURLY_ANCHOR",
-      file: origin?.file ?? page,
-      line: origin?.line ?? line + entryLineOffset(entry),
-      message: inPartial
-        ? `\`${marker}\` is a JSX expression once this partial is included in ${page} (.mdx), so that page fails to compile.`
-        : `\`${marker}\` is a JSX expression in .mdx, so this page fails to compile.`,
-      severity: "error",
-      suggestion: `Write \`[#${id}]\` or escape it as \`\\{#${id}\\}\` — both pin the same anchor in .md and .mdx.`,
-    };
-  });
+  markers
+    .filter(({ attributes }) => !attributes)
+    .map(({ id, line, marker }) => {
+      const origin = entry.expanded?.origins[line - 1];
+      const page = entry.sourcePath ?? `${sourceName}:${entry.ref}`;
+      const inPartial =
+        origin !== undefined && origin.file !== entry.sourcePath;
+      return {
+        code: "BLUME_MDX_CURLY_ANCHOR",
+        file: origin?.file ?? page,
+        line: origin?.line ?? line + entryLineOffset(entry),
+        message: inPartial
+          ? `\`${marker}\` is a JSX expression once this partial is included in ${page} (.mdx), so that page fails to compile.`
+          : `\`${marker}\` is a JSX expression in .mdx, so this page fails to compile.`,
+        severity: "error",
+        suggestion: `Write \`[#${id}]\` or escape it as \`\\{#${id}\\}\` — both pin the same anchor in .md and .mdx.`,
+      };
+    });
 
 /**
  * Warnings for the spaced `{ #id }` and kramdown `{: #id }` heading markers
  * (MkDocs' `attr_list` writes both) in an `.md` page. Only the unspaced
  * `{#id}` pins an anchor there; the other spellings stay in the heading's
  * text, so the page shows them and the heading's id is slugged from them
- * (`## Setup { #setup }` anchors as `setup--setup`).
+ * (`## Setup { #setup }` anchors as `setup--setup`). So does an attribute
+ * list that sets the id beside classes or attributes (`{ #setup .wide }`),
+ * whose other attributes no heading takes either.
  */
 const mdCurlyMarkerDiagnostics = (
   entry: SourceEntry,
@@ -1637,7 +1700,7 @@ const mdCurlyMarkerDiagnostics = (
 ): Diagnostic[] =>
   markers
     .filter(({ id, marker }) => marker !== `{#${id}}`)
-    .map(({ id, line, marker }) => {
+    .map(({ attributes, id, line, marker }) => {
       const origin = entry.expanded?.origins[line - 1];
       return {
         code: "BLUME_MD_CURLY_ANCHOR",
@@ -1645,7 +1708,11 @@ const mdCurlyMarkerDiagnostics = (
         line: origin?.line ?? line + entryLineOffset(entry),
         message: `\`${marker}\` doesn't pin an anchor: only the unspaced \`{#${id}}\` does, so this one shows in the heading and its id is slugged from it.`,
         severity: "warning",
-        suggestion: `Write \`{#${id}}\` or \`[#${id}]\` to pin the anchor \`#${id}\`.`,
+        suggestion: `Write \`{#${id}}\` or \`[#${id}]\` to pin the anchor \`#${id}\`.${
+          attributes
+            ? " Blume sets no classes or other attributes on a heading."
+            : ""
+        }`,
       };
     });
 

@@ -1049,16 +1049,25 @@ describe(scanBody, () => {
       "## G { #g }",
       "## H {: #h }",
       "## I {:#i} [toc]",
+      // So does an id among other attributes; a list with no id isn't one.
+      '## J {: .wide #j title="a #b" } [toc]',
+      "## K { .wide data-x=1 }",
     ].join("\n");
     const scan = scanBody(body);
     expect(scan.curlyMarkers).toStrictEqual([
-      { id: "a", line: 4, marker: "{#a}" },
-      { id: "b", line: 6, marker: "{#b}" },
-      { id: "d", line: 9, marker: "{#d}" },
-      { id: "f", line: 13, marker: "{#f}" },
-      { id: "g", line: 14, marker: "{ #g }" },
-      { id: "h", line: 15, marker: "{: #h }" },
-      { id: "i", line: 16, marker: "{:#i}" },
+      { attributes: false, id: "a", line: 4, marker: "{#a}" },
+      { attributes: false, id: "b", line: 6, marker: "{#b}" },
+      { attributes: false, id: "d", line: 9, marker: "{#d}" },
+      { attributes: false, id: "f", line: 13, marker: "{#f}" },
+      { attributes: false, id: "g", line: 14, marker: "{ #g }" },
+      { attributes: false, id: "h", line: 15, marker: "{: #h }" },
+      { attributes: false, id: "i", line: 16, marker: "{:#i}" },
+      {
+        attributes: true,
+        id: "j",
+        line: 17,
+        marker: '{: .wide #j title="a #b" }',
+      },
     ]);
     expect(scan.headings.map((h) => h.slug)).toContain("c");
   });

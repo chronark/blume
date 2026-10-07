@@ -298,7 +298,50 @@ describe("attribute lists in .mdx", () => {
     expect(found(':badge[New]{color="primary"}\n', "mdx")).toStrictEqual([
       { code: "BLUME_MDC_SYNTAX", column: 1, line: 1 },
     ]);
-    expect(found('![x](/x.png){ width="300" }\n', "md")).toStrictEqual([]);
+  });
+});
+
+describe("attribute lists in .md", () => {
+  it("warns about kramdown and attr_list lists, on their own line or after a block", () => {
+    const text = [
+      "A note.",
+      "{: .note }",
+      "",
+      "{: #intro }",
+      "",
+      '![A diagram](/x.png){ width="300" }',
+      "",
+      "## Title { .wide }",
+    ].join("\n");
+    expect(found(text)).toStrictEqual([
+      { code: "BLUME_MD_ATTRIBUTE_LIST", column: 1, line: 2 },
+      { code: "BLUME_MD_ATTRIBUTE_LIST", column: 1, line: 4 },
+      { code: "BLUME_MD_ATTRIBUTE_LIST", column: 21, line: 6 },
+      { code: "BLUME_MD_ATTRIBUTE_LIST", column: 10, line: 8 },
+    ]);
+    expect(syntaxDiagnostics(entry(text), "docs")[0]).toMatchObject({
+      message:
+        "`{: .note }` is an attribute list, which Blume doesn't read, so the page shows it as written.",
+      suggestion:
+        'Remove it. To keep the attributes, write the element as HTML (`<img src="…" width="300">`), or pin a heading\'s anchor with `[#id]`. To show the braces as text, put them in inline code.',
+    });
+  });
+
+  it("leaves heading anchors, variables, directives, and code alone", () => {
+    const quiet = [
+      // `{#id}` pins the anchor; BLUME_MD_CURLY_ANCHOR reports the others.
+      "## Title {#id}\n\n## Other { #other }\n\n## Wide {: #wide .x }\n",
+      "Setext title {: #id .x }\n===\n",
+      "Version {{version}} and {{ size=3 }}.\n",
+      ':::note{title="Heads up"}\nA.\n:::\n',
+      'Write `{: .note }`.\n\n```md\n{ width="300" }\n```\n\n    {: .note }\n',
+      "Half is {0.5}, or {.5}, and \\{: .note }.\n",
+    ];
+    for (const text of quiet) {
+      expect(
+        found(text).filter(({ code }) => code === "BLUME_MD_ATTRIBUTE_LIST")
+      ).toStrictEqual([]);
+    }
   });
 });
 
@@ -354,6 +397,20 @@ describe("unclosed void elements in .mdx", () => {
       expect(found(text, "mdx")).toStrictEqual([]);
     }
     expect(found('<img src="a.png">\n', "md")).toStrictEqual([]);
+  });
+
+  it("leaves a link destination in angle brackets alone", () => {
+    // MDX reads `<img/a b.png>` after `](` or `]:` as a URL, not a tag.
+    const text = [
+      "![shot](<img/a b.png>) and [the list]( <br/notes.md>)",
+      "",
+      "[ref]: <hr/x.png>",
+      "",
+      "Then <br>.",
+    ].join("\n");
+    expect(found(text, "mdx")).toStrictEqual([
+      { code: "BLUME_MDX_UNCLOSED_ELEMENT", column: 6, line: 5 },
+    ]);
   });
 });
 
