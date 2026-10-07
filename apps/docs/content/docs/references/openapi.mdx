@@ -195,6 +195,8 @@ reference: [
 ],
 ```
 
+A source's group sits at its route, and each folder of the route above it is a sidebar group too. So route a spec at the folder it describes: `route: "/apis/messaging"` makes the source's group the `messaging` folder's own group, named by its `label`, while `"/apis/messaging/openapi"` nests that group inside a **Messaging** group that holds nothing else.
+
 `spec` is shorthand for a single-entry `sources`, so you only reach for `sources` when you have more than one. When two specs need different display options — a different code-sample set, say — list two `openapi()` adapters instead, each with its own `route`. An embedded [Scalar](/docs/references/scalar) reference beside native pages is its own `scalar()` adapter in the list. Sources are resolved in list order, and when two resolve to the same route the first one wins (the build warns about the one it dropped).
 
 [Combine multiple OpenAPI specifications in one docs site](/guides/multiple-openapi-specs-documentation) builds an API portal this way, with each service's spec on its own route and tab.
