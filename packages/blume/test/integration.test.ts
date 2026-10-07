@@ -738,6 +738,7 @@ const devServer = async (poweredBy?: boolean) => {
     "public/demo/index.html": "<p>Demo</p>",
   });
   const http = createServer((request, response) => {
+    response.writeHead(200, { "content-type": "text/plain" });
     response.end(request.url);
   });
   http.listen(0, "127.0.0.1");
