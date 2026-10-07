@@ -9,6 +9,7 @@ import {
   pollingWatch,
   snapshotCache,
 } from "./cache.ts";
+import { extractHeadings } from "./normalize.ts";
 import { REMOTE_TIMEOUT_MS } from "./remote.ts";
 import type {
   ContentSource,
@@ -71,19 +72,28 @@ interface RemoteRef {
 // arbitrary third party.
 const GITHUB_HOSTS = new Set(["api.github.com", "raw.githubusercontent.com"]);
 
+const isGithubUrl = (url: string): boolean =>
+  URL.canParse(url) && GITHUB_HOSTS.has(new URL(url).hostname);
+
 const githubHeaders = (url: string): Record<string, string> => {
   const token = process.env.GITHUB_TOKEN;
-  if (!token) {
-    return {};
-  }
-  let host = "";
-  try {
-    host = new URL(url).hostname;
-  } catch {
-    return {};
-  }
-  return GITHUB_HOSTS.has(host) ? { authorization: `Bearer ${token}` } : {};
+  return token && isGithubUrl(url) ? { authorization: `Bearer ${token}` } : {};
 };
+
+// What GitHub answers a request for a private repository's file without a
+// token (404, so it never confirms the repository exists), a token it rejects
+// (401), and a client past the unauthenticated rate limit (403).
+const TOKEN_STATUSES = new Set([401, 403, 404]);
+
+/**
+ * Why a request failed, naming GITHUB_TOKEN when it's unset and a token could
+ * fix the status. A public repository needs no token, so a raw `url` source
+ * declares none up front and only says so here, once a request fails.
+ */
+const statusReason = (url: string, status: number): string =>
+  TOKEN_STATUSES.has(status) && !process.env.GITHUB_TOKEN && isGithubUrl(url)
+    ? `${url} -> ${status}; GITHUB_TOKEN is not set, which a private repository needs`
+    : `${url} -> ${status}`;
 
 /**
  * GET `url`'s body, giving up after {@link REMOTE_TIMEOUT_MS}: a server that
@@ -103,7 +113,7 @@ const fetchText = async (
       signal: AbortSignal.timeout(REMOTE_TIMEOUT_MS),
     });
     if (!res.ok) {
-      throw new Error(`${url} -> ${res.status}`);
+      throw new Error(statusReason(url, res.status));
     }
     return await res.text();
   } catch (error) {
@@ -183,6 +193,50 @@ const enumerateGithub = async (
   };
 };
 
+// A line an ATX heading opens (`# Title`); any other first line can only open
+// a setext heading, underlined on the line after it.
+const ATX_HEADING = /^ {0,3}#/u;
+
+/** A remote page's body and front matter, as the source hands them on. */
+interface RemotePage {
+  body: string;
+  // oxlint-disable-next-line anti-slop/no-unsafe-dictionary-type -- pre-validation front matter, as `SourceEntry.data` holds it
+  data: Record<string, unknown>;
+}
+
+/**
+ * Drop a remote page's leading h1 when it is the page's title. A file written
+ * to read on GitHub opens with `# Title`, and Blume renders the page's title
+ * as its h1, so the heading would show twice. A local page loses the
+ * duplicate when its author deletes the heading (the fix the multiple-h1
+ * audit names); a remote file can't be edited from the site that reads it.
+ * The heading's text becomes `title` when the front matter sets none, the
+ * title Blume derives from it anyway, and an h1 that differs from a front
+ * matter title stays. The heading's lines are blanked rather than removed, so
+ * every other line keeps the number it has in the remote file.
+ */
+const withoutTitleHeading = (page: RemotePage): RemotePage => {
+  const lines = page.body.split("\n");
+  const start = lines.findIndex((line) => line.trim() !== "");
+  const span = ATX_HEADING.test(lines[start] ?? "") ? 1 : 2;
+  const [heading] =
+    start === -1
+      ? []
+      : extractHeadings(lines.slice(start, start + span).join("\n"));
+  if (
+    heading?.depth !== 1 ||
+    heading.text === "" ||
+    (page.data.title !== undefined && page.data.title !== heading.text)
+  ) {
+    return page;
+  }
+  lines.fill("", start, start + span);
+  return {
+    body: lines.join("\n"),
+    data: { ...page.data, title: heading.text },
+  };
+};
+
 /**
  * Remote Markdown/MDX content source. Fetches raw `.md`/`.mdx` over HTTP and
  * passes the text straight through `normalizeEntry`. A snapshot under
@@ -229,12 +283,19 @@ export const mdxRemoteSource = (
     const text = await fetchText(item.fetchUrl, doFetch);
     const parsed = matter(text);
     const format = item.ref.toLowerCase().endsWith(".mdx") ? "mdx" : "md";
-    return {
-      body: { format, text: parsed.content },
+    const page = withoutTitleHeading({
+      body: parsed.content,
       data: parsed.data,
+    });
+    return {
+      body: { format, text: page.body },
+      data: page.data,
       editUrl: item.editUrl,
       hash: hashText(text),
-      raw: text,
+      // The body is the text's tail, after the front matter, which stays as
+      // written: a title taken from the dropped heading lives in `data`, as a
+      // title derived from a local page's heading does.
+      raw: text.slice(0, text.length - parsed.content.length) + page.body,
       ref: item.ref,
     };
   };

@@ -37,7 +37,9 @@ mdxRemote({
 
 A relative link between remote files (`[Errors](./02-errors.mdx)`) lands on the page the linked file publishes at, with its ordering prefix dropped from the route, and `blume validate` checks it the same way.
 
-A private repo's token is read from the `GITHUB_TOKEN` environment variable — the adapter declares it, so `blume dev` and `blume build` warn when it's unset. It is never inlined into your config or generated output, and it is only ever sent to GitHub's own hosts (`api.github.com`, `raw.githubusercontent.com`), never to a custom `url` base. A public repo works without it.
+A private repo's token is read from the `GITHUB_TOKEN` environment variable. It is never inlined into your config or generated output, and it is only ever sent to GitHub's own hosts (`api.github.com`, `raw.githubusercontent.com`), never to a custom `url` base. A public repo works without it. With `github`, the adapter declares the variable, so `blume dev` and `blume build` warn `BLUME_MISSING_SECRET` when it's unset: the file listing goes through GitHub's API, which allows 60 unauthenticated requests an hour. A raw `url` reads files only, so nothing warns up front; when GitHub refuses a file with a 401, 403, or 404 while `GITHUB_TOKEN` is unset, the warning for the skipped file says the variable isn't set.
+
+A file written to read on GitHub often opens with a `# Heading`, while Blume renders the page's `title` as its `<h1>`. When a remote page's first line is an h1 that matches its front matter `title`, or the front matter sets no `title`, the heading is dropped and its text is the title, so the page shows one `<h1>`. A first heading that differs from `title` stays.
 
 Remote pages are rendered with full MDX-plus-component fidelity: their bodies are materialized into a hidden staging directory and rendered through Astro alongside your local docs, so callouts, tabs, and every other Blume component keep working.
 

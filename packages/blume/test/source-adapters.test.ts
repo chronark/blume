@@ -154,10 +154,12 @@ const secretsFor = (url: string) =>
   mdxRemote({ files: ["intro.mdx"], url }).requiredSecrets;
 
 describe("blume/sources factories", () => {
-  it("declare GITHUB_TOKEN for an mdxRemote url base only on a GitHub host", () => {
+  it("declare GITHUB_TOKEN for mdxRemote only when it lists files through GitHub's API", () => {
+    // A public repository's raw files need no token, so a raw `url` base
+    // declares none, even on GitHub's own host.
     expect(
       secretsFor("https://raw.githubusercontent.com/acme/sdk/main/docs")
-    ).toStrictEqual(["GITHUB_TOKEN"]);
+    ).toStrictEqual([]);
     expect(secretsFor("https://cdn.example.com/docs")).toStrictEqual([]);
     expect(secretsFor("not a url")).toStrictEqual([]);
     expect(mdxRemote({ files: ["intro.mdx"] }).requiredSecrets).toStrictEqual(

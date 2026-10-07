@@ -723,7 +723,7 @@ describe("normalizeEntry with content.types frontmatter", () => {
 describe("mdxRemoteSource (files mode)", () => {
   const FILES = new Map([
     ["guide.md", "---\ntitle: Guide\n---\n# Guide\n"],
-    ["intro.mdx", "---\ntitle: Intro\n---\n# Intro\n"],
+    ["intro.mdx", "---\ntitle: Intro\n---\n# Intro\n\nWelcome.\n"],
     ["notes.txt", "ignored\n"],
   ]);
 
@@ -754,8 +754,10 @@ describe("mdxRemoteSource (files mode)", () => {
     expect(refs).toStrictEqual(["guide.md", "intro.mdx"]);
 
     const intro = entries.find((entry) => entry.ref === "intro.mdx");
-    expect(intro?.body.text.trim()).toBe("# Intro");
-    expect(intro?.raw).toContain("title: Intro");
+    // The `# Intro` heading repeats the title Blume renders as the h1, so its
+    // line is blanked in both the body and the staged raw text.
+    expect(intro?.body.text).toBe("\n\nWelcome.\n");
+    expect(intro?.raw).toBe("---\ntitle: Intro\n---\n\n\nWelcome.\n");
     expect(intro?.editUrl).toBe("https://example.com/docs/intro.mdx");
     expect(await source.read?.("intro.mdx")).toContain("title: Intro");
   });
@@ -894,6 +896,116 @@ describe("mdxRemoteSource (files mode)", () => {
     expect(diagnostics.map((d) => d.code)).toContain(
       "BLUME_SOURCE_FETCH_FAILED"
     );
+  });
+
+  it("names GITHUB_TOKEN only when GitHub refuses a request a token could fix", async () => {
+    const original = process.env.GITHUB_TOKEN;
+    const statuses = new Map([
+      ["gone.mdx", 404],
+      ["broken.mdx", 500],
+    ]);
+    const failing = asFetch((input) => {
+      const ref = input.toString().split("/").pop() ?? "";
+      return Promise.resolve(
+        new Response(ref === "ok.mdx" ? "Ok.\n" : "", {
+          status: statuses.get(ref) ?? 200,
+        })
+      );
+    });
+    const reasons = async (url: string): Promise<string[]> => {
+      const cacheDir = join(await makeProject({}), ".cache");
+      const { diagnostics } = await mdxRemoteSource(
+        {
+          fetchImpl: failing,
+          files: ["ok.mdx", "gone.mdx", "broken.mdx"],
+          include: ["**/*.mdx"],
+          name: "sdk",
+          url,
+        },
+        ctxFor(cacheDir)
+      ).load();
+      return diagnostics.map((d) => d.message);
+    };
+    const raw = "https://raw.githubusercontent.com/o/r/main/docs";
+    try {
+      delete process.env.GITHUB_TOKEN;
+      // A private repository's file is a 404 without a token; a 500 is the
+      // server's own failure, which no token fixes.
+      expect(await reasons(raw)).toStrictEqual([
+        `Source "sdk" skipped "gone.mdx" (${raw}/gone.mdx -> 404; GITHUB_TOKEN is not set, which a private repository needs); the rest were imported.`,
+        `Source "sdk" skipped "broken.mdx" (${raw}/broken.mdx -> 500); the rest were imported.`,
+      ]);
+      // Another host is never sent the token, so it never names it.
+      expect(await reasons("https://example.com/docs")).toContain(
+        'Source "sdk" skipped "gone.mdx" (https://example.com/docs/gone.mdx -> 404); the rest were imported.'
+      );
+      // With a token set, the 404 is the file's own.
+      process.env.GITHUB_TOKEN = "t0ken";
+      expect(await reasons(raw)).toContain(
+        `Source "sdk" skipped "gone.mdx" (${raw}/gone.mdx -> 404); the rest were imported.`
+      );
+    } finally {
+      if (original === undefined) {
+        delete process.env.GITHUB_TOKEN;
+      } else {
+        process.env.GITHUB_TOKEN = original;
+      }
+    }
+  });
+
+  it("drops a leading h1 that is the page's title", async () => {
+    const pages = new Map([
+      // No front matter title: the heading becomes it.
+      ["untitled.md", "# Getting started\n\nBody.\n"],
+      // A setext heading spans its underline too.
+      ["setext.md", "\nOverview\n========\n\nText.\n"],
+      // A title the heading doesn't match: both stay.
+      ["differs.md", "---\ntitle: Install\n---\n# Installation\n"],
+      // Not an h1, not first, or no text: nothing to drop.
+      ["section.md", "## Usage\n\n# Later\n"],
+      ["prose.md", "Intro.\n\n# Heading\n"],
+      ["blank.md", "# <span></span>\n\nText.\n"],
+      ["empty.md", ""],
+    ]);
+    const cacheDir = join(await makeProject({}), ".cache");
+    const { entries } = await mdxRemoteSource(
+      {
+        fetchImpl: asFetch((input) => {
+          const ref = input.toString().split("/").pop() ?? "";
+          return Promise.resolve(ok(pages.get(ref) ?? ""));
+        }),
+        files: [...pages.keys()],
+        include: ["**/*.md"],
+        name: "sdk",
+        url: "https://example.com/docs",
+      },
+      ctxFor(cacheDir)
+    ).load();
+    const byRef = new Map(entries.map((entry) => [entry.ref, entry]));
+    const read = (ref: string) => {
+      const entry = byRef.get(ref);
+      return { body: entry?.body.text, data: entry?.data, raw: entry?.raw };
+    };
+
+    expect(read("untitled.md")).toStrictEqual({
+      body: "\n\nBody.\n",
+      data: { title: "Getting started" },
+      raw: "\n\nBody.\n",
+    });
+    expect(read("setext.md")).toStrictEqual({
+      body: "\n\n\n\nText.\n",
+      data: { title: "Overview" },
+      raw: "\n\n\n\nText.\n",
+    });
+    expect(read("differs.md")).toStrictEqual({
+      body: "# Installation\n",
+      data: { title: "Install" },
+      raw: "---\ntitle: Install\n---\n# Installation\n",
+    });
+    for (const ref of ["section.md", "prose.md", "blank.md", "empty.md"]) {
+      const text = pages.get(ref);
+      expect(read(ref)).toStrictEqual({ body: text, data: {}, raw: text });
+    }
   });
 });
 

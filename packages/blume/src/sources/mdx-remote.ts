@@ -50,27 +50,19 @@ export const mdxRemoteAdapterSchema = adapterDescriptorSchema(
   mdxRemoteOptionsSchema
 );
 
-// The hosts the source ever sends `GITHUB_TOKEN` to (the same set the fetch
-// in core/sources/mdx-remote.ts checks), so only an adapter reading from
-// GitHub declares the variable.
-const GITHUB_HOSTS = new Set(["api.github.com", "raw.githubusercontent.com"]);
-
-const readsFromGithub = (options: MdxRemoteOptions): boolean =>
-  options.github !== undefined ||
-  (options.url !== undefined &&
-    URL.canParse(options.url) &&
-    GITHUB_HOSTS.has(new URL(options.url).hostname));
-
 /**
  * Remote Markdown/MDX fetched over HTTP. Enumerate files explicitly against a
  * raw `url` base, or from a GitHub repo subtree via `github`. A private repo's
- * token comes from `GITHUB_TOKEN` — never inline it here. The adapter declares
- * the variable only when it reads from GitHub, since a `url` on any other host
- * is never sent the token.
+ * token comes from `GITHUB_TOKEN` — never inline it here. Only `github`
+ * declares the variable: it lists files through GitHub's API, whose
+ * unauthenticated rate limit a build can run into even for a public
+ * repository. A raw `url` needs no token for a public repository, so a fetch
+ * that fails for want of one names the variable instead (see
+ * core/sources/mdx-remote.ts).
  */
 export const mdxRemote = (options: MdxRemoteOptions): MdxRemoteAdapter => ({
   kind: "mdx-remote",
   options,
-  requiredSecrets: readsFromGithub(options) ? ["GITHUB_TOKEN"] : [],
+  requiredSecrets: options.github ? ["GITHUB_TOKEN"] : [],
   runtimeDeps: [],
 });
