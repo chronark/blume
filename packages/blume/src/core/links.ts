@@ -22,6 +22,22 @@ const HTTP = /^https?:\/\//iu;
 const PROTOCOL_RELATIVE = /^\/\//u;
 const SCHEME = /^[a-z][a-z0-9+.-]*:/iu;
 
+/**
+ * Link schemes only one docs platform understands: ReadMe resolves
+ * `doc:slug`, `ref:slug`, `page:slug`, `changelog:slug`, and `blog:slug` to
+ * its own pages, but no browser or app handles them, so each ships as a dead
+ * `href`. A denylist, not an allowlist of web schemes: an app's deep link
+ * (`vscode:`, `cursor://`, `slack://`) is as real a link as `mailto:`, and
+ * which apps a reader has installed can't be known here.
+ */
+const PLATFORM_SCHEMES = new Set([
+  "blog:",
+  "changelog:",
+  "doc:",
+  "page:",
+  "ref:",
+]);
+
 /** Percent-decode a link piece; malformed sequences stay verbatim. */
 const decodePercent = (value: string): string => {
   try {
@@ -547,9 +563,19 @@ const classifyLink = (
     });
     return null;
   }
-  if (SCHEME.test(target)) {
-    // mailto:, tel:, and other non-HTTP schemes are not validated.
-    return null;
+  const scheme = SCHEME.exec(target)?.[0];
+  if (scheme !== undefined) {
+    // mailto:, tel:, and other non-HTTP schemes are not validated — except a
+    // platform's own, which no browser follows.
+    return PLATFORM_SCHEMES.has(scheme.toLowerCase())
+      ? {
+          ...site,
+          code: "BLUME_UNSUPPORTED_LINK_SCHEME",
+          message: `Link ${target} uses ReadMe's ${scheme} scheme, which browsers can't follow, so it ships as a dead link.`,
+          severity: "warning",
+          suggestion: "Link the page by its path instead, like /guides/setup.",
+        }
+      : null;
   }
 
   const hashIndex = target.indexOf("#");

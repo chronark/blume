@@ -1,10 +1,13 @@
 import { describe, expect, it } from "bun:test";
 
+import { validateLinks } from "../src/core/links.ts";
+import { pageMetaSchema } from "../src/core/schema.ts";
 import {
   extractLinks,
   normalizeEntry,
   scanBody,
 } from "../src/core/sources/normalize.ts";
+import type { ContentGraph, PageLink, PageRecord } from "../src/core/types.ts";
 
 // How `blume validate` reads link syntax: which destinations, definitions,
 // and anchors a page's source holds, as the renderer reads them.
@@ -190,5 +193,72 @@ describe("<a name> anchors", () => {
       "bare",
       "jsx",
     ]);
+  });
+});
+
+const makePage = (links: PageLink[]): PageRecord => ({
+  anchors: [],
+  contentType: "doc",
+  format: "md",
+  groups: [],
+  headings: [],
+  id: "a.md",
+  links,
+  locale: "",
+  meta: pageMetaSchema.parse({}),
+  navPath: "a.md",
+  route: "/a",
+  segments: [],
+  source: { name: "filesystem", ref: "a.md" },
+  sourcePath: "/abs/a.md",
+  title: "A",
+  translationKey: "/a",
+  version: "",
+  versionKey: "/a",
+});
+
+const validate = (hrefs: string[]) =>
+  validateLinks(
+    // SAFETY: link validation reads only pages and routes.
+    {
+      pages: [
+        makePage(hrefs.map((target) => ({ column: 1, line: 1, target }))),
+      ],
+      routes: new Map([["/a", "a.md"]]),
+    } as ContentGraph,
+    { publicDir: null }
+  );
+
+describe("link schemes", () => {
+  it("warns on ReadMe's link schemes, which no browser follows", async () => {
+    const diagnostics = await validate([
+      "doc:getting-started",
+      "REF:create-user",
+      "page:about",
+      "changelog:v2",
+      "blog:launch",
+    ]);
+    expect(diagnostics.map((d) => [d.code, d.severity])).toStrictEqual(
+      Array.from({ length: 5 }, () => [
+        "BLUME_UNSUPPORTED_LINK_SCHEME",
+        "warning",
+      ])
+    );
+    expect(diagnostics[0]?.message).toBe(
+      "Link doc:getting-started uses ReadMe's doc: scheme, which browsers can't follow, so it ships as a dead link."
+    );
+  });
+
+  it("leaves every other scheme alone", async () => {
+    expect(
+      await validate([
+        "mailto:a@b.dev",
+        "tel:+15551234",
+        "vscode:mcp/install?x",
+        "cursor://anysphere.cursor-deeplink/mcp/install",
+        "data:image/png;base64,AAAA",
+        "docs:not-readme",
+      ])
+    ).toStrictEqual([]);
   });
 });
