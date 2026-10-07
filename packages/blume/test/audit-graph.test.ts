@@ -233,7 +233,8 @@ describe("resolveRedirects", () => {
         { from: "/older", status: 301, to: "/beta/final" },
         { from: "/v2/final", status: 301, to: "/final" },
       ],
-      served
+      // `/beta` itself goes to `/v2`.
+      (path) => served(path) || path === "/v2"
     );
     expect(pattern?.outcome).toBe("pattern");
     expect(via?.chain).toEqual([
@@ -243,6 +244,48 @@ describe("resolveRedirects", () => {
       "/final",
     ]);
     expect(via?.outcome).toBe("chain");
+  });
+
+  it("walks the bare path a pattern's rest also matches", () => {
+    // Every host gets `/mcp /user-api` beside `/mcp/* /user-api/:splat`, so
+    // a `/user-api` that isn't served breaks `/mcp`.
+    const [broken, through, loop, ok] = resolveRedirects(
+      [
+        { from: "/mcp/*", status: 301, to: "/user-api/*" },
+        { from: "/beta/:slug*", status: 301, to: "/older" },
+        { from: "/a/*", status: 301, to: "/a" },
+        { from: "/fine/*", status: 301, to: "/new" },
+        { from: "/older", status: 301, to: "/gone" },
+      ],
+      served
+    );
+    expect(broken?.outcome).toBe("broken");
+    expect(broken?.chain).toEqual(["/mcp", "/user-api"]);
+    expect(through?.outcome).toBe("broken");
+    expect(through?.chain).toEqual(["/beta", "/older", "/gone"]);
+    expect(loop?.outcome).toBe("loop");
+    expect(loop?.chain).toEqual(["/a", "/a"]);
+    // A bare path that lands leaves the pattern as it was.
+    expect(ok?.outcome).toBe("pattern");
+    // One whose bare path holds a capture names no single path to walk.
+    const [captured] = resolveRedirects(
+      [{ from: "/:lang/*", status: 301, to: "/gone" }],
+      served
+    );
+    expect(captured?.outcome).toBe("pattern");
+  });
+
+  it("calls a walk that never ends a loop", () => {
+    // `/x` → `/a/b` → `/a/b/b` → …: no hop repeats, and none lands.
+    const [result] = resolveRedirects(
+      [
+        { from: "/x", status: 301, to: "/a/b" },
+        { from: "/a/*", status: 301, to: "/a/b/:splat" },
+      ],
+      served
+    );
+    expect(result?.outcome).toBe("loop");
+    expect(result?.chain.length).toBeGreaterThan(32);
   });
 
   it("detects a self-redirect as a loop", () => {

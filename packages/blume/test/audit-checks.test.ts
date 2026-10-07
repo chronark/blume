@@ -700,6 +700,18 @@ describe("redirect checks", () => {
     expect(run(redirectChecks, ctx)).toContain("REDIRECT_BROKEN");
   });
 
+  it("names the bare path a broken pattern also matches", () => {
+    const ctx = context({
+      redirects: [{ from: "/mcp/*", status: 301, to: "/user-api/*" }],
+    });
+    // SAFETY: the redirect checks run synchronously, like every static check.
+    const [found] = redirectChecks.run(ctx) as Diagnostic[];
+    expect(found?.code).toBe("BLUME_AUDIT_REDIRECT_BROKEN");
+    expect(found?.message).toBe(
+      "Redirect from /mcp/*, which also matches /mcp, lands on /user-api, which the build does not serve."
+    );
+  });
+
   it("reports a redirect loop", () => {
     const ctx = context({
       redirects: [

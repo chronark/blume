@@ -226,7 +226,7 @@ redirects: [
 ```
 
 - `:name` matches one whole segment: `/blog/:slug` covers `/blog/hello`, not `/blog/a/b`.
-- `:name*` as the last segment matches the rest of the path, any number of segments: `/beta/:slug*` sends `/beta/guides/setup` to `/v2/guides/setup`, and `/beta` itself to `/v2`. A last segment of `*` does the same.
+- `:name*` as the last segment matches the rest of the path, any number of segments: `/beta/:slug*` sends `/beta/guides/setup` to `/v2/guides/setup`, and `/beta` itself to `/v2`. A last segment of `*` does the same. Every host gets that bare path as a rule of its own (`/beta /v2` in `_redirects`), so all of them send it to the same place. `blume audit` checks where it lands, and reports `/beta` going to a `/v2` the build doesn't serve as a broken redirect.
 - `*` at the end of a segment matches the rest of the path from there: `/articles/concepts-*` covers `/articles/concepts-overview`.
 
 `to` reads a capture by name, as a whole segment (`/:slug*`, `/:slug`), or a `*` for what the `*` in `from` matched (`:splat`, the way `_redirects` spells it, reads it too). A `to` that reads no capture sends every path the pattern covers to one page. An exact redirect wins over a pattern that covers the same path, and patterns are tried in the order you list them.

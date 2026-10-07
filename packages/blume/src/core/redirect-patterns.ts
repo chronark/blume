@@ -278,6 +278,32 @@ export const expandRedirect = (redirect: RedirectEnds): RedirectRule[] => {
   ];
 };
 
+/**
+ * The bare path a pattern ending in a rest also matches, as the exact
+ * redirect every host is given for it: `/beta/:slug*` (or `/beta/*`) to
+ * `/v2/:slug*` sends `/beta` itself to `/v2`. Null for an exact redirect,
+ * a pattern with no rest, and one whose bare path still holds a capture
+ * (`/:lang/*`), which names no single path.
+ */
+export const bareRedirect = (
+  redirect: RedirectEnds
+): { from: string; to: string } | null => {
+  // A rest expands to two rules, the bare path first (see `expandRedirect`).
+  const rules = expandRedirect(redirect);
+  const [bare] = rules;
+  if (rules.length !== 2 || bare === undefined) {
+    return null;
+  }
+  let from = "";
+  for (const part of bare.parts) {
+    if (part.kind !== "text") {
+      return null;
+    }
+    from += part.text;
+  }
+  return { from, to: bare.to };
+};
+
 /** Put exact redirects ahead of patterns, which hosts try in order. */
 export const exactFirst = <Redirect extends { from: string }>(
   redirects: readonly Redirect[]

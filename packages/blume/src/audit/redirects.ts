@@ -1,4 +1,5 @@
 import {
+  bareRedirect,
   isPatternPath,
   patternDestination,
 } from "../core/redirect-patterns.ts";
@@ -23,16 +24,32 @@ const pathOnly = (value: string): string => {
 };
 
 /**
+ * The most hops a walk follows before calling it a loop. A pattern can send a
+ * path somewhere it covers again, one segment longer each time (`/a/*` to
+ * `/a/b/:splat`), which never revisits a hop yet never resolves either.
+ */
+const MAX_HOPS = 32;
+
+/** Where a walk from one path ended, and how. */
+type Walk = Pick<RedirectResolution, "chain" | "outcome">;
+
+/**
  * Follow every configured redirect through to its destination, classifying what
  * it lands on.
  *
- * - `loop`    — the chain revisits a hop it has already been to. Never resolves.
+ * - `loop`    — the chain revisits a hop it has already been to, or runs past
+ *   {@link MAX_HOPS}. Never resolves.
  * - `broken`  — the chain ends somewhere the build does not serve.
  * - `chain`   — it resolves, but through at least one intermediate redirect.
  * - `ok`      — one hop, straight to a real page.
  * - `pattern` — a pattern (`/beta/:slug*`), which covers paths rather than
  *   naming one, so there is no single chain to walk; {@link redirectAt}
  *   resolves a path it covers.
+ *
+ * A pattern ending in a rest also matches its bare path (`/beta`, see
+ * `bareRedirect`), which every host gets as an exact rule. That one path is
+ * walked like an exact redirect: when it loops or breaks, the pattern takes
+ * that outcome, its chain starting at the bare path.
  *
  * An external destination (`https://…`) is always `ok`: it's outside the site,
  * so there's no local page to check it against. A hop onto a path a pattern
@@ -50,14 +67,10 @@ export const resolveRedirects = (
   const hopFrom = (path: string): string | undefined =>
     byFrom.get(path)?.to ?? patternDestination(redirects, path);
 
-  return redirects.map((redirect) => {
-    const from = normalizePath(redirect.from);
-    if (isPatternPath(redirect.from)) {
-      return { ...redirect, chain: [from], outcome: "pattern" as const };
-    }
+  const walk = (from: string, to: string): Walk => {
     const chain: string[] = [from];
     const seen = new Set<string>([from]);
-    let current = redirect.to;
+    let current = to;
 
     for (;;) {
       // An external hop ends the walk — we can't follow it locally.
@@ -66,13 +79,9 @@ export const resolveRedirects = (
         break;
       }
       const next = normalizePath(pathOnly(current));
-      if (seen.has(next)) {
+      if (seen.has(next) || chain.length > MAX_HOPS) {
         chain.push(next);
-        return {
-          ...redirect,
-          chain,
-          outcome: "loop" as const,
-        };
+        return { chain, outcome: "loop" };
       }
       chain.push(next);
       seen.add(next);
@@ -86,15 +95,23 @@ export const resolveRedirects = (
     const destination = chain.at(-1) ?? from;
     const external = /^https?:\/\//iu.test(destination);
     if (!(external || served(destination))) {
-      return { ...redirect, chain, outcome: "broken" as const };
+      return { chain, outcome: "broken" };
     }
     // `chain` is [from, …hops, destination]; more than two entries means at
     // least one intermediate redirect.
-    return {
-      ...redirect,
-      chain,
-      outcome: chain.length > 2 ? ("chain" as const) : ("ok" as const),
-    };
+    return { chain, outcome: chain.length > 2 ? "chain" : "ok" };
+  };
+
+  return redirects.map((redirect) => {
+    const from = normalizePath(redirect.from);
+    if (!isPatternPath(redirect.from)) {
+      return { ...redirect, ...walk(from, redirect.to) };
+    }
+    const bare = bareRedirect(redirect);
+    const walked = bare && walk(normalizePath(bare.from), bare.to);
+    return walked && (walked.outcome === "loop" || walked.outcome === "broken")
+      ? { ...redirect, ...walked }
+      : { ...redirect, chain: [from], outcome: "pattern" as const };
   });
 };
 

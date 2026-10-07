@@ -48,11 +48,15 @@ export const redirectChecks: CheckModule = {
           )
         );
       } else if (redirect.outcome === "broken") {
+        // A pattern's chain starts at the bare path it also matches.
+        const [start] = redirect.chain;
+        const what =
+          start === from ? from : `${from}, which also matches ${start},`;
         found.push(
           finding(
             "BLUME_AUDIT_REDIRECT_BROKEN",
             { ...site, url: from },
-            `Redirect from ${from} lands on ${redirect.chain.at(-1)}, which the build does not serve.`
+            `Redirect from ${what} lands on ${redirect.chain.at(-1)}, which the build does not serve.`
           )
         );
       } else if (redirect.outcome === "chain") {

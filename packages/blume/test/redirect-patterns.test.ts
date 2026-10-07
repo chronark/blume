@@ -9,6 +9,7 @@ import { validateLinks } from "../src/core/links.ts";
 import { scanProject } from "../src/core/project-graph.ts";
 import type { BlumeProject } from "../src/core/project-graph.ts";
 import {
+  bareRedirect,
   compileEveryRedirect,
   compileRedirects,
   encodeCapture,
@@ -162,6 +163,28 @@ describe(expandRedirect, () => {
     expect(expandRedirect({ from: "/a/*/b", status: 301, to: "/" })).toEqual(
       []
     );
+  });
+});
+
+describe(bareRedirect, () => {
+  it("names the bare path a rest also matches, and where it goes", () => {
+    expect(bareRedirect(BETA)).toStrictEqual({ from: "/beta", to: "/v2" });
+    expect(bareRedirect(SPLAT)).toStrictEqual({
+      from: "/legacy",
+      to: "/?from=legacy",
+    });
+    expect(
+      bareRedirect({ from: "/mcp/*", status: 301, to: "/user-api/*" })
+    ).toStrictEqual({ from: "/mcp", to: "/user-api" });
+  });
+
+  it("has none for an exact path, a pattern without a rest, or a capture left", () => {
+    expect(bareRedirect({ from: "/old", status: 301, to: "/new" })).toBeNull();
+    expect(bareRedirect(ONE)).toBeNull();
+    expect(bareRedirect(ARTICLE)).toBeNull();
+    expect(
+      bareRedirect({ from: "/v/:version/:slug*", status: 301, to: "/" })
+    ).toBeNull();
   });
 });
 
