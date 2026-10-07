@@ -12,6 +12,7 @@ import { buildManifest } from "../../core/manifest.ts";
 import { scanProject } from "../../core/project-graph.ts";
 import type { Diagnostic } from "../../core/types.ts";
 import { generatedFilePaths } from "../../deploy/generated-files.ts";
+import { referenceRoutes } from "../../openapi/references.ts";
 import { parseIgnoreFlag } from "../args.ts";
 import { commandMeta } from "../command-meta.ts";
 import { reportInternalError } from "../internal-error.ts";
@@ -55,13 +56,17 @@ export const validateCommand = defineCommand({
       // link-validation blind spot, so silently passing would be misleading.
       diagnostics.push(...project.diagnostics);
 
-      // Custom `.astro` pages and the generated changelog index are servable
-      // routes the content graph can't see — without them, a docs link to e.g.
-      // a custom landing page fails as BLUME_BROKEN_LINK.
+      // Custom `.astro` pages, reference routes (a `scalar()` page), and the
+      // generated changelog index are servable routes the content graph can't
+      // see — without them, a docs link to e.g. a custom landing page fails as
+      // BLUME_BROKEN_LINK.
       const userPages = project.context.pagesRoot
         ? await discoverPages(project.context.pagesRoot)
         : [];
-      const extraRoutes = customStaticRoutes(userPages);
+      const extraRoutes = [
+        ...customStaticRoutes(userPages),
+        ...referenceRoutes(project.config),
+      ];
       if (hasGeneratedChangelog(project, userPages)) {
         extraRoutes.push("/changelog");
       }
@@ -90,6 +95,7 @@ export const validateCommand = defineCommand({
         ...(await validateLinks(project.graph, {
           basePath: project.config.basePath,
           checkExternal: Boolean(args.external),
+          configFile: project.context.configFile ?? undefined,
           extraRoutes,
           generatedFiles: generatedFilePaths(project),
           i18n: project.config.i18n,

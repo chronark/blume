@@ -1,16 +1,21 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 
 import { basename, dirname, join, normalize, relative, resolve } from "pathe";
 
-import { stripBasePath, withBasePath } from "./base-path.ts";
+import { isInternalPath, stripBasePath, withBasePath } from "./base-path.ts";
 import {
   isRelativeImageTarget,
   resolveRelativeImage,
 } from "./content-assets.ts";
+import { locatePath } from "./diagnostics.ts";
 import type { LocaleRouting } from "./i18n.ts";
 import { localizeLinkPath } from "./locale-links.ts";
 import { gradeExternal, probeAll } from "./probe.ts";
-import { isPatternPath, pathsUnderPattern } from "./redirect-patterns.ts";
+import {
+  destinationPrefix,
+  isPatternPath,
+  pathsUnderPattern,
+} from "./redirect-patterns.ts";
 import { staticFileResolver } from "./static-files.ts";
 import type {
   ContentGraph,
@@ -680,6 +685,108 @@ const classifyLink = (
 };
 
 /**
+ * Whether an exact redirect target lands somewhere the site serves: a page, a
+ * custom or generated route, a `public/` or generated file, or another
+ * redirect (a chain, which `blume audit` reports on the built site). `self`
+ * is the redirect's own based `from`, which leads nowhere but back.
+ */
+const redirectLands = (
+  path: string,
+  self: string,
+  ctx: LinkContext
+): boolean => {
+  const route = toRoute(withBasePath(ctx.basePath, path));
+  const redirected =
+    ctx.redirects.has(route) ||
+    ctx.redirectPatterns.some(
+      (from) => pathsUnderPattern(from, [route]).length > 0
+    );
+  return (
+    ctx.routes.has(route) ||
+    ctx.extraRoutes.has(route) ||
+    (route !== self && redirected) ||
+    ctx.servesFile(stripBasePath(ctx.basePath, path))
+  );
+};
+
+/**
+ * Whether anything the site serves sits under a pattern target's literal
+ * start (`/guides/` for `/guides/:slug*`): a page, a custom or generated
+ * route, a redirect, or a `public/` folder. Which path a capture fills in
+ * can't be known before a request, so the prefix is what's checked.
+ */
+const redirectLandsUnder = (
+  prefix: string,
+  ctx: LinkContext,
+  publicDir: string | null
+): boolean => {
+  const based = withBasePath(ctx.basePath, prefix);
+  const folder = prefix.slice(0, prefix.lastIndexOf("/") + 1);
+  return (
+    [...ctx.routes, ...ctx.extraRoutes, ...ctx.redirects].some((route) =>
+      `${route}/`.startsWith(based)
+    ) ||
+    (publicDir !== null &&
+      statSync(join(publicDir, folder), {
+        throwIfNoEntry: false,
+      })?.isDirectory() === true)
+  );
+};
+
+/**
+ * Warn about each internal redirect `to` that lands nowhere, located at its
+ * `to` in the config file when the redirects are written there. `blume audit`
+ * follows redirects through the built site; this catches a dead end before
+ * the build. External targets aren't checked.
+ */
+const redirectTargetDiagnostics = (
+  redirects: readonly { from: string; to: string }[],
+  ctx: LinkContext,
+  options: { configFile?: string; publicDir: string | null }
+): Diagnostic[] => {
+  const { configFile, publicDir } = options;
+  let source: string | undefined;
+  return redirects.flatMap((redirect, index): Diagnostic[] => {
+    if (!isInternalPath(redirect.to)) {
+      return [];
+    }
+    const path = decodePercent(redirect.to.split(/[?#]/u)[0] ?? "");
+    const prefix = destinationPrefix(path);
+    const lands =
+      prefix === undefined
+        ? redirectLands(
+            path,
+            toRoute(withBasePath(ctx.basePath, redirect.from)),
+            ctx
+          )
+        : redirectLandsUnder(prefix, ctx, publicDir);
+    if (lands) {
+      return [];
+    }
+    if (configFile && source === undefined) {
+      source = readFileSync(configFile, "utf-8");
+    }
+    const position = source
+      ? locatePath(source, ["redirects", index, "to"])
+      : undefined;
+    return [
+      {
+        code: "BLUME_BROKEN_REDIRECT",
+        column: position?.column,
+        file: configFile,
+        line: position?.line,
+        message:
+          prefix === undefined
+            ? `The redirect from ${redirect.from} sends readers to ${redirect.to}, which no page, file, or other redirect serves.`
+            : `The redirect from ${redirect.from} sends readers to ${redirect.to}, but nothing is served under ${prefix}.`,
+        severity: "warning",
+        suggestion: "Point `to` at a page that exists, or remove the redirect.",
+      },
+    ];
+  });
+};
+
+/**
  * Validate every link discovered in the content graph: internal page links and
  * anchors against the route map, asset links against the public dir, and
  * (opt-in) external links over the network.
@@ -710,8 +817,13 @@ export const validateLinks = async (
     checkExternal?: boolean;
     /** External URLs not to request (`--ignore`). Internal links are always checked. */
     ignore?: (url: string) => boolean;
-    /** Configured redirects; their `from` paths count as valid link targets. */
-    redirects?: { from: string }[];
+    /**
+     * Configured redirects: their `from` paths count as valid link targets,
+     * and an internal `to` must land somewhere the site serves.
+     */
+    redirects?: { from: string; to: string }[];
+    /** The config file the redirects are written in, for their positions. */
+    configFile?: string;
   }
 ): Promise<Diagnostic[]> => {
   const basePath = options.basePath ?? "";
@@ -745,6 +857,12 @@ export const validateLinks = async (
       }
     }
   }
+  diagnostics.push(
+    ...redirectTargetDiagnostics(options.redirects ?? [], ctx, {
+      configFile: options.configFile,
+      publicDir: options.publicDir,
+    })
+  );
 
   // `--ignore` names URLs that can't be checked from where this runs: a
   // placeholder host, a local server, a site that turns bots away.

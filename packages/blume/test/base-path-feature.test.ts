@@ -369,7 +369,7 @@ describe("validateLinks under basePath", () => {
     const diagnostics = await validateLinks(makeGraph(pages), {
       basePath: "/manual",
       publicDir: null,
-      redirects: [{ from: "/old" }],
+      redirects: [{ from: "/old", to: "/start" }],
     });
     expect(diagnostics.filter((d) => d.severity === "error")).toStrictEqual([]);
   });

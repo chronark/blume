@@ -12,6 +12,7 @@ import {
   bareRedirect,
   compileEveryRedirect,
   compileRedirects,
+  destinationPrefix,
   encodeCapture,
   exactFirst,
   expandRedirect,
@@ -125,6 +126,17 @@ describe("parsing and validation", () => {
   it("puts exact redirects ahead of patterns", () => {
     const exact = { from: "/beta/pinned", status: 301, to: "/pinned" };
     expect(exactFirst([BETA, exact])).toStrictEqual([exact, BETA]);
+  });
+});
+
+describe(destinationPrefix, () => {
+  it("cuts a target at its first capture reference", () => {
+    expect(destinationPrefix("/guides/:slug*")).toBe("/guides/");
+    expect(destinationPrefix("/v2/*")).toBe("/v2/");
+    expect(destinationPrefix("/new/article-*")).toBe("/new/article-");
+    expect(destinationPrefix("/a/:x/b/:y")).toBe("/a/");
+    expect(destinationPrefix("/:page")).toBe("/");
+    expect(destinationPrefix("/exact/path")).toBeUndefined();
   });
 });
 
@@ -622,11 +634,15 @@ describe("the scan", () => {
     ]);
 
     // A link into a pattern is a valid target, like one to an exact `from`.
+    // Only the first redirect's own target is reported: nothing is served
+    // under `/tutorials/`.
     const links = await validateLinks(scanned.graph, {
       publicDir: null,
       redirects: scanned.config.redirects,
     });
-    expect(links).toEqual([]);
+    expect(links.map((diagnostic) => diagnostic.message)).toEqual([
+      "The redirect from /guides/:slug* sends readers to /tutorials/:slug*, but nothing is served under /tutorials/.",
+    ]);
   });
 
   it("warns on an exact redirect from a page's Markdown copy", async () => {

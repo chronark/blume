@@ -288,7 +288,10 @@ describe(validateLinks, () => {
         makePage({ id: "a.mdx", links: [link("/providers")], route: "/a" }),
         makePage({ id: "openai.mdx", route: "/providers/openai" }),
       ]),
-      { publicDir: null, redirects: [{ from: "/providers" }] }
+      {
+        publicDir: null,
+        redirects: [{ from: "/providers", to: "/providers/openai" }],
+      }
     );
     expect(diagnostics).toHaveLength(0);
   });
@@ -298,7 +301,10 @@ describe(validateLinks, () => {
       makeGraph([
         makePage({ id: "a.mdx", links: [link("/nope")], route: "/a" }),
       ]),
-      { publicDir: null, redirects: [{ from: "/providers" }] }
+      {
+        publicDir: null,
+        redirects: [{ from: "/providers", to: "/providers/openai" }],
+      }
     );
     expect(diagnostics[0]?.code).toBe("BLUME_BROKEN_LINK");
   });
@@ -957,6 +963,69 @@ describe("validateLinks — assets against a public dir", () => {
     );
     expect(diagnostics.map((d) => d.message)).toStrictEqual([
       "Image ./missing.png was not found next to a.mdx.",
+    ]);
+  });
+
+  it("warns about a redirect whose target nothing serves, at its `to`", async () => {
+    const redirects = [
+      { from: "/old", to: "/guides/a#intro" },
+      { from: "/logo", to: "/logo.png" },
+      { from: "/feed", to: "/llms.txt" },
+      { from: "/hop", to: "/old" },
+      { from: "/self", to: "/self" },
+      { from: "/gone", to: "/nowhere?ref=old" },
+      { from: "/elsewhere", to: "https://example.com/missing" },
+      { from: "/beta/:slug*", to: "/guides/:slug*" },
+      { from: "/media/*", to: "/demo/*" },
+      { from: "/alpha/:slug*", to: "/missing/:slug*" },
+    ];
+    const configFile = join(root, "blume.config.ts");
+    await writeFile(
+      configFile,
+      `export default {\n  redirects: ${JSON.stringify(redirects, null, 2)},\n};\n`
+    );
+    const diagnostics = await validateLinks(
+      makeGraph([guidePage([]), makePage({ id: "docs.mdx", route: "/docs" })]),
+      { configFile, generatedFiles: ["/llms.txt"], publicDir, redirects }
+    );
+    expect(diagnostics.map((d) => [d.code, d.line, d.message])).toStrictEqual([
+      [
+        "BLUME_BROKEN_REDIRECT",
+        21,
+        "The redirect from /self sends readers to /self, which no page, file, or other redirect serves.",
+      ],
+      [
+        "BLUME_BROKEN_REDIRECT",
+        25,
+        "The redirect from /gone sends readers to /nowhere?ref=old, which no page, file, or other redirect serves.",
+      ],
+      [
+        "BLUME_BROKEN_REDIRECT",
+        41,
+        "The redirect from /alpha/:slug* sends readers to /missing/:slug*, but nothing is served under /missing/.",
+      ],
+    ]);
+    expect(diagnostics[0]?.file).toBe(configFile);
+  });
+
+  it("checks redirect targets under the base path, with no config file to locate them in", async () => {
+    const diagnostics = await validateLinks(
+      makeGraph([makePage({ id: "a.mdx", route: "/docs/a" })]),
+      {
+        basePath: "/docs",
+        publicDir: null,
+        redirects: [
+          { from: "/old", to: "/a" },
+          { from: "/older", to: "/b" },
+          { from: "/v1/:path*", to: "/:path*" },
+        ],
+      }
+    );
+    expect(diagnostics.map((d) => [d.message, d.line])).toStrictEqual([
+      [
+        "The redirect from /older sends readers to /b, which no page, file, or other redirect serves.",
+        undefined,
+      ],
     ]);
   });
 });

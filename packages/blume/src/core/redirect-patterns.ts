@@ -184,6 +184,21 @@ const replaceReferences = (
     replace(referenceName(name), match.startsWith("/"))
   );
 
+/**
+ * The literal start of a `to` that reads a capture, up to its first
+ * reference: `/guides/` for `/guides/:slug*`, `/new/article-` for
+ * `/new/article-*`. `undefined` for a `to` that reads none, which is one
+ * exact path.
+ */
+export const destinationPrefix = (to: string): string | undefined => {
+  const at = to.search(REFERENCE);
+  if (at === -1) {
+    return undefined;
+  }
+  // A whole-segment reference starts at its slash, which the prefix keeps.
+  return to.slice(0, to[at] === "/" ? at + 1 : at);
+};
+
 /** Whether a path is a pattern, rather than one exact path. */
 export const isPatternPath = (path: string): boolean => {
   const parsed = parseFrom(path);

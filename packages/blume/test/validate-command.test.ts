@@ -115,6 +115,45 @@ describe("blume validate — routes beyond the content graph", () => {
     expect(exitCode).toBe(0);
   });
 
+  it("accepts links and redirects to a scalar() reference page", async () => {
+    const root = await fixture({
+      "blume.config.ts": [
+        'import { scalar } from "blume/reference";',
+        "",
+        "export default {",
+        '  redirects: [{ from: "/api-docs", to: "/reference" }],',
+        '  reference: [scalar({ spec: "https://x.dev/openapi.json" })],',
+        "};",
+        "",
+      ].join("\n"),
+      "docs/a.md": "---\ntitle: A\n---\n\n[API](/reference)\n",
+    });
+    const { exitCode, stderr } = await validate(root, "--strict");
+    expect(stderr).not.toContain("BLUME_BROKEN");
+    expect(exitCode).toBe(0);
+  });
+
+  it("warns about a redirect to a page that doesn't exist, at its line", async () => {
+    const root = await fixture({
+      "blume.config.ts": [
+        "export default {",
+        "  redirects: [",
+        '    { from: "/old", to: "/a" },',
+        '    { from: "/older", to: "/b" },',
+        "  ],",
+        "};",
+        "",
+      ].join("\n"),
+      "docs/a.md": "---\ntitle: A\n---\n\nA.\n",
+    });
+    const { exitCode, stderr } = await validate(root);
+    expect(stderr).toContain(
+      "BLUME_BROKEN_REDIRECT The redirect from /older sends readers to /b"
+    );
+    expect(stderr).toContain("blume.config.ts:4:23");
+    expect(exitCode).toBe(0);
+  });
+
   it("accepts links to the generated /changelog index", async () => {
     const root = await fixture({
       "docs/a.md": "---\ntitle: A\n---\n\n[updates](/changelog)\n",
