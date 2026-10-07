@@ -12,7 +12,7 @@ const UNKEY_ROOT_KEY_ENV = "UNKEY_ROOT_KEY";
 export const UNKEY_NAMESPACE = "docs";
 
 /** The longest window Unkey takes, in seconds (30 days). */
-const UNKEY_MAX_WINDOW = 2_592_000;
+export const UNKEY_MAX_WINDOW = 2_592_000;
 
 /** Options for {@link unkey}. */
 export interface UnkeyOptions extends RateLimitOptions {

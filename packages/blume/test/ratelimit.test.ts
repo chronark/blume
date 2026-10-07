@@ -332,6 +332,26 @@ describe(unkeyLimiter, () => {
       now: time.now,
     });
     expect(await skewed("a")).toStrictEqual({ allowed: false, retryAfter: 60 });
+    // An override set in Unkey replaces the window, so its reset stands.
+    const overridden = unkeyLimiter(5, 60, "docs", "k", {
+      fetch: unkeyStub(() =>
+        Response.json({
+          data: {
+            limit: 1,
+            overrideId: "rlor_1",
+            remaining: 0,
+            reset: time.now() + 3_600_000,
+            success: false,
+          },
+          meta: { requestId: "req_1" },
+        })
+      ).fetch,
+      now: time.now,
+    });
+    expect(await overridden("a")).toStrictEqual({
+      allowed: false,
+      retryAfter: 3600,
+    });
   });
 
   it("swaps characters Unkey's identifiers don't take for _", async () => {

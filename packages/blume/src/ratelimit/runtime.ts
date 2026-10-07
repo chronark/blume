@@ -18,7 +18,7 @@ import type { ClientContext } from "../core/client-address.ts";
 import { RATE_LIMIT_BINDING } from "./cloudflare.ts";
 import { DEFAULT_REQUESTS, DEFAULT_WINDOW } from "./memory.ts";
 import type { RateLimitAdapter } from "./schema.ts";
-import { UNKEY_NAMESPACE, unkeySecrets } from "./unkey.ts";
+import { UNKEY_MAX_WINDOW, UNKEY_NAMESPACE, unkeySecrets } from "./unkey.ts";
 import { upstashSecrets } from "./upstash.ts";
 
 /** What a limiter says about one request. */
@@ -166,7 +166,11 @@ export const UNKEY_TIMEOUT = 2000;
 
 /** The part of Unkey's reply the limiter reads. */
 const unkeyReplySchema = z.object({
-  data: z.object({ reset: z.number(), success: z.boolean() }),
+  data: z.object({
+    overrideId: z.string().optional(),
+    reset: z.number(),
+    success: z.boolean(),
+  }),
 });
 
 /**
@@ -174,7 +178,8 @@ const unkeyReplySchema = z.object({
  * digits, and `_.:/-`, so anything else in the key (an IPv6 host's brackets,
  * an address's `%` zone) becomes `_`. Its `reset` is a timestamp on Unkey's
  * clock, which this server's may not match, so `retryAfter` is kept between
- * one second and the window.
+ * one second and the window: the configured one, or Unkey's longest when an
+ * override set in Unkey replaced it.
  */
 export const unkeyLimiter =
   (
@@ -205,9 +210,10 @@ export const unkeyLimiter =
     }
     const { data } = unkeyReplySchema.parse(await response.json());
     const seconds = Math.ceil((data.reset - now()) / 1000);
+    const longest = data.overrideId ? UNKEY_MAX_WINDOW : window;
     return {
       allowed: data.success,
-      retryAfter: Math.min(window, Math.max(1, seconds)),
+      retryAfter: Math.min(longest, Math.max(1, seconds)),
     };
   };
 
