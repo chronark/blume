@@ -365,7 +365,7 @@ lastModified: "git",
 | `"git"` | Read the date from git history (commit dates). |
 | `"frontmatter"` | Never run git — use only the `lastModified` frontmatter field. |
 
-The git source reads the most recent commit that touched each file, so it works in any git repository — including monorepos — and needs the repo's history at build time. CI platforms usually check out a shallow clone, which silently drops most dates (the build warns with `BLUME_SHALLOW_GIT_HISTORY` when that happens): on Vercel, set the `VERCEL_DEEP_CLONE=true` environment variable; with `actions/checkout`, set `fetch-depth: 0`. A page's own `lastModified` frontmatter always wins, which is handy for pinning a date or for files that aren't committed yet:
+The git source reads the most recent commit that touched each file, so it works in any git repository — including monorepos — and needs the repo's history at build time. It follows renames, as `git log --follow` does: renaming `page.md` to `page.mdx`, or moving a file to another folder under the same content root, keeps the page's date as long as the commit leaves its content unchanged. A rename that also edits the file dates the page at that commit, and so does moving a file in from outside the content root. CI platforms usually check out a shallow clone, which silently drops most dates (the build warns with `BLUME_SHALLOW_GIT_HISTORY` when that happens): on Vercel, set the `VERCEL_DEEP_CLONE=true` environment variable; with `actions/checkout`, set `fetch-depth: 0`. A page's own `lastModified` frontmatter always wins, which is handy for pinning a date or for files that aren't committed yet:
 
 ```mdx page.mdx
 ---

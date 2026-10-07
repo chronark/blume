@@ -41,19 +41,50 @@ export const resolveLastModifiedConfig = (
     : { enabled: true, source: value };
 
 /**
- * Parse `git log --format=%x00%cI --name-only` output into a map of
- * repo-root-relative path → most recent committer ISO date. Each commit emits a
- * NUL-prefixed date line followed by the paths it touched; since git logs
- * newest-first, the first date seen for a path wins. Blank lines are ignored.
+ * Parse `git log --format=%x00%cI --name-status -M100%` output into a map of
+ * repo-root-relative path → the committer ISO date of the newest commit that
+ * changed the file. Each commit emits a NUL-prefixed date line followed by a
+ * status line per path it touched (`M\tpath`, `R100\told\tnew`); since git
+ * logs newest-first, the first date seen for a path wins. Blank lines are
+ * ignored.
+ *
+ * A rename (`-M100%` reports only exact ones, where the content is unchanged)
+ * follows the file the way `git log --follow` does for one path: it dates
+ * nothing itself, and the older commits that name the old path date the file
+ * under its current name, so renaming `page.md` to `page.mdx` keeps the page's
+ * date. A file whose visible history starts at a rename (a shallow clone cut
+ * off the commits before it) takes the rename's date.
  */
 export const parseGitLog = (output: string): Map<string, string> => {
   const times = new Map<string, string>();
+  // An older name of a file → its name now, for the commits read after the
+  // rename (older ones).
+  const currentNames = new Map<string, string>();
+  const renamedAt = new Map<string, string>();
   let current: string | null = null;
   for (const line of output.split("\n")) {
     if (line.startsWith("\0")) {
       current = line.slice(1);
-    } else if (line && current && !times.has(line)) {
-      times.set(line, current);
+      continue;
+    }
+    const [status = "", from = "", to] = line.split("\t");
+    const path = to ?? from;
+    if (!(current && path)) {
+      continue;
+    }
+    const name = currentNames.get(path) ?? path;
+    if (status.startsWith("R")) {
+      currentNames.set(from, name);
+      if (!renamedAt.has(name)) {
+        renamedAt.set(name, current);
+      }
+    } else if (!times.has(name)) {
+      times.set(name, current);
+    }
+  }
+  for (const [name, date] of renamedAt) {
+    if (!times.has(name)) {
+      times.set(name, date);
     }
   }
   return times;
@@ -99,8 +130,10 @@ export const gitRepositoryRoot = (root: string): string | null => {
 /**
  * Resolve each source file's last-modified date from git history, keyed by
  * absolute source path. Runs a single `git log` over the given content roots
- * (each local source's own root, which may diverge from `content.root`)
- * and maps repo-root-relative paths back to the given absolute paths
+ * (each local source's own root, which may diverge from `content.root`),
+ * following renames within them (see `parseGitLog`; a file moved in from
+ * outside every root dates from the move), and maps repo-root-relative paths
+ * back to the given absolute paths
  * (monorepo-safe via `rev-parse --show-toplevel`). Returns an empty map if git
  * is unavailable or the project isn't a repo — the feature then simply shows
  * no dates.
@@ -141,7 +174,11 @@ export const gitLastModifiedTimes = (
         "core.quotePath=false",
         "log",
         "--format=%x00%cI",
-        "--name-only",
+        "--name-status",
+        // Exact renames only: git pairs them by blob id without comparing
+        // contents, so following them costs nothing, and a rename with edits
+        // dates the file at that commit either way.
+        "-M100%",
         "--",
         ...contentRoots.map(realPath),
       ],

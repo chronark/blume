@@ -90,17 +90,18 @@ describe("resolveLastModifiedConfig", () => {
 
 describe("parseGitLog", () => {
   it("maps each path to its most recent (first-seen) commit date", () => {
-    // Mirrors `git log --format=%x00%cI --name-only`: a NUL-prefixed date line,
-    // a blank line, then the paths the commit touched, newest commit first.
+    // Mirrors `git log --format=%x00%cI --name-status`: a NUL-prefixed date
+    // line, a blank line, then a status line per path the commit touched,
+    // newest commit first.
     const output = [
       dateLine("2026-06-20T10:00:00+00:00"),
       "",
-      "docs/a.mdx",
-      "docs/b.mdx",
+      "M\tdocs/a.mdx",
+      "A\tdocs/b.mdx",
       dateLine("2026-01-01T00:00:00+00:00"),
       "",
-      "docs/a.mdx",
-      "docs/c.mdx",
+      "A\tdocs/a.mdx",
+      "A\tdocs/c.mdx",
     ].join("\n");
 
     const times = parseGitLog(output);
@@ -108,6 +109,49 @@ describe("parseGitLog", () => {
     expect(times.get("docs/a.mdx")).toBe("2026-06-20T10:00:00+00:00");
     expect(times.get("docs/b.mdx")).toBe("2026-06-20T10:00:00+00:00");
     expect(times.get("docs/c.mdx")).toBe("2026-01-01T00:00:00+00:00");
+  });
+
+  it("follows an exact rename back to the commit that last changed the file", () => {
+    const output = [
+      dateLine("2026-09-01T00:00:00+00:00"),
+      "",
+      "R100\tdocs/guide.md\tdocs/guide.mdx",
+      // A later file takes the old name; it's a different file.
+      dateLine("2026-08-01T00:00:00+00:00"),
+      "",
+      "R100\tdocs/old/guide.md\tdocs/guide.md",
+      dateLine("2026-03-01T00:00:00+00:00"),
+      "",
+      "M\tdocs/old/guide.md",
+      dateLine("2026-01-01T00:00:00+00:00"),
+      "",
+      "A\tdocs/old/guide.md",
+    ].join("\n");
+
+    const times = parseGitLog(output);
+    // Two renames, neither of which changed the content: the date is the
+    // edit before them, read under the file's current name.
+    expect(times.get("docs/guide.mdx")).toBe("2026-03-01T00:00:00+00:00");
+    expect(times.has("docs/guide.md")).toBe(false);
+    expect(times.has("docs/old/guide.md")).toBe(false);
+  });
+
+  it("dates a file at its rename when the log holds nothing older", () => {
+    // A shallow clone's history can end at the rename itself.
+    const output = [
+      dateLine("2026-09-01T00:00:00+00:00"),
+      "",
+      "M\tdocs/b.mdx",
+      dateLine("2026-08-01T00:00:00+00:00"),
+      "",
+      "R100\tdocs/a.md\tdocs/a.mdx",
+      "R100\tdocs/b.md\tdocs/b.mdx",
+    ].join("\n");
+
+    const times = parseGitLog(output);
+    expect(times.get("docs/a.mdx")).toBe("2026-08-01T00:00:00+00:00");
+    // An edit after the rename still dates the file.
+    expect(times.get("docs/b.mdx")).toBe("2026-09-01T00:00:00+00:00");
   });
 
   it("ignores blank lines and returns an empty map for empty input", () => {
@@ -307,6 +351,47 @@ describe("gitLastModifiedTimes", () => {
     expect(times.get(tracked)).toMatch(/^\d{4}-\d{2}-\d{2}T/u);
     // A path with no commit history is simply absent from the map.
     expect(times.has(untracked)).toBe(false);
+  });
+
+  it("keeps a page's date across a rename that leaves its content alone", async () => {
+    const root = initRepo(await makeDir());
+    const contentRoot = join(root, "docs");
+    await mkdir(contentRoot, { recursive: true });
+    await writeFile(join(contentRoot, "guide.md"), "# Guide\n\nSteps.\n");
+    await writeFile(join(contentRoot, "faq.md"), "# FAQ\n\nAnswers.\n");
+    const commitAt = (iso: string, message: string): void => {
+      runGit(root, ["add", "-A"]);
+      // Pinned dates: the commits run within the same second otherwise.
+      execFileSync(
+        // oxlint-disable-next-line sonarjs/no-os-command-from-path
+        "git",
+        ["-C", root, "-c", "commit.gpgsign=false", "commit", "-m", message],
+        {
+          env: {
+            ...fixtureGitEnv(),
+            GIT_AUTHOR_DATE: iso,
+            GIT_COMMITTER_DATE: iso,
+          },
+          stdio: "ignore",
+        }
+      );
+    };
+    commitAt("2026-01-01T00:00:00Z", "add docs");
+    // `.md` to `.mdx` as is, and `.md` to `.mdx` with an edit.
+    runGit(root, ["mv", "docs/guide.md", "docs/guide.mdx"]);
+    runGit(root, ["mv", "docs/faq.md", "docs/faq.mdx"]);
+    await writeFile(join(contentRoot, "faq.mdx"), "# FAQ\n\nNew answers.\n");
+    commitAt("2026-09-01T00:00:00Z", "rename to mdx");
+
+    const guide = join(contentRoot, "guide.mdx");
+    const faq = join(contentRoot, "faq.mdx");
+    const times = gitLastModifiedTimes(root, [contentRoot], [guide, faq]);
+    expect(new Date(times.get(guide) ?? "").toISOString()).toBe(
+      "2026-01-01T00:00:00.000Z"
+    );
+    expect(new Date(times.get(faq) ?? "").toISOString()).toBe(
+      "2026-09-01T00:00:00.000Z"
+    );
   });
 
   it("ignores a GIT_DIR inherited from a parent git process", async () => {
