@@ -26,6 +26,7 @@ import { languageIconTransformer } from "./language-icon.ts";
 import { mathPlugin } from "./math.ts";
 import { mermaidPlugin } from "./mermaid.ts";
 import { packageInstallPlugin } from "./package-install.ts";
+import { promptTextPlugin } from "./prompt-text.ts";
 import { relativeLinksPlugin } from "./relative-links.ts";
 import { tableWrapPlugin } from "./table-wrap.ts";
 import { DEFAULT_CODE_THEMES } from "./themes.ts";
@@ -378,8 +379,9 @@ export type BlumeMdxOptions = BlumeMarkdownOptions;
  * components — `package-install` → package-manager tabs, ` ```ts ts2js ` →
  * TypeScript/JavaScript tabs, `:::note` → `<Callout>`, ` ```mermaid ` → a
  * `<blume-mermaid>` element, block math
- * (`$$…$$`) → the `<Math>` component, and top-level `<RequestExample>` and
- * `<ResponseExample>` → the page's `<ApiRail>`. Used as the `processor` for
+ * (`$$…$$`) → the `<Math>` component, top-level `<RequestExample>` and
+ * `<ResponseExample>` → the page's `<ApiRail>`, and a `<Prompt>` body's text
+ * back to the punctuation its author typed. Used as the `processor` for
  * `@astrojs/mdx` so these apply to `.mdx` only (plain `.md` uses
  * {@link blumeMarkdownProcessor}).
  *
@@ -407,5 +409,6 @@ export const blumeMdxProcessor = (options: BlumeMdxOptions = {}) =>
       ...blumeSharedMdastPlugins(options),
       asMdastPlugin(apiRailPlugin()),
       asMdastPlugin(viewsPlugin()),
+      asMdastPlugin(promptTextPlugin()),
     ],
   });
