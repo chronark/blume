@@ -1,12 +1,15 @@
 import type { Nodes, Paragraph } from "mdast";
-import { mdxToMdast } from "satteri";
+import { markdownToMdast, mdxToMdast } from "satteri";
 
 import {
   CALLOUT_ALIASES,
   CALLOUT_TYPES,
   calloutTypeFor,
 } from "../markdown/directives.ts";
-import { MDX_BODY_FEATURES } from "../markdown/features.ts";
+import {
+  MARKDOWN_BODY_FEATURES,
+  MDX_BODY_FEATURES,
+} from "../markdown/features.ts";
 import { strippedLineOffset } from "./sources/normalize.ts";
 import type { SourceEntry } from "./sources/types.ts";
 import type { Diagnostic } from "./types.ts";
@@ -36,6 +39,11 @@ const OPENING_TEXT_LINE =
 // A markdown-it style opener, `::: tip Title`, which is no directive at all.
 const SPACED_OPENING =
   /^[\t >]*(?<written>(?<fence>:{3,})[\t ]+(?<name>[a-z][\w-]*)(?<title>.*?))\s*$/iu;
+
+// A container opener's colon fence and name, after any quote or list
+// indentation, as one line of a `.md` paragraph holds it.
+const MD_OPENING = /^[\t >]*(?<written>:{3,}(?<name>[a-z][\w-]*))/iu;
+const MD_OPENING_LINE = /^[\t >]*:{3,}[a-z]/imu;
 
 const codeList = (names: Iterable<string>): string =>
   [...names].map((name) => `\`${name}\``).join(", ");
@@ -209,8 +217,62 @@ const directiveFindings = (text: string): Finding[] => {
 };
 
 /**
- * Warn about the `:::` directives in an `.mdx` entry that don't render as
- * their author meant:
+ * Container directive openers on the lines of an `.md` paragraph (`:::note`).
+ * A `.md` page renders no directives, so the opener, its content, and its
+ * closing `:::` show as text. A directive in a code block is no paragraph.
+ */
+const mdOpenings = (node: Paragraph, lines: readonly string[]): Finding[] => {
+  const start = node.position?.start.line ?? 1;
+  const end = node.position?.end.line ?? start;
+  return lines.slice(start - 1, end).flatMap((text, index) => {
+    const groups = MD_OPENING.exec(text)?.groups;
+    if (!(groups?.name && groups.written)) {
+      return [];
+    }
+    const callout = calloutTypeFor(groups.name);
+    return [
+      {
+        code: "BLUME_MD_DIRECTIVE",
+        line: start + index,
+        message: `\`${groups.written}\` opens a directive, which Blume renders only in .mdx, so this .md page shows it and its closing \`:::\` as text.`,
+        suggestion: callout
+          ? `Rename the page to .mdx to render it as a \`${callout}\` callout.`
+          : `Rename the page to .mdx and use a callout type — ${CALLOUT_NAMES} — or remove the \`:::\` lines to keep the content as plain prose.`,
+      },
+    ];
+  });
+};
+
+/**
+ * The directives in an `.md` body, in source order, read the way the
+ * renderer reads the page: as paragraphs, since `.md` has no directives. A
+ * page is parsed only when a line looks like an opener.
+ */
+const mdDirectiveFindings = (text: string): Finding[] => {
+  if (!MD_OPENING_LINE.test(text)) {
+    return [];
+  }
+  const tree: Nodes = markdownToMdast(text, {
+    features: MARKDOWN_BODY_FEATURES,
+  });
+  const lines = text.split("\n");
+  const found: Finding[] = [];
+  const walk = (node: Nodes): void => {
+    if (node.type === "paragraph") {
+      found.push(...mdOpenings(node, lines));
+    } else if ("children" in node) {
+      for (const child of node.children) {
+        walk(child);
+      }
+    }
+  };
+  walk(tree);
+  return found;
+};
+
+/**
+ * Warn about the `:::` directives in an entry that don't render as their
+ * author meant. In `.mdx`:
  *
  * - `BLUME_UNKNOWN_DIRECTIVE`: a `:::name` container that isn't a callout.
  *   The page keeps its content — the body renders between the literal `:::`
@@ -224,6 +286,10 @@ const directiveFindings = (text: string): Finding[] => {
  * - `BLUME_DIRECTIVE_SPACED_NAME`: a spaced callout opener (`::: tip`), which
  *   the page shows as text.
  *
+ * In `.md`, which renders no directives:
+ *
+ * - `BLUME_MD_DIRECTIVE`: a `:::name` opener, which the page shows as text.
+ *
  * Lines point into the file the author wrote, a partial's own file for a
  * directive an `<include>` brought in.
  */
@@ -231,21 +297,21 @@ export const directiveDiagnostics = (
   entry: SourceEntry,
   sourceName: string
 ): Diagnostic[] => {
-  if (entry.body.format !== "mdx") {
-    return [];
-  }
   const page = entry.sourcePath ?? `${sourceName}:${entry.ref}`;
   const offset =
     entry.bodyLineOffset ?? strippedLineOffset(entry.raw, entry.body.text);
-  return directiveFindings(entry.expanded?.text ?? entry.body.text).map(
-    ({ line, ...finding }) => {
-      const origin = entry.expanded?.origins[line - 1];
-      return {
-        ...finding,
-        file: origin?.file ?? page,
-        line: origin?.line ?? line + offset,
-        severity: "warning",
-      };
-    }
-  );
+  const text = entry.expanded?.text ?? entry.body.text;
+  const findings =
+    entry.body.format === "mdx"
+      ? directiveFindings(text)
+      : mdDirectiveFindings(text);
+  return findings.map(({ line, ...finding }) => {
+    const origin = entry.expanded?.origins[line - 1];
+    return {
+      ...finding,
+      file: origin?.file ?? page,
+      line: origin?.line ?? line + offset,
+      severity: "warning",
+    };
+  });
 };

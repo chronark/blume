@@ -68,6 +68,7 @@ const DOCS_PATHS = new Map(
     BLUME_MDX_UNDEFINED_NAME: DOCS_MARKDOWN_AND_MDX,
     BLUME_MD_ATTRIBUTE_LIST: DOCS_OTHER_TOOLS_SYNTAX,
     BLUME_MD_CURLY_ANCHOR: "/docs/content/syntax",
+    BLUME_MD_DIRECTIVE: "/docs/content/syntax",
     BLUME_MD_GITHUB_ALERT: "/docs/content/syntax",
     BLUME_META_INVALID: "/docs/content/meta",
     BLUME_META_LOAD_FAILED: "/docs/content/meta",

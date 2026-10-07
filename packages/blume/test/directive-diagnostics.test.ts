@@ -87,18 +87,129 @@ describe(directiveDiagnostics, () => {
     expect(diagnostic?.file).toBe("cms:guide.mdx");
   });
 
-  it("stays quiet for callouts, code, `.md`, and a body MDX can't parse", () => {
+  it("stays quiet for callouts, code, and a body MDX can't parse", () => {
     const quiet = [
       entry(":::note\nA callout.\n:::\n\n:::caution[Alias]\nToo.\n:::\n"),
       entry("```md\n:::details\nAn example.\n:::\n```\n"),
       entry(":::details\n<!-- not MDX -->\n:::\n"),
-      entry(":::details\nMarkdown has no directives.\n:::\n", {
-        body: { format: "md", text: ":::details\nBody.\n:::\n" },
-      }),
     ];
     for (const item of quiet) {
       expect(directiveDiagnostics(item, "docs")).toStrictEqual([]);
     }
+  });
+});
+
+/** A `.md` entry with this body. */
+const mdEntry = (text: string, over: Partial<SourceEntry> = {}) =>
+  entry(text, {
+    body: { format: "md", text },
+    ref: "guide.md",
+    sourcePath: "/docs/guide.md",
+    ...over,
+  });
+
+describe("a directive in .md", () => {
+  it("warns that it shows as text, and says to rename the page", () => {
+    const diagnostics = directiveDiagnostics(
+      mdEntry("Intro.\n\n:::note\nBody.\n:::\n", {
+        raw: "---\ntitle: Guide\n---\nIntro.\n\n:::note\nBody.\n:::\n",
+      }),
+      "docs"
+    );
+    expect(diagnostics).toStrictEqual([
+      {
+        code: "BLUME_MD_DIRECTIVE",
+        file: "/docs/guide.md",
+        line: 6,
+        message:
+          "`:::note` opens a directive, which Blume renders only in .mdx, so this .md page shows it and its closing `:::` as text.",
+        severity: "warning",
+        suggestion: "Rename the page to .mdx to render it as a `note` callout.",
+      },
+    ]);
+  });
+
+  it("names the callout types for any other name", () => {
+    const [diagnostic] = directiveDiagnostics(
+      mdEntry(":::details[More]\nBody.\n:::\n"),
+      "docs"
+    );
+    expect(diagnostic?.suggestion).toBe(
+      "Rename the page to .mdx and use a callout type — `danger`, `info`, `note`, `success`, `tip`, `warning` (or the aliases `caution`, `error`, `important`, `warn`) — or remove the `:::` lines to keep the content as plain prose."
+    );
+  });
+
+  it("finds an opener in a quote, a list, a nested callout, and an alias", () => {
+    const text = [
+      "> :::tip",
+      "> Quoted.",
+      "> :::",
+      "",
+      "- Item",
+      "",
+      "  :::caution",
+      "  Listed.",
+      "  :::",
+      "",
+      "::::note",
+      ":::warning[Inner]",
+      "Nested.",
+      ":::",
+      "::::",
+    ].join("\n");
+    expect(
+      directiveDiagnostics(mdEntry(text), "docs").map(
+        ({ line, suggestion }) => ({ line, suggestion })
+      )
+    ).toStrictEqual([
+      {
+        line: 1,
+        suggestion: "Rename the page to .mdx to render it as a `tip` callout.",
+      },
+      {
+        line: 7,
+        suggestion:
+          "Rename the page to .mdx to render it as a `warning` callout.",
+      },
+      {
+        line: 11,
+        suggestion: "Rename the page to .mdx to render it as a `note` callout.",
+      },
+      {
+        line: 12,
+        suggestion:
+          "Rename the page to .mdx to render it as a `warning` callout.",
+      },
+    ]);
+  });
+
+  it("stays quiet for code, escapes, a spaced or bare fence, and a page without one", () => {
+    const quiet = [
+      "```md\n:::note\nAn example.\n```\n\n    :::note\n\nWrite `:::note`.\n",
+      "\\:::note\nEscaped.\n:::\n",
+      "::: tip\nNot a directive anywhere.\n:::\n",
+      "Text.\n",
+    ];
+    for (const text of quiet) {
+      expect(directiveDiagnostics(mdEntry(text), "docs")).toStrictEqual([]);
+    }
+  });
+
+  it("points at the partial the opener was included from", () => {
+    const [diagnostic] = directiveDiagnostics(
+      mdEntry("<include>./_part.md</include>\n", {
+        expanded: {
+          includes: ["/docs/_part.md"],
+          origins: [
+            { file: "/docs/_part.md", line: 4 },
+            { file: "/docs/_part.md", line: 5 },
+          ],
+          text: ":::note\nBody.\n:::\n",
+        },
+      }),
+      "docs"
+    );
+    expect(diagnostic).toMatchObject({ file: "/docs/_part.md", line: 4 });
   });
 });
 
