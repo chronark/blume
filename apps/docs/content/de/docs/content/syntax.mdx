@@ -26,7 +26,7 @@ Anker-IDs werden aus dem Überschriftentext erzeugt, eine umformulierte Übersch
 ## Getting started [#setup]
 ```
 
-Verlinke darauf als `/page#setup`. Die Syntax entspricht der von Fumadocs, migrierte Inhalte funktionieren also wortwörtlich.
+Verlinke darauf als `/page#setup`. Die Syntax entspricht der von Fumadocs, migrierte Inhalte funktionieren also wortwörtlich. Die ID wird genau so verwendet, wie sie geschrieben ist: Die intelligente Interpunktion wandelt im Text der Überschrift `--` in einen Gedankenstrich und gerade Anführungszeichen in typografische um, im Marker aber nicht, `[#read--write]` erhält also den Anker `#read--write`.
 
 Die von Pandoc, kramdown und Markdown-basierten Spezifikations-Toolchains verwendete Form `{#custom-id}` wird in `.md`-Dateien als gleichwertig akzeptiert. Nur diese Schreibweise ohne Leerzeichen nagelt einen Anker fest: Das `{ #custom-id }` mit Leerzeichen und das `{: #custom-id }` von kramdown (beide aus `attr_list` von MkDocs) sowie eine Attributliste, die die ID neben Klassen oder Attributen setzt (`{ #custom-id .wide }`), bleiben im Text der Überschrift und in ihrem Anker stehen, und `blume check` warnt in `.md` davor als `BLUME_MD_CURLY_ANCHOR`. In `.mdx` ist ein nacktes `{…}` ein JSX-Ausdruck und die Seite lässt sich nicht kompilieren — `blume check` meldet alle drei Schreibweisen als `BLUME_MDX_CURLY_ANCHOR` —, schreibe dort also `[#custom-id]` oder escape die geschweiften Klammern. Die escapte Form nagelt in beiden Formaten denselben Anker fest, was sie zur richtigen Schreibweise für ein Partial macht, das `.mdx`-Seiten [einbinden](/docs/content/includes):
 

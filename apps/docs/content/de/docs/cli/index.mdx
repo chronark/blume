@@ -109,4 +109,4 @@ Lege im Root deines Projekts eine `tsconfig.json` an, die die Astro-Konfiguratio
 
 Ohne eine `tsconfig.json` im Projekt wird nur die generierte Runtime geprüft.
 
-Auch der Build liest diese Datei, um Importe aufzulösen. Ein `extends`, das sich nicht auflösen lässt (ein nicht installiertes Paket, eine verschobene Datei), bricht `blume build`, `blume dev` und `blume check` deshalb mit `BLUME_TSCONFIG_EXTENDS` ab und verweist dabei auf die Zeile, in der es eingetragen ist. Installiere das Paket oder entferne den Eintrag aus `extends`.
+Auch der Build liest diese Datei, um Importe aufzulösen. Ein Eintrag in `extends` oder `references`, der sich nicht auflösen lässt (ein nicht installiertes Paket, eine verschobene Datei, eine vom Framework generierte tsconfig, die noch nicht existiert), bricht `blume build`, `blume dev` und `blume check` deshalb mit `BLUME_TSCONFIG_EXTENDS` ab und verweist dabei auf die Zeile, in der er eingetragen ist. Installiere das Paket, stelle die Datei wieder her oder generiere sie, oder entferne den Eintrag.

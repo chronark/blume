@@ -109,4 +109,4 @@ Adicione na raiz do projeto um `tsconfig.json` que estenda a configuração do A
 
 Sem um `tsconfig.json` no projeto, só o runtime gerado é verificado.
 
-O build também lê esse arquivo para resolver imports, então um `extends` que não se resolve (um pacote que não está instalado, um arquivo que foi movido) interrompe `blume build`, `blume dev` e `blume check` com `BLUME_TSCONFIG_EXTENDS`, apontando a linha que o referencia. Instale o pacote ou remova a entrada do `extends`.
+O build também lê esse arquivo para resolver imports, então uma entrada de `extends` ou `references` que não se resolve (um pacote que não está instalado, um arquivo que foi movido, um tsconfig gerado por um framework que ainda não existe) interrompe `blume build`, `blume dev` e `blume check` com `BLUME_TSCONFIG_EXTENDS`, apontando a linha que a referencia. Instale, restaure ou gere o arquivo, ou remova a entrada.

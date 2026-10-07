@@ -26,7 +26,7 @@ Os ids das âncoras são gerados a partir do texto do título, então um título
 ## Getting started [#setup]
 ```
 
-Crie um link para ela como `/page#setup`. A sintaxe é igual à do Fumadocs, então conteúdo migrado funciona sem alterações.
+Crie um link para ela como `/page#setup`. A sintaxe é igual à do Fumadocs, então conteúdo migrado funciona sem alterações. O id é usado exatamente como foi escrito: a pontuação inteligente transforma `--` em um traço e deixa as aspas curvas no texto do título, mas não no marcador, então `[#read--write]` gera a âncora `#read--write`.
 
 A forma `{#custom-id}`, usada pelo Pandoc, pelo kramdown e por toolchains de especificação baseadas em Markdown, é aceita como equivalente em arquivos `.md`. Somente essa grafia sem espaços fixa uma âncora: a forma com espaços `{ #custom-id }` e o `{: #custom-id }` do kramdown (ambos vindos do `attr_list` do MkDocs), além de uma lista de atributos que define o id junto de classes ou atributos (`{ #custom-id .wide }`), permanecem no texto do título e na sua âncora, e o `blume check` alerta sobre eles no `.md` como `BLUME_MD_CURLY_ANCHOR`. No `.mdx`, um `{…}` solto é uma expressão JSX e a página não compila — o `blume check` reporta as três grafias como `BLUME_MDX_CURLY_ANCHOR` — então escreva `[#custom-id]` ali, ou escape as chaves. A forma escapada fixa a mesma âncora nos dois formatos, o que a torna a grafia certa para um partial que páginas `.mdx` [incluem](/docs/content/includes):
 

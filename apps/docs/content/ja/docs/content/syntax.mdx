@@ -26,7 +26,7 @@ Blume は、標準的な Markdown と MDX を、厳選された GitHub Flavored 
 ## Getting started [#setup]
 ```
 
-`/page#setup` としてリンクします。この構文は Fumadocs と一致するため、移行したコンテンツはそのまま動作します。
+`/page#setup` としてリンクします。この構文は Fumadocs と一致するため、移行したコンテンツはそのまま動作します。id は書いたとおりにそのまま使われます：スマート句読点は見出しのテキスト内の `--` をダッシュに変換し、引用符を曲線的にしますが、マーカー内ではこれらを行わないため、`[#read--write]` のアンカーは `#read--write` となります。
 
 Pandoc、kramdown、および Markdown ベースの仕様策定ツールチェーンで使われる `{#custom-id}` 形式は、`.md` ファイルでは同等のものとして受け付けられます。アンカーを固定するのは、このスペースを含まない書き方だけです：スペースを含む `{ #custom-id }` や kramdown の `{: #custom-id }`（どちらも MkDocs の `attr_list` に由来します）、そしてクラスや属性と並べて id を設定する属性リスト（`{ #custom-id .wide }`）は、見出しのテキストとそのアンカーにそのまま残り、`blume check` は `.md` においてこれらを `BLUME_MD_CURLY_ANCHOR` として警告します。`.mdx` では、裸の `{…}` は JSX 式となりページのコンパイルに失敗します — `blume check` はこれら 3 つの書き方をすべて `BLUME_MDX_CURLY_ANCHOR` として報告します — そのため、そこでは `[#custom-id]` と書くか、波括弧をエスケープしてください。エスケープした形式はどちらのフォーマットでも同じアンカーを固定するため、`.mdx` ページが[インクルード](/docs/content/includes)するパーシャルにはこの書き方が適しています：
 
