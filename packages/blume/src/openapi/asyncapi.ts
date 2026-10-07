@@ -1,4 +1,8 @@
-import type { ApiOperationRef, ApiTagRef } from "./model.ts";
+import type {
+  ApiOperationRef,
+  ApiTagMeta,
+  CollectedOperations,
+} from "./model.ts";
 import { operationCollector, operationKey } from "./model.ts";
 
 /**
@@ -285,10 +289,11 @@ const operationSite = (
   return { action, address: channelAddress(channelId, channel), channelId };
 };
 
-/** The route-mapped operations, ordered tags, and skip warnings of one document. */
-export interface AsyncApiOperationCatalog {
-  operations: ApiOperationRef[];
-  tags: ApiTagRef[];
+/**
+ * The route-mapped operations, ordered tags, moved routes, and skip warnings
+ * of one document.
+ */
+export interface AsyncApiOperationCatalog extends CollectedOperations {
   warnings: string[];
 }
 
@@ -315,7 +320,10 @@ export const extractAsyncApiOperations = (
         (tag): tag is { name: string; description?: string } =>
           typeof tag?.name === "string"
       )
-      .map((tag): [string, string] => [tag.name, tag.description ?? ""])
+      .map((tag): [string, ApiTagMeta] => [
+        tag.name,
+        { description: tag.description ?? "" },
+      ])
   );
   const collector = operationCollector(baseRoute, tagMeta);
   const channels = document.channels ?? {};

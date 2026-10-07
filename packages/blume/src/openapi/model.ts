@@ -6,8 +6,9 @@ import type {
   AsyncApiDocument,
   AsyncApiSpecValue,
 } from "./asyncapi.ts";
-// Type-only, so the import can't cycle at runtime (graphql.ts imports the
-// collector from here).
+// Type-only, so the import can't cycle at runtime (checks.ts and graphql.ts
+// import from here).
+import type { SpecIssue } from "./checks.ts";
 import type { GraphqlDocument, GraphqlMember } from "./graphql.ts";
 import type { ReferenceKind } from "./references.ts";
 import { slugify } from "./references.ts";
@@ -295,15 +296,25 @@ const specText = <Value>(value: Value): string | undefined =>
   isText(value) ? String(value) : undefined;
 
 /**
+ * A tag's slug before collisions are resolved, its word boundaries hyphenated
+ * the way an operation id's are (`InboxesThreads` -> `inboxes-threads`).
+ */
+const wordSlug = (name: string): string => slugify(splitIdentifier(name));
+
+/**
  * Assign each distinct tag name a unique slug. `slugify` can collapse
  * different names onto one value — any two punctuation-only tags (`!!!`,
  * `???`) both fall through to the `operations` fallback — and a shared slug
  * silently merges the tags' routes, sidebar groups, and overview sections.
  * Collisions gain `-2`, `-3`, … in first-seen order. Shared with the AsyncAPI
  * extractor (`asyncapi.ts`), whose untagged fallback groups are channel
- * addresses.
+ * addresses. `slug` is the rule before collisions: the collector also runs
+ * the one earlier releases used (`slugify` alone, so `InboxesThreads` ->
+ * `inboxesthreads`) to redirect the routes they gave.
  */
-export const tagSlugger = (): ((name: string) => string) => {
+export const tagSlugger = (
+  slug: (name: string) => string = wordSlug
+): ((name: string) => string) => {
   const assigned = new Map<string, string>();
   const taken = new Set<string>();
   return (name) => {
@@ -311,16 +322,29 @@ export const tagSlugger = (): ((name: string) => string) => {
     if (existing) {
       return existing;
     }
-    const base = slugify(name) || "operations";
-    let slug = base;
-    for (let suffix = 2; taken.has(slug); suffix += 1) {
-      slug = `${base}-${suffix}`;
+    const base = slug(name) || "operations";
+    let unique = base;
+    for (let suffix = 2; taken.has(unique); suffix += 1) {
+      unique = `${base}-${suffix}`;
     }
-    taken.add(slug);
-    assigned.set(name, slug);
-    return slug;
+    taken.add(unique);
+    assigned.set(name, unique);
+    return unique;
   };
 };
+
+/**
+ * How a warning names an operation: `GET /pets`, or a webhook by its name
+ * (`Webhook "newPet" (POST)`), since a webhook has no path.
+ */
+export const operationLabel = (
+  name: string,
+  method: string,
+  webhook: boolean
+): string =>
+  webhook
+    ? `Webhook "${name}" (${method.toUpperCase()})`
+    : `${method.toUpperCase()} ${name}`;
 
 /** One entry of a document's `paths` or `webhooks` map. */
 type PathItemEntry =
@@ -330,15 +354,39 @@ type PathItemEntry =
 /** An operation before the collector assigns its unique key and route. */
 type CollectedOperation = Omit<ApiOperationRef, "route" | "tagSlug">;
 
+/** What a spec's `tags` list says about one tag. */
+export interface ApiTagMeta {
+  description: string;
+  /**
+   * The tag's label, in place of its name, from Redocly's `x-displayName`
+   * extension. Only the label changes: the tag's slug, and so its routes,
+   * still come from its name.
+   */
+  displayName?: string;
+}
+
+/**
+ * A route an earlier release gave an operation's page, and the route the
+ * page has now: the source turns each into a redirect, so links to the old
+ * URL keep working.
+ */
+export interface MovedRoute {
+  from: string;
+  to: string;
+}
+
 /** The flattened output both extractors produce. */
 export interface CollectedOperations {
   operations: ApiOperationRef[];
   tags: ApiTagRef[];
+  /** Operation routes that moved from what earlier slug rules gave them. */
+  moved: MovedRoute[];
 }
 
 /** The collector handle: feed operations in, read the flattened output out. */
 export interface OperationCollector {
-  add: (entry: CollectedOperation) => void;
+  /** Add an operation, returning it with its key and route assigned. */
+  add: (entry: CollectedOperation) => ApiOperationRef;
   finish: () => CollectedOperations;
 }
 
@@ -353,18 +401,34 @@ export interface ExtractedOperations extends CollectedOperations {
  * (a repeated key gains its method/action as a suffix), and the shared route
  * template — so URL shape and slug rules can never drift between the two spec
  * kinds.
+ *
+ * A key is unique across the spec, since it names the operation in
+ * `<Operation id>`. Its page's URL only has to be unique within its tag's
+ * folder, so the last route segment de-duplicates per tag: `list` in two
+ * tags is `/pets/list` and `/stores/list`, not `/stores/list-get`. Earlier
+ * releases de-duplicated the route like the key, and slugged tags without
+ * splitting their words; each route those rules gave differently is
+ * reported in `moved`.
  */
 export const operationCollector = (
   baseRoute: string,
-  tagMeta: ReadonlyMap<string, string>
+  tagMeta: ReadonlyMap<string, ApiTagMeta>
 ): OperationCollector => {
   const operations: ApiOperationRef[] = [];
+  const moved: MovedRoute[] = [];
   const tagOrder: string[] = [];
   const tagsSeen = new Set<string>();
   const seen = new Set<string>();
+  // Tag slug -> the route segments its operations took.
+  const segments = new Map<string, Set<string>>();
   const slugForTag = tagSlugger();
+  const legacySlugForTag = tagSlugger(slugify);
+  // A root-mounted reference (`route: "/"`) must not emit `//tag/key`.
+  const base = baseRoute === "/" ? "" : baseRoute;
+  const label = (name: string): string =>
+    tagMeta.get(name)?.displayName ?? name;
 
-  const add = (entry: CollectedOperation): void => {
+  const add = (entry: CollectedOperation): ApiOperationRef => {
     const tagSlug = slugForTag(entry.tag);
     if (!tagsSeen.has(entry.tag)) {
       tagsSeen.add(entry.tag);
@@ -375,13 +439,27 @@ export const operationCollector = (
       key = `${key}-${entry.method}`;
     }
     seen.add(key);
-    operations.push({
+    const taken = segments.get(tagSlug) ?? new Set<string>();
+    segments.set(tagSlug, taken);
+    let segment = entry.key;
+    while (taken.has(segment)) {
+      segment = `${segment}-${entry.method}`;
+    }
+    taken.add(segment);
+    const route = `${base}/${tagSlug}/${segment}`;
+    const legacy = `${base}/${legacySlugForTag(entry.tag)}/${key}`;
+    if (legacy !== route) {
+      moved.push({ from: legacy, to: route });
+    }
+    const operation: ApiOperationRef = {
       ...entry,
       key,
-      // A root-mounted reference (`route: "/"`) must not emit `//tag/key`.
-      route: `${baseRoute === "/" ? "" : baseRoute}/${tagSlug}/${key}`,
+      route,
+      tag: label(entry.tag),
       tagSlug,
-    });
+    };
+    operations.push(operation);
+    return operation;
   };
 
   // Declared tags in the order the spec's `tags` list gives them, then any
@@ -395,12 +473,13 @@ export const operationCollector = (
   };
 
   const finish = (): CollectedOperations => ({
+    moved,
     operations,
     tags: tagOrder
       .toSorted((a, b) => rank(a) - rank(b))
       .map((name) => ({
-        description: tagMeta.get(name) ?? "",
-        name,
+        description: tagMeta.get(name)?.description ?? "",
+        name: label(name),
         // The same slugger instance, so every tag resolves to the slug its
         // operations were routed under.
         slug: slugForTag(name),
@@ -410,25 +489,52 @@ export const operationCollector = (
   return { add, finish };
 };
 
+/** {@link ExtractedOperations} plus the spec mistakes extraction noticed. */
+export interface ExtractedApiOperations extends ExtractedOperations {
+  issues: SpecIssue[];
+}
+
+/** A spec's `tags` as the collector reads them: name -> description and label. */
+const declaredTags = (document: ApiDocument): Map<string, ApiTagMeta> =>
+  new Map(
+    (document.tags ?? []).flatMap((tag): [string, ApiTagMeta][] => {
+      const name = specText(tag.name);
+      if (name === undefined) {
+        return [];
+      }
+      const meta: ApiTagMeta = { description: tag.description ?? "" };
+      const displayName = specText(tag["x-displayName"]);
+      if (displayName) {
+        meta.displayName = displayName;
+      }
+      return [[name, meta]];
+    })
+  );
+
 /**
  * Flatten a 3.1 document into a route-mapped operation list and its ordered
  * tags, webhooks included. Operations inherit the first tag they declare; keys
- * are de-duplicated so a repeated `operationId` still yields distinct routes.
- * `warnings` reports anything skipped (a `$ref` path item), so missing
- * operations aren't silent.
+ * are de-duplicated so a repeated `operationId` still yields distinct routes,
+ * with an issue naming both operations. `warnings` reports anything skipped (a
+ * `$ref` path item), so missing operations aren't silent.
+ *
+ * Operations come out in the spec's order: paths as listed, and each path's
+ * methods as written. They're keyed in the method order earlier releases
+ * walked (`HTTP_METHODS`), so a repeated id resolves to the same key, and
+ * the same route, it always did.
  */
 export const extractOperations = (
   document: ApiDocument,
   baseRoute: string
-): ExtractedOperations => {
+): ExtractedApiOperations => {
   const warnings: string[] = [];
-  const tagMeta = new Map(
-    (document.tags ?? []).flatMap((tag): [string, string][] => {
-      const name = specText(tag.name);
-      return name === undefined ? [] : [[name, tag.description ?? ""]];
-    })
-  );
-  const collector = operationCollector(baseRoute, tagMeta);
+  const issues: SpecIssue[] = [];
+  const collector = operationCollector(baseRoute, declaredTags(document));
+  // Each operation's place in the spec, and the first operation to declare
+  // each operationId.
+  const position = new Map<ApiOperationRef, number>();
+  const firstWithId = new Map<string, string>();
+  let cursor = 0;
 
   // A path item's operations, filed under `name`: a path for `paths`, the
   // webhook's key for `webhooks`.
@@ -449,6 +555,9 @@ export const extractOperations = (
       );
       return;
     }
+    const written = Object.keys(item);
+    const offset = cursor;
+    cursor += written.length;
     for (const method of HTTP_METHODS) {
       const operation = item[method];
       if (!isOperation(operation)) {
@@ -473,7 +582,28 @@ export const extractOperations = (
           specText(operation.tags?.[0]) ??
           (webhook ? UNTAGGED_WEBHOOKS : UNTAGGED),
       };
-      collector.add(webhook ? { ...entry, webhook: true } : entry);
+      const added = collector.add(
+        webhook ? { ...entry, webhook: true } : entry
+      );
+      position.set(added, offset + written.indexOf(method));
+      if (operationId === undefined) {
+        continue;
+      }
+      const label = operationLabel(name, method, webhook);
+      const first = firstWithId.get(operationId);
+      if (first === undefined) {
+        firstWithId.set(operationId, label);
+        continue;
+      }
+      // The key always gains a suffix; the URL only when the two share a tag.
+      const url = added.route.endsWith(`/${entry.key}`)
+        ? ""
+        : ` and serves its page at ${added.route}`;
+      issues.push({
+        code: "BLUME_OPENAPI_DUPLICATE_OPERATION_ID",
+        message: `${first} and ${label} share the operationId "${operationId}", which must be unique in a spec, so Blume names the second one "${added.key}" in \`<Operation id>\`${url}.`,
+        suggestion: `Give each operation its own operationId.`,
+      });
     }
   };
 
@@ -486,7 +616,16 @@ export const extractOperations = (
     addPathItem(name, item, true);
   }
 
-  return { ...collector.finish(), warnings };
+  const collected = collector.finish();
+  return {
+    ...collected,
+    issues,
+    // `position` holds every operation the collector added.
+    operations: collected.operations.toSorted(
+      (a, b) => (position.get(a) ?? 0) - (position.get(b) ?? 0)
+    ),
+    warnings,
+  };
 };
 
 /** Resolve the operation object for a ref out of its (OpenAPI) document. */

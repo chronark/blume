@@ -1,7 +1,7 @@
 import type { OperationObject } from "@scalar/openapi-types/3.2";
 
 import type { ApiDocument } from "./model.ts";
-import { HTTP_METHODS } from "./model.ts";
+import { HTTP_METHODS, operationLabel } from "./model.ts";
 
 /**
  * Targeted checks for spec mistakes that would otherwise render silently
@@ -31,19 +31,6 @@ const NAMED_OPERATIONS = 3;
 
 /** One entry of a document's `paths` or `webhooks` map. */
 type PathItem = NonNullable<ApiDocument["paths"]>[string];
-
-/**
- * How a warning names an operation: `GET /pets`, or a webhook by its name
- * (`Webhook "newPet" (POST)`), since a webhook has no path.
- */
-export const operationLabel = (
-  name: string,
-  method: string,
-  webhook: boolean
-): string =>
-  webhook
-    ? `Webhook "${name}" (${method.toUpperCase()})`
-    : `${method.toUpperCase()} ${name}`;
 
 /** One entry of a `parameters` list: a parameter, or a `$ref` to one. */
 type ParameterEntry = NonNullable<OperationObject["parameters"]>[number];

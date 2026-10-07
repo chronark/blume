@@ -397,9 +397,9 @@ export const operationMdx = (
   if (reference?.noindex) {
     seo.noindex = true;
   }
-  const sidebar: RenderedPageData["sidebar"] = {
-    label: operation.summary || operation.path,
-  };
+  // An operation without a summary is labeled as its page is titled, by its
+  // method and path: the path alone repeats for `GET /pets` and `POST /pets`.
+  const sidebar: RenderedPageData["sidebar"] = { label: title };
   // GraphQL operation kinds badge like HTTP methods, but a type page's kind
   // already heads its sidebar group ("Objects", "Enums", …) — an `OBJECT`
   // badge on every row would only repeat it, so type pages get none. The

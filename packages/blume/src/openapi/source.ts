@@ -1,5 +1,6 @@
 import { withBasePath } from "../core/base-path.ts";
 import matter from "../core/frontmatter.ts";
+import { stripOrderingPrefix } from "../core/ordering-prefix.ts";
 import type { FolderMeta } from "../core/schema.ts";
 import { hashText } from "../core/sources/cache.ts";
 import type {
@@ -7,6 +8,7 @@ import type {
   SourceContext,
   SourceEntry,
   SourceLoadResult,
+  SourceRedirect,
 } from "../core/sources/types.ts";
 import type { Diagnostic } from "../core/types.ts";
 import { extractAsyncApiOperations } from "./asyncapi.ts";
@@ -21,6 +23,7 @@ import type {
   ApiOperationRef,
   ApiSpecData,
   ApiTagRef,
+  MovedRoute,
   OpenApiData,
 } from "./model.ts";
 import {
@@ -185,17 +188,31 @@ const specEntries = (
  * not "Github V2"). Keys are the directories under the reference route, the
  * same group paths `meta.ts` files use, so user-authored meta still
  * overrides these.
+ *
+ * Each group lists its operation pages in `operations` order, the spec's own
+ * (see `extractOperations`), as the overview does, rather than letting the
+ * sidebar sort them by label. A page's nav key is its file name without an
+ * ordering prefix, as `meta.ts` `pages` entries are.
  */
 const tagFolderMeta = (
   spec: ApiSpecData,
   tags: { slug: string; name: string }[],
+  operations: ApiOperationRef[],
   groupLabel: string | undefined
 ): Record<string, FolderMeta> => {
   const base = routeToRef(spec.route);
   const meta: Record<string, FolderMeta> = Object.fromEntries(
     tags.map((tag, order) => [
       base ? `${base}/${tag.slug}` : tag.slug,
-      { order, title: tag.name },
+      {
+        order,
+        pages: operations
+          .filter((operation) => operation.tagSlug === tag.slug)
+          .map((operation) =>
+            stripOrderingPrefix(operation.route.split("/").at(-1) ?? "")
+          ),
+        title: tag.name,
+      },
     ])
   );
   // A root-mounted reference has no group of its own to name.
@@ -211,6 +228,8 @@ interface LoadedSpec {
   entries: SourceEntry[];
   /** Sidebar-group labels for the spec's tag directories. */
   folderMeta: Record<string, FolderMeta>;
+  /** Redirects from the routes earlier releases gave its operations. */
+  redirects: SourceRedirect[];
   /** Non-fatal notes from the load (e.g. an offline cache fallback). */
   diagnostics: Diagnostic[];
 }
@@ -221,6 +240,8 @@ interface ParsedReference {
   warnings: string[];
   operations: ApiOperationRef[];
   tags: ApiTagRef[];
+  /** Operation routes earlier releases gave elsewhere (see `operationCollector`). */
+  moved: MovedRoute[];
   extractWarnings: string[];
   /** Spec mistakes that would render silently wrong (OpenAPI only). */
   issues?: SpecIssue[];
@@ -241,6 +262,7 @@ const parseReference = async (
     return {
       document,
       extractWarnings: extracted.warnings,
+      moved: extracted.moved,
       operations: extracted.operations,
       tags: extracted.tags,
       warnings,
@@ -256,6 +278,7 @@ const parseReference = async (
     return {
       document,
       extractWarnings: extracted.warnings,
+      moved: extracted.moved,
       operations: extracted.operations,
       tags: extracted.tags,
       warnings,
@@ -270,7 +293,8 @@ const parseReference = async (
   return {
     document,
     extractWarnings: extracted.warnings,
-    issues: [...issues, ...specIssues(document)],
+    issues: [...issues, ...specIssues(document), ...extracted.issues],
+    moved: extracted.moved,
     operations: extracted.operations,
     tags: extracted.tags,
     warnings,
@@ -291,8 +315,15 @@ export const openApiSource = (
     const kindLabel = KIND_LABELS[reference.kind];
     const codePrefix = CODE_PREFIXES[reference.kind];
     try {
-      const { document, warnings, operations, tags, extractWarnings, issues } =
-        await parseReference(reference, ctx);
+      const {
+        document,
+        warnings,
+        operations,
+        tags,
+        moved,
+        extractWarnings,
+        issues,
+      } = await parseReference(reference, ctx);
       const info = document.info ?? { title: reference.label, version: "" };
       // The playground proxy resolves here, not client-side: `true` selects
       // the built-in `/_api-proxy` route (mounted under the site `basePath`,
@@ -375,7 +406,8 @@ export const openApiSource = (
             : []),
         ],
         entries: specEntries(spec, operations, reference),
-        folderMeta: tagFolderMeta(spec, tags, reference.groupLabel),
+        folderMeta: tagFolderMeta(spec, tags, operations, reference.groupLabel),
+        redirects: moved,
         slug: reference.slug,
         spec,
       };
@@ -410,6 +442,7 @@ export const openApiSource = (
     );
     const data: OpenApiData = {};
     const folderMeta: Record<string, FolderMeta> = {};
+    const redirects: SourceRedirect[] = [];
     for (const result of results) {
       if ("severity" in result) {
         diagnostics.push(result);
@@ -418,10 +451,11 @@ export const openApiSource = (
       data[result.slug] = result.spec;
       entries.push(...result.entries);
       Object.assign(folderMeta, result.folderMeta);
+      redirects.push(...result.redirects);
       diagnostics.push(...result.diagnostics);
     }
     parsed = data;
-    return { diagnostics, entries, folderMeta };
+    return { diagnostics, entries, folderMeta, redirects };
   };
 
   return {

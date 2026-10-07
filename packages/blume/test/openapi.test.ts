@@ -1805,11 +1805,12 @@ describe("source.openApiSource", () => {
     expect(refs.at(-1)).toBe("api/index.mdx");
     // Each tag directory is labeled with the spec's own tag name, so the
     // sidebar group renders the authored casing instead of a re-humanized slug,
-    // and ranked in the overview's order. The source names no `label`, so its
-    // own group keeps the name its route gives it.
+    // and ranked in the overview's order, with its pages in the spec's order.
+    // The source names no `label`, so its own group keeps the name its route
+    // gives it.
     expect(folderMeta).toStrictEqual({
-      "api/operations": { order: 1, title: "Operations" },
-      "api/pet": { order: 0, title: "pet" },
+      "api/operations": { order: 1, pages: ["get-ping"], title: "Operations" },
+      "api/pet": { order: 0, pages: ["add-pet", "get-pet"], title: "pet" },
     });
 
     const data = source.openApiData();

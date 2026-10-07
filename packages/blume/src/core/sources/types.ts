@@ -67,6 +67,16 @@ export interface SourceEntry {
   };
 }
 
+/**
+ * A redirect a source asks for: from a route one of its pages used to have
+ * to the route it has now, both locale-stripped and without `basePath`, as
+ * the page routes its entries map to.
+ */
+export interface SourceRedirect {
+  from: string;
+  to: string;
+}
+
 /** The result of a single `ContentSource.load()` call. */
 export interface SourceLoadResult {
   entries: SourceEntry[];
@@ -80,6 +90,13 @@ export interface SourceLoadResult {
    * beneath user-authored meta files, which always win.
    */
   folderMeta?: Record<string, FolderMeta>;
+  /**
+   * Redirects from routes the source's pages moved off: the OpenAPI source
+   * keeps the URLs earlier releases gave operation pages working. Added to
+   * the config's `redirects` after them, skipping any whose `from` a page or
+   * a configured redirect already owns.
+   */
+  redirects?: SourceRedirect[];
 }
 
 /**

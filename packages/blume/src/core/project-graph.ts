@@ -384,6 +384,55 @@ const redirectPageDiagnostics = (
     ];
   });
 
+/**
+ * The config with the redirects sources ask for added after its own (see
+ * `SourceLoadResult.redirects`), so every surface that reads
+ * `config.redirects` — Astro's redirect pages, the host files, the link
+ * checker — serves them alike. Each is repeated under every locale prefix
+ * whose copy of the target page is served (a translation, or the fallback
+ * copy), and is kept only where its target is a page and nothing else
+ * answers for its `from`: a page there, or a configured redirect, wins.
+ * `pages` are the served page paths, which carry `basePath`.
+ */
+const withSourceRedirects = (
+  config: ResolvedConfig,
+  loaded: readonly SourceLoadResult[],
+  pages: RouteSet
+): ResolvedConfig => {
+  const requested = loaded.flatMap(({ redirects }) => redirects ?? []);
+  if (requested.length === 0) {
+    return config;
+  }
+  const served = (route: string): string =>
+    normalizePath(withBasePath(config.basePath, route));
+  const prefixes = [
+    "",
+    ...(config.i18n?.locales.map((locale) => `/${locale.code}`) ?? []),
+  ];
+  const taken = new Set(
+    config.redirects.map((redirect) => served(redirect.from))
+  );
+  const added: ResolvedConfig["redirects"] = [];
+  for (const redirect of requested) {
+    for (const prefix of prefixes) {
+      const from = `${prefix}${redirect.from}`;
+      const to = `${prefix}${redirect.to}`;
+      if (
+        !pages.has(served(to)) ||
+        pages.has(served(from)) ||
+        taken.has(served(from))
+      ) {
+        continue;
+      }
+      taken.add(served(from));
+      added.push({ from, status: 301, to });
+    }
+  }
+  return added.length > 0
+    ? { ...config, redirects: [...config.redirects, ...added] }
+    : config;
+};
+
 /** The configured banner link target, when the banner has a link. */
 const bannerLinkHref = (
   banner: ResolvedConfig["banner"]
@@ -637,10 +686,15 @@ export const scanProject = async (
   ];
 
   return {
-    config:
+    // Then the routes the API references served under earlier versions'
+    // rules redirect to where those operations live now.
+    config: withSourceRedirects(
       redirects.length === config.redirects.length
         ? config
         : { ...config, redirects },
+      loaded,
+      new Set([...routeSetFor(manifest.routes), ...extraRoutes])
+    ),
     context,
     diagnostics: [
       ...configResult.diagnostics,

@@ -299,16 +299,23 @@ describe("graphql.extractGraphqlOperations", () => {
     expect(names).toContain("SearchResult");
   });
 
-  it("disambiguates a type page whose slug collides with a root field", () => {
+  it("disambiguates a type page's key from a root field's, not its route", () => {
     // Query field `pet` claims the `pet` key; the `Pet` type page collides and
-    // gains its kind as a suffix — two distinct routes, no silent overwrite.
+    // gains its kind as a suffix — two distinct keys, no silent overwrite.
+    // Their routes are in different groups, so each keeps the short slug, and
+    // the route the suffixed key used to give redirects to it.
     const field = extracted.operations.find((op) => op.operationId === "pet");
     const type = extracted.operations.find(
       (op) => op.operationId === "Pet" && op.method === "object"
     );
     expect(field?.key).toBe("pet");
+    expect(field?.route).toBe("/graphql/queries/pet");
     expect(type?.key).toBe("pet-object");
-    expect(type?.route).toBe("/graphql/objects/pet-object");
+    expect(type?.route).toBe("/graphql/objects/pet");
+    expect(extracted.moved).toContainEqual({
+      from: "/graphql/objects/pet-object",
+      to: "/graphql/objects/pet",
+    });
   });
 
   it("still pages a rootless schema's custom types", () => {
@@ -608,11 +615,13 @@ describe("source.openApiSource (graphql)", () => {
     expect(diagnostics).toStrictEqual([]);
     const refs = entries.map((entry) => entry.ref);
     expect(refs).toContain("graphql/queries/pets.mdx");
-    expect(refs).toContain("graphql/objects/pet-object.mdx");
+    expect(refs).toContain("graphql/objects/pet.mdx");
     expect(refs.at(-1)).toBe("graphql/index.mdx");
-    // Groups rank in the overview's order: operations first, then types.
+    // Groups rank in the overview's order: operations first, then types. A
+    // group's pages follow the schema's field order, as the overview does.
     expect(folderMeta?.["graphql/queries"]).toStrictEqual({
       order: 0,
+      pages: ["pets", "pet", "search", "legacy"],
       title: "Queries",
     });
     expect(folderMeta?.["graphql/input-objects"]?.title).toBe("Input Objects");
@@ -1038,7 +1047,7 @@ describe("graphql-helpers", () => {
 
   it("maps type names to their page routes", () => {
     const routes = graphqlRoutes(spec);
-    expect(routes.get("Pet")).toBe("/graphql/objects/pet-object");
+    expect(routes.get("Pet")).toBe("/graphql/objects/pet");
     expect(routes.get("PetStatus")).toBe("/graphql/enums/pet-status");
     // Root fields never claim a type-name slot; built-ins have no page.
     expect(routes.get("pets")).toBeUndefined();

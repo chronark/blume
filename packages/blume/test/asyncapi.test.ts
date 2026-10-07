@@ -1092,9 +1092,11 @@ describe("render-mdx for AsyncAPI operations", () => {
       description:
         "Reference for the send operation on user/signedup in the Events API.",
     });
+    // An untitled operation's label is its page title, so a channel's send
+    // and receive don't share one.
     expect(page.data.sidebar).toStrictEqual({
       badge: "SEND",
-      label: "user/signedup",
+      label: "SEND user/signedup",
     });
     expect(page.data.search).toStrictEqual({ tags: ["ping", "SEND"] });
     expect(page.body).toBe('<Operation source="events" id="ping-op" />');
@@ -1137,8 +1139,12 @@ describe("source.openApiSource with AsyncAPI references", () => {
       "events/index.mdx",
     ]);
     expect(folderMeta).toStrictEqual({
-      "events/ping": { order: 1, title: "ping" },
-      "events/users": { order: 0, title: "Users" },
+      "events/ping": { order: 1, pages: ["ping-op"], title: "ping" },
+      "events/users": {
+        order: 0,
+        pages: ["publish-user-signedup"],
+        title: "Users",
+      },
     });
     const data = source.openApiData();
     expect(data.events?.kind).toBe("asyncapi");

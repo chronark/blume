@@ -30,7 +30,9 @@ navigation: {
 }
 ```
 
-The sidebar's tag groups and the overview page's sections follow the same order: the order of the spec's top-level `tags` list, then any tag it doesn't declare, in the order operations first use it.
+The sidebar's tag groups and the overview page's sections follow the same order: the order of the spec's top-level `tags` list, then any tag it doesn't declare, in the order operations first use it. Within a tag, operations follow the spec too: paths in the order they're listed, and each path's methods in the order they're written. A [`meta.ts`](/docs/content/meta) in a tag's folder with its own `pages` list overrides that order.
+
+A tag's `x-displayName`, Redocly's extension, labels its sidebar group and overview section in place of its name. Its URL still comes from its name, so adding one doesn't move any page. An operation is labeled by its `summary`, or by its method and path (`GET /pets`), as its page is titled, when it has none.
 
 :::note
 Operations are indexed for search by their **summary, description, tag, and endpoint** (`GET /pets/{id}`). The rendered schema tables and generated code samples aren't full-text indexed; search matches an operation's title, prose, section, and path, then links to its own page. [Your own samples](#your-own-samples) are indexed like any code block, only with [`search.indexing.includeCodeBlocks`](/docs/configuration/search).
@@ -66,6 +68,10 @@ reference: [
   }),
 ],
 ```
+
+An operation's `<tag>` is its first tag (`operations` when it has none), and its `<operation>` is its `operationId`, else its method and path. Both are lowercased with their words split by hyphens, camelCase and PascalCase included: the tag `InboxesThreads` gives `inboxes-threads`, and the operationId `listThreads` gives `list-threads`. An operation's slug only has to be unique within its tag, so two tags can each have a `list`; a second `list` in the same tag gets its method added (`list-post`), with a [`BLUME_OPENAPI_DUPLICATE_OPERATION_ID`](#spec-warnings) warning when the two share an `operationId`.
+
+Earlier versions of Blume kept a tag's words together (`inboxesthreads`) and made an operation's slug unique across the whole spec (`list-get` for the second `list`). Blume redirects each of those URLs, and its Markdown copy, to the page's current one, unless a page or one of your [`redirects`](/docs/deployment#redirects) is already at that URL.
 
 ## Code samples and schemas
 
@@ -322,6 +328,7 @@ Blume doesn't validate a spec against the OpenAPI schema: run a linter such as [
 | `BLUME_OPENAPI_CODE_SAMPLE_REF` | An `x-codeSamples` entry's `source` is a `$ref` Blume can't read, or one that points inside a document, so that [sample](#your-own-samples) is left out. |
 | `BLUME_OPENAPI_X_WEBHOOKS` | A 3.1 or later spec keeps its webhooks under `x-webhooks`, the extension 3.0 tools read, and has no `webhooks`, so none of them render. Rename the field to `webhooks`. |
 | `BLUME_OPENAPI_REF_PATH_ITEM` | A path or webhook is a `$ref` to a shared path item, such as one under `components.pathItems`. Blume doesn't resolve these, so its operations are missing from the reference. Inline the path item under `paths` or `webhooks`; its schemas, parameters, and responses can stay `$ref`s. |
+| `BLUME_OPENAPI_DUPLICATE_OPERATION_ID` | Two operations share an `operationId`, which must be unique in a spec. The warning names both. Blume adds the method to the second one's id in `<Operation id>`, and to its [URL](#route) when the two share a tag. Give each operation its own `operationId`. |
 
 [Keep API documentation in sync with backend changes in CI](/guides/openapi-documentation-ci) runs those checks in GitHub Actions: it exports the spec from the backend, fails when the spec is stale, invalid, or breaking, and rebuilds the reference from it.
 
