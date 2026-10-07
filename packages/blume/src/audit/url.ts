@@ -158,8 +158,8 @@ export const resolveHref = (
   // A relative href resolves the way a browser resolves it from the page's
   // canonical URL. `URL` needs an origin to do that, so borrow a placeholder
   // one and keep only the path. The canonical URL is slashless — the generated
-  // config sets `trailingSlash: "never"`, Vercel redirects `/docs/api/` onto
-  // `/docs/api`, and the dev server 404s the slashed form — so `./auth` there
+  // config sets `trailingSlash: "never"`, and Vercel and the dev server
+  // redirect `/docs/api/` onto `/docs/api` — so `./auth` there
   // means `/docs/auth`, exactly where a reader's click lands. Content links
   // never hit this: the Markdown pipeline rewrites them root-relative (see
   // `resolveRelativeHref`); what's left is hand-written HTML, which a browser

@@ -68,6 +68,13 @@ blume preview
 
 `blume preview` serves static builds and `node()` and `cloudflare()` server builds. The Vercel and Netlify adapters have no local preview server, so after a `vercel()` or `netlify()` server build it stops with an error instead. Try the site with `blume dev`, or deploy a preview with `vercel deploy` or `netlify deploy`.
 
+On a static build, `blume preview` also answers what the host would, beyond the files in `dist/`. It applies the [redirects](#redirects), patterns included, with their configured status, as the host files the build writes do. It also handles trailing slashes the way static hosts do:
+
+- A page's URL with a trailing slash (`/guide/`) redirects to the page (`/guide`), keeping the query string.
+- A folder of HTML you ship in `public/` (`public/demo/index.html`) is served at `/demo/`, and `/demo` redirects there, so the relative links inside it resolve.
+
+`blume dev` handles trailing slashes the same way.
+
 ## Subpath deploys
 
 Serving docs under a path like `example.com/docs`? Set `base` — common for GitHub Pages project sites. The whole site, root included, moves under the base, and internal links and assets are rewritten to include it.
@@ -190,7 +197,7 @@ Map old URLs to new ones in `blume.config.ts`:
 redirects: [{ from: "/old", to: "/new", status: 301 }],
 ```
 
-`status` accepts `301`, `302`, `307`, or `308` (default `301`). Server builds answer redirects at request time with the configured status, and so does `blume dev`. Static builds emit redirect pages **and** the platform files your host reads, so it issues a real HTTP redirect: `_redirects` for `netlify()` and `cloudflare()`, `vercel.json` for `vercel()`, and — when no host is named — both of those plus `blume-redirects.json`, a structured manifest for anything else (nginx/Apache rules, an edge worker). A `_redirects` or `vercel.json` you ship in `public/` is left untouched.
+`status` accepts `301`, `302`, `307`, or `308` (default `301`). Server builds answer redirects at request time with the configured status, and so do `blume dev` and `blume preview`. Static builds emit redirect pages **and** the platform files your host reads, so it issues a real HTTP redirect: `_redirects` for `netlify()` and `cloudflare()`, `vercel.json` for `vercel()`, and — when no host is named — both of those plus `blume-redirects.json`, a structured manifest for anything else (nginx/Apache rules, an edge worker). A `_redirects` or `vercel.json` you ship in `public/` is left untouched.
 
 A redirect that moves one page to another moves the page's [raw Markdown](/docs/discoverability/markdown#raw-markdown) with it: `/old.md` and `/old.mdx` redirect to `/new.md` and `/new.mdx` with the same status, in `blume dev` and every build. A redirect from an `.html` URL, like `/old.html` from a site you migrated, doesn't, since that URL never had a Markdown copy. Nor does one whose Markdown URL already serves a copy: `/index.md` is the home page's, so a redirect from `/index` to `/` leaves it alone.
 
@@ -224,7 +231,7 @@ redirects: [
 
 `to` reads a capture by name, as a whole segment (`/:slug*`, `/:slug`), or a `*` for what the `*` in `from` matched (`:splat`, the way `_redirects` spells it, reads it too). A `to` that reads no capture sends every path the pattern covers to one page. An exact redirect wins over a pattern that covers the same path, and patterns are tried in the order you list them.
 
-Each host gets the patterns in its own syntax: splats in `_redirects`, `path-to-regexp` sources in `vercel.json`, and the routing config of a `vercel()` or `netlify()` server build. The `node()` and `cloudflare()` servers match them themselves, and so does `blume dev`. A static build writes no redirect page for a pattern, since it would need one for every path the pattern covers, so a host that reads none of these files (GitHub Pages, say) applies only the exact redirects; `blume-redirects.json` lists patterns as you wrote them.
+Each host gets the patterns in its own syntax: splats in `_redirects`, `path-to-regexp` sources in `vercel.json`, and the routing config of a `vercel()` or `netlify()` server build. The `node()` and `cloudflare()` servers match them themselves, and so do `blume dev` and `blume preview`. A static build writes no redirect page for a pattern, since it would need one for every path the pattern covers, so a host that reads none of these files (GitHub Pages, say) applies only the exact redirects; `blume-redirects.json` lists patterns as you wrote them.
 
 A pattern can't also match a page: hosts disagree on which of the two answers, so the build stops with `BLUME_REDIRECT_MATCHES_PAGE`, naming the page. Narrow the pattern to the paths that moved. An exact redirect from a page's own URL answers the same way on every host, taking the URL over so the page never publishes, so the same code is a warning there: delete the page if it moved, or drop the redirect. So is one from a page's Markdown copy, like `/guide.md` or the home page's `/index.md`, which takes that copy away from agents: drop the redirect.
 

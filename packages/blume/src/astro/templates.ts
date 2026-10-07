@@ -919,10 +919,10 @@ ${userConfigSetup}export default defineConfig({
   devToolbar: { enabled: false },
   // One canonical URL per page: canonicals, the sitemap, and hreflang all use
   // the slashless form, so the slashed spelling is not a second address. Astro
-  // applies this itself — its dev server answers a slashed URL with a 404 that
-  // names the setting, an on-demand route redirects — and the Vercel adapter
-  // turns it into the platform's 308 route, so the Build Output config needs
-  // no hand-spliced redirect (see deploy/vercel-negotiation.ts). Static hosts
+  // applies this itself — an on-demand route redirects, and the integration
+  // has the dev server redirect too, ahead of Astro's own 404 — and the Vercel
+  // adapter turns it into the platform's 308 route, so the Build Output config
+  // needs no hand-spliced redirect (see deploy/vercel-negotiation.ts). Static hosts
   // serve the \`index.html\` directory layout as they always did.
   trailingSlash: "never",
   // The layouts render Astro's <ClientRouter />, and its in-place swaps read

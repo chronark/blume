@@ -32,7 +32,8 @@ interface PagefindEntry {
 
 // Pagefind names each page after its built file (`quickstart/index.html`), so
 // its URLs end in a slash. Blume serves pages without one (`trailingSlash:
-// "never"`): hosts redirect the slashed URL, and `blume preview` 404s it.
+// "never"`): Vercel, `blume dev`, and `blume preview` redirect the slashed
+// URL, so linking it costs a hop.
 const TRAILING_SLASH = /(?<=.)\/(?=[#?]|$)/u;
 
 /**

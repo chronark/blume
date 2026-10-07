@@ -1,6 +1,9 @@
 import { afterAll, afterEach, describe, expect, it } from "bun:test";
+import { once } from "node:events";
 import { existsSync } from "node:fs";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
+import type { AddressInfo } from "node:net";
 import { tmpdir } from "node:os";
 import nodePath from "node:path";
 import { pathToFileURL } from "node:url";
@@ -723,6 +726,81 @@ describe("showBlumeErrorOverlay", () => {
       [key]?: { overlay: DevServerStub | null };
     };
     expect(host[key]?.overlay?.hot).toBe(channel);
+  });
+});
+
+/**
+ * Run the config and server hooks against a real HTTP server whose own
+ * handler echoes the URL it was handed, as Vite's middleware would see it.
+ */
+const devServer = async (poweredBy?: boolean) => {
+  const { root } = await projectFixture({
+    "public/demo/index.html": "<p>Demo</p>",
+  });
+  const http = createServer((request, response) => {
+    response.end(request.url);
+  });
+  http.listen(0, "127.0.0.1");
+  await once(http, "listening");
+  const integration = blumeIntegration({ pages: [], poweredBy });
+  // SAFETY: the done hook reads `root`, `srcDir`, `base`, and `publicDir`
+  // and calls `injectTypes`, all provided by the fixture.
+  integration.hooks["astro:config:done"]?.({
+    config: {
+      base: "/docs/",
+      publicDir: pathToFileURL(`${root}/public/`),
+      root: pathToFileURL(`${root}/`),
+      srcDir: pathToFileURL(`${root}/src/`),
+    },
+    injectTypes: () => pathToFileURL(`${root}/.astro/x.d.ts`),
+  } as never);
+  // SAFETY: the setup hook only touches the fields provided here.
+  integration.hooks["astro:server:setup"]?.({
+    server: {
+      environments: {},
+      httpServer: http,
+      middlewares: { stack: [] },
+      watcher: { on: () => {} },
+    },
+  } as never);
+  // SAFETY: a server listening on a TCP port reports an AddressInfo.
+  const { port } = http.address() as AddressInfo;
+  const get = (path: string) =>
+    fetch(`http://127.0.0.1:${port}${path}`, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(10_000),
+    });
+  return { get, http };
+};
+
+describe("trailing slashes in dev", () => {
+  it("answers a trailing slash ahead of Astro's middleware", async () => {
+    const { get, http } = await devServer();
+    try {
+      const page = await get("/docs/guide/?tab=1");
+      expect(page.status).toBe(301);
+      expect(page.headers.get("location")).toBe("/docs/guide?tab=1");
+      expect(page.headers.get("x-powered-by")).toBe("Blume");
+      const folder = await get("/docs/demo");
+      expect(folder.headers.get("location")).toBe("/docs/demo/");
+      const index = await get("/docs/demo/");
+      expect(await index.text()).toBe("/docs/demo/index.html");
+      const untouched = await get("/docs/guide");
+      expect(await untouched.text()).toBe("/docs/guide");
+    } finally {
+      http.close();
+    }
+  });
+
+  it("leaves Blume's name off the redirect with poweredBy off", async () => {
+    const { get, http } = await devServer(false);
+    try {
+      const page = await get("/docs/guide/");
+      expect(page.status).toBe(301);
+      expect(page.headers.get("x-powered-by")).toBeNull();
+    } finally {
+      http.close();
+    }
   });
 });
 

@@ -1,10 +1,12 @@
+import { Server } from "node:http";
 import type { IncomingMessage, ServerResponse } from "node:http";
 import { fileURLToPath } from "node:url";
 
-import type { AstroIntegration } from "astro";
+import type { AstroConfig, AstroIntegration } from "astro";
 import { join, relative, resolve } from "pathe";
 
 import { loadEnvFiles } from "../cli/env.ts";
+import { normalizeBasePath } from "../core/base-path.ts";
 import type { CustomPageRoute } from "../core/custom-pages.ts";
 import { enrichDiagnostic } from "../core/diagnostics.ts";
 import { POWERED_BY_HEADERS } from "../core/powered-by.ts";
@@ -15,6 +17,11 @@ import {
   requestPath,
 } from "../core/redirect-patterns.ts";
 import type { CompiledRedirect } from "../core/redirect-patterns.ts";
+import {
+  answerRequestsFirst,
+  publicFolder,
+  trailingSlashAnswer,
+} from "../core/static-host.ts";
 import type { Diagnostic } from "../core/types.ts";
 import { publishBuildArtifacts } from "../deploy/artifacts.ts";
 import type { ArtifactLogger } from "../deploy/artifacts.ts";
@@ -492,6 +499,9 @@ export const blumeIntegration = (
   // The Astro root, kept for the build-artifacts scan: `astro:build:done`
   // receives no config.
   let astroRoot: URL | null = null;
+  // What the dev server's trailing-slash handling needs from the config
+  // (see `core/static-host.ts`): the base the URLs carry, and `public/`.
+  let staticHost: Pick<AstroConfig, "base" | "publicDir"> | null = null;
   return {
     hooks: {
       "astro:build:done": async ({ dir, logger }) => {
@@ -511,6 +521,7 @@ export const blumeIntegration = (
       },
       "astro:config:done": ({ config, injectTypes }) => {
         astroRoot = config.root;
+        staticHost = config;
         const from = fileURLToPath(
           codegenDir ?? defaultCodegenDir(config.root)
         );
@@ -586,6 +597,21 @@ export const blumeIntegration = (
             handle: identifyBlume,
             route: "",
           });
+        }
+        // A trailing slash is answered the way a static host answers it,
+        // ahead of Astro's own middleware, which would 404 it (see
+        // `core/static-host.ts`). They're unshifted after this hook runs,
+        // so this goes on the HTTP server instead.
+        if (staticHost && server.httpServer instanceof Server) {
+          const base = normalizeBasePath(staticHost.base);
+          const isPublicFolder = publicFolder(
+            fileURLToPath(staticHost.publicDir)
+          );
+          answerRequestsFirst(
+            server.httpServer,
+            (request) => trailingSlashAnswer(request, base, isPublicFolder),
+            options.poweredBy === false ? {} : POWERED_BY_HEADERS
+          );
         }
       },
     },

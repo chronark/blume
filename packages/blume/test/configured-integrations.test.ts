@@ -624,6 +624,47 @@ it("negotiates Markdown for content routes under deployment.base in dev", async 
   }
 }, 180_000);
 
+it("answers trailing slashes the way a static host does in dev", async () => {
+  // Astro's own dev middleware, which `trailingSlash: "never"` makes 404 a
+  // slashed URL, runs ahead of every integration middleware; the redirect
+  // has to come first, base and all.
+  const root = await writeProject({
+    "blume.config.ts": `export default { deployment: { base: "/sub" }, ${offlineFontsSource} };\n`,
+    "docs/guide.md": "---\ntitle: Guide\n---\n# Guide\n",
+    "docs/index.md": "# Home\n",
+    "public/demo/index.html": "<p>demo folder</p>\n",
+  });
+  const { output, port, proc } = await startDevReady(root);
+  const get = (path: string) =>
+    fetch(`http://127.0.0.1:${port}${path}`, {
+      redirect: "manual",
+      signal: AbortSignal.timeout(60_000),
+    });
+  let failure: unknown;
+  try {
+    const page = await get("/sub/guide/?tab=1");
+    expect(page.status).toBe(301);
+    expect(page.headers.get("location")).toBe("/sub/guide?tab=1");
+    const slashless = await get("/sub/guide");
+    expect(slashless.status).toBe(200);
+    // A folder of HTML in `public/` is served at its slashed URL.
+    const folder = await get("/sub/demo");
+    expect(folder.status).toBe(301);
+    expect(folder.headers.get("location")).toBe("/sub/demo/");
+    const index = await get("/sub/demo/");
+    expect(index.status).toBe(200);
+    expect(await index.text()).toContain("demo folder");
+  } catch (error) {
+    failure = error;
+  } finally {
+    await stopDev(proc);
+  }
+  const [stdout, stderr] = await drainOutput(output);
+  if (failure) {
+    throw new Error(`${String(failure)}\n${stdout}\n${stderr}`);
+  }
+}, 180_000);
+
 it("serves deferred sidebar fragments on a route outside every header tab in dev", async () => {
   // With header tabs configured, a route under no tab renders the sidebar
   // minus the tab-owned sections. That pruned view must still address its
