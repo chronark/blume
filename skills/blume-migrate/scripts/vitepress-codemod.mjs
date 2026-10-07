@@ -13,8 +13,10 @@
 //     block when its closer is missing), `::: details` → `<Expandable>`,
 //     `::: raw` / `::: v-pre` wrappers removed.
 //   - GitHub alerts (`> [!NOTE]`) → directives, when the blockquote is
-//     unambiguous.
-//   - Fence meta: `[label]` → a title, `js{1,3}` → `js {1,3}`,
+//     unambiguous. (Blume renders GitHub's own five in `.mdx` as written, but
+//     not VitePress's `[!INFO]` and `[!DANGER]`, nor any alert in `.md`.)
+//   - Fence meta: `[label]` → a title, `js{1,3}` → `js {1,3}` (Blume reads
+//     a lone `[label]` and `js{1,3}` as written too; those two only normalize),
 //     `:line-numbers` → `lineNumbers`, and a title for every block in a code
 //     group (VitePress labels an unlabeled one with its language).
 //   - `<<< @/file [Label]` snippet imports and `<!--@include: ./part.md-->`
@@ -83,6 +85,16 @@ const ALERTS = new Map([
   ["note", "note"],
   ["tip", "tip"],
   ["warning", "warning"],
+]);
+
+// The alerts GitHub defines, which Blume itself renders as callouts in `.mdx`
+// (a `.md` page shows them as quotes, with a BLUME_MD_GITHUB_ALERT warning).
+const GITHUB_ALERTS = new Set([
+  "caution",
+  "important",
+  "note",
+  "tip",
+  "warning",
 ]);
 
 // VitePress `<Badge type>` → Blume `variant` (`default` is Blume's default).
@@ -275,6 +287,13 @@ const routeOf = (rel) => {
 const expandAlerts = (items, review) => {
   const out = [];
   let fence = null;
+  const leftAsQuote = (line, type) =>
+    review(
+      line,
+      GITHUB_ALERTS.has(type.toLowerCase())
+        ? "GitHub alert left as a blockquote: Blume renders it as a callout only in .mdx (a .md page warns BLUME_MD_GITHUB_ALERT), so check it there or convert it by hand"
+        : "GitHub alert left as a blockquote: convert it by hand"
+    );
   for (let i = 0; i < items.length; i += 1) {
     const { line, text } = items[i];
     if (fence) {
@@ -288,10 +307,12 @@ const expandAlerts = (items, review) => {
       out.push(items[i]);
       continue;
     }
-    const indented = /^\s+>\s?\[!\w+\]/u.test(text);
+    const indented = /^\s+>\s?\[!(?<type>\w+)\]/u.exec(text);
     const m = ALERT_RE.exec(text);
-    if (indented || (m && !ALERTS.has(m.groups.type.toLowerCase()))) {
-      review(line, "GitHub alert left as a blockquote: convert it by hand");
+    if (indented) {
+      leftAsQuote(line, indented.groups.type);
+    } else if (m && !ALERTS.has(m.groups.type.toLowerCase())) {
+      leftAsQuote(line, m.groups.type);
     }
     if (!m || !ALERTS.has(m.groups.type.toLowerCase())) {
       out.push(items[i]);
@@ -304,7 +325,7 @@ const expandAlerts = (items, review) => {
     const block = items.slice(i + 1, end);
     const lazy = end < items.length && items[end].text.trim() !== "";
     if (lazy || block.some((item) => /^>\s?>/u.test(item.text))) {
-      review(line, "GitHub alert left as a blockquote: convert it by hand");
+      leftAsQuote(line, m.groups.type);
       out.push(items[i]);
       continue;
     }
@@ -802,7 +823,9 @@ const convertBody = (items, file, project, report) => {
       edit("heading {#id} → [#id]");
     }
     // VitePress slugged the source heading: a self-closing badge added no
-    // text, a badge with children added its children.
+    // text, a badge with children added its children. Blume leaves a badge's
+    // text out of the id, so the pin only changes the id for the second kind;
+    // for the first it repeats Blume's own.
     const heading = HEADING_RE.exec(text);
     if (
       converted &&

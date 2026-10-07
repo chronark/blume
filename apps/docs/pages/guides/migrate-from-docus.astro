@@ -440,7 +440,8 @@ const vercelJson = `{
     and inline components look like <code>:kbd{"{value=\"K\"}"}</code>. Blume
     pages are Markdown or MDX, and components need MDX. Blume reads MDC as
     plain text, so an unconverted <code>::note</code> shows on the page as{" "}
-    <code>::note</code>, with no error.
+    <code>::note</code>. The build doesn't fail, but it warns about each one
+    as <code>BLUME_MDC_SYNTAX</code>, with its file and line.
   </p>
   <p>The conversion follows three rules:</p>
   <ul>
@@ -661,8 +662,9 @@ const vercelJson = `{
   <h2>Troubleshooting</h2>
   <h3>A page shows <code>::note</code> as text</h3>
   <p>
-    The block wasn't converted. Rewrite it as <code>:::note</code> with three
-    colons, and make sure the page is <code>.mdx</code>.
+    The block wasn't converted, and the build log names it as{" "}
+    <code>BLUME_MDC_SYNTAX</code>. Rewrite it as <code>:::note</code> with
+    three colons, and make sure the page is <code>.mdx</code>.
   </p>
   <h3>The build fails with "Could not parse expression"</h3>
   <p>

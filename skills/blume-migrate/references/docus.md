@@ -2,7 +2,7 @@
 
 Docus is a Nuxt layer for docs sites. It's built on Nuxt Content (pages are Markdown files in `content/`, routed by their path) and Nuxt UI (the theme, and the prose components pages use). Navigation is the file tree plus per-folder `.navigation.yml` files, and settings live in `app.config.ts` and `nuxt.config.ts`. Pages are written in **MDC**, Nuxt Content's Markdown-with-components syntax. The bundled codemod converts most of it; these traps are why it exists:
 
-- **MDC's `::note` … `::` looks like a Blume directive and isn't one.** In `.mdx`, Blume prints `::note` and its `::` closer as text, with no warning. In `.md`, every MDC construct prints as text.
+- **MDC's `::note` … `::` looks like a Blume directive and isn't one.** Blume prints `::note` and its `::` closer as text (in `.md`, every MDC construct), and `blume check` and `build` warn `BLUME_MDC_SYNTAX` at each block opener and inline component (`:badge[New]{color="primary"}`) left in either format: convert them as below.
 - **MDX is stricter than MDC.** `[text]{.class}` spans fail the build, and so do `{…}`, `<Name>`, and `<50` in prose. Prompt bodies are full of these.
 - **Icons are Iconify names** (`i-lucide-zap`, `i-simple-icons-github`). Blume renders nothing for them, and warns only for sidebar and tab icons.
 - **Docus sorts siblings by file path as text,** so `10.faq.md` lists between `1.` and `2.`. Blume sorts the prefixes as numbers.
@@ -146,7 +146,7 @@ The codemod applies these rules; you need them for what it leaves. They're remar
   - An unclosed block runs to the end of its parent, and a closer inside a code fence is code.
   - Check the old HTML for a literal `::` to see what the live site already showed broken.
 - **MDX safety:** in a `.mdx` page, prose must escape `{` and `}` as `\{` and `\}`, and turn **any `<` followed by a non-space character** into `&lt;` (or `\<`) unless it opens a real tag: `useFetch<User>()`, `<script setup>` written as text, `<50 ms`, `<= 5`. Case matters as in JSX: `<input>` is HTML, but `<Input>` is a component, so a generic like `useTool<Input>()` is text. HTML comments become `{/* … */}`, `<https://…>` autolinks become links, and `<br>` becomes `<br />`. Code spans and `$$` math stay as written.
-- **Code fences:** ` ```ts [file.ts]{2} ` → ` ```ts file.ts {2} ` (`title="Two words"` for a label with spaces). Leave MDC samples inside fences alone: they're documentation.
+- **Code fences:** ` ```ts [file.ts]{2} ` → ` ```ts file.ts {2} ` (`title="Two words"` for a label with spaces). Blume reads ` ```ts [file.ts] ` and a multi-word title as written, but a range glued to the `]` stays in the title. Leave MDC samples inside fences alone: they're documentation.
 
 ## What the codemod leaves
 
@@ -284,7 +284,7 @@ Report each of these, and anything else you drop:
   - `sitemap: false`, `toc`, `layout`, and other unknown keys
   - derived descriptions
 - **Components:**
-  - callout `to` links and colors, and card colors
+  - callout `to` links, callout colors (mapped to the nearest type; `<Callout color>` takes a CSS color when a tint matters), and card colors
   - prompt icons and Windsurf/Claude actions
   - the `code-tree` file browser and `code-preview` live rendering
   - Nuxt UI landing decorations

@@ -34,7 +34,9 @@
 // Blume's deployment docs and wasn't run. The Acme before/after sample is
 // the codemod's real output, built with Blume; `blume preview` with the
 // `.html` fix from e10a457f (after 2.1.3) served it at /guide/install and
-// the /guide/install.html redirect page (it still 404s /guide/ with a slash).
+// the /guide/install.html redirect page (it 404ed /guide/ with a slash then;
+// preview and dev now redirect it to /guide, and a redirect from an index.html
+// no longer fails the build, so the text below says so without a rerun).
 // Not run: `npx blume migrate vitepress` itself (the agent was pointed at the
 // skill directly; detection landed after the run), a deploy, or the lockfile
 // regeneration. How GitHub Pages serves the `.html` redirect pages is
@@ -505,13 +507,12 @@ node check-urls.mjs ../old-urls.txt`}
     Netlify, Cloudflare, or no named host. Add a redirect for each URL it
     prints and run it again until it prints nothing. Index pages need no redirect:{" "}
     <code>/guide/</code> and <code>/guide/index.html</code> already serve the
-    page Blume writes at <code>guide/index.html</code>. A redirect from{" "}
-    <code>/guide/index.html</code> fails the build, and one from{" "}
-    <code>/guide/</code> replaces the page. <code>npx blume preview</code>{" "}
-    serves the built pages and the <code>.html</code> redirect pages, so you
-    can also click through a few old URLs there. It answers a trailing-slash
-    URL like <code>/guide/</code> with a 404, where static hosts serve the
-    page.
+    page Blume writes at <code>guide/index.html</code>, and a redirect from{" "}
+    <code>/guide/</code> would replace the page. <code>npx blume preview</code>{" "}
+    serves the built pages and answers your redirects the way the host
+    files the build writes do, so you can also click through a few old URLs
+    there. It redirects a trailing-slash URL like <code>/guide/</code> to{" "}
+    <code>/guide</code>.
   </p>
 
   <h2>Check the heading anchors</h2>
@@ -580,9 +581,8 @@ node check-urls.mjs ../old-urls.txt`}
     </li>
     <li>
       <strong>Some Markdown extensions.</strong> <code>[[toc]]</code>, emoji
-      shortcodes, <code>// [!code error]</code> and{" "}
-      <code>// [!code warning]</code>, line numbers that start past 1, snippet
-      regions, and include line ranges. Regions become their own snippet files.
+      shortcodes, line numbers that start past 1, snippet regions, and include
+      line ranges. Regions become their own snippet files.
     </li>
     <li>
       <strong>Page settings.</strong> Per-page outline levels, one-sided{" "}
@@ -621,10 +621,5 @@ node check-urls.mjs ../old-urls.txt`}
   <p>
     Look for a raw <code>&lt;img src="./…"&gt;</code> tag. Blume only copies
     images written as Markdown, so rewrite it as <code>![alt](./…)</code>.
-  </p>
-  <h3>The build fails with EISDIR on an index.html</h3>
-  <p>
-    A redirect starts at an index URL like <code>/guide/index.html</code>.
-    Remove it: that URL already serves the page.
   </p>
 </GuidePage>

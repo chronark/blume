@@ -25,7 +25,10 @@
 // URL check below passed on the run's build, and the reference's redirect
 // one-liner matched the run's 80 redirects; and `blume preview` with the
 // `.html` fix from e10a457f (after 2.1.3) served /guide/assets and the
-// /guide/assets.html redirect page (it still 404s /guide/ with a slash).
+// /guide/assets.html redirect page (it 404ed /guide/ with a slash then;
+// preview and dev now redirect it to /guide, and Blume now leaves badge text
+// and a trailing emoji out of heading ids, so the text below says so without
+// a rerun).
 // In review: `blume migrate` with no agent flag, run by path from the working
 // tree's CLI in a copy of packages/docs, detected VuePress from
 // docs/.vuepress/config.ts; check-urls.mjs, copied from this page, printed
@@ -486,15 +489,13 @@ node check-urls.mjs ../old-urls.txt`}
     prints as <code>MISSING</code>, and run it again until it prints{" "}
     <code>Every old URL reaches a page.</code> Folder pages need no
     redirect: on a static host, <code>/guide/</code> already serves the page
-    Blume writes at <code>guide/index.html</code>. <code>blume dev</code> and{" "}
-    <code>blume preview</code> answer <code>/guide/</code> with a 404, so
-    check trailing-slash URLs on a preview deployment instead.
+    Blume writes at <code>guide/index.html</code>, and <code>blume dev</code>{" "}
+    and <code>blume preview</code> redirect it to <code>/guide</code>.
   </p>
   <p>
     Then check the anchors. VuePress and Blume build heading ids differently:
-    VuePress left badges and emoji shortcodes out, turned punctuation into
-    dashes, and numbered a repeated heading from <code>-2</code>, where Blume
-    starts at <code>-1</code>. The bundled script the agent uses compares every heading
+    VuePress turned punctuation into dashes, and numbered a repeated heading
+    from <code>-2</code>, where Blume starts at <code>-1</code>. The bundled script the agent uses compares every heading
     in your old build with the new one and reports each id that changed:
   </p>
   <CodeBlock code={pinAnchors} lang="bash" />

@@ -251,6 +251,11 @@ describe("vitepress-codemod", () => {
         "> Lazy",
         "continuation.",
         "",
+        "  > [!INFO] Indented",
+        "",
+        "> [!FOO]",
+        "> Unknown.",
+        "",
       ].join("\n"),
       "guide/fences.md": [
         "---",
@@ -288,8 +293,16 @@ describe("vitepress-codemod", () => {
     });
 
     const report = runCodemod("--write", root);
+    // Blume renders a GitHub alert itself, but only in .mdx.
     expect(report).toContain(
-      "REVIEW line 6: GitHub alert left as a blockquote"
+      "REVIEW line 6: GitHub alert left as a blockquote: Blume renders it as a callout only in .mdx"
+    );
+    // VitePress's own alert types, and unknown ones, it never renders.
+    expect(report).toContain(
+      "REVIEW line 10: GitHub alert left as a blockquote: convert it by hand"
+    );
+    expect(report).toContain(
+      "REVIEW line 12: GitHub alert left as a blockquote: convert it by hand"
     );
     expect(report).toContain("line numbers started at 3: Blume starts at 1");
     expect(report).toContain("link /nope.html: no page backs /nope");
