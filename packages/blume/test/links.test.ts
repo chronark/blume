@@ -754,6 +754,55 @@ describe("validateLinks — assets against a public dir", () => {
     ]);
   });
 
+  it("reports .html links to pages with the route to link instead", async () => {
+    const diagnostics = await validateWithPublic([
+      makePage({
+        id: "guides/a.mdx",
+        links: [
+          link("./setup.html#run"),
+          link("/guides/setup.html"),
+          link("/guides/index.htm"),
+          raw("setup.html", 4),
+          link("/nope.html"),
+          // A real file in `public/` is served at its `.html` path.
+          link("/demo/index.html"),
+        ],
+        route: "/guides/a",
+      }),
+      makePage({ id: "guides/index.mdx", route: "/guides" }),
+      makePage({ id: "guides/setup.mdx", route: "/guides/setup" }),
+    ]);
+    expect(
+      diagnostics.map((d) => [d.code, d.message, d.suggestion])
+    ).toStrictEqual([
+      [
+        "BLUME_BROKEN_ASSET",
+        "Link ./setup.html#run points at /guides/setup.html, which public/ doesn't have, and pages aren't served at .html URLs.",
+        "Link the page at /guides/setup instead.",
+      ],
+      [
+        "BLUME_BROKEN_ASSET",
+        "Link /guides/setup.html points at /guides/setup.html, which public/ doesn't have, and pages aren't served at .html URLs.",
+        "Link the page at /guides/setup instead.",
+      ],
+      [
+        "BLUME_BROKEN_ASSET",
+        "Link /guides/index.htm points at /guides/index.htm, which public/ doesn't have, and pages aren't served at .html URLs.",
+        "Link the page at /guides instead.",
+      ],
+      [
+        "BLUME_BROKEN_ASSET",
+        "Link setup.html points at /guides/setup.html, which public/ doesn't have, and pages aren't served at .html URLs.",
+        "Link the page at /guides/setup instead.",
+      ],
+      [
+        "BLUME_BROKEN_ASSET",
+        "Asset /nope.html was not found in the public directory.",
+        "Add the file at public/nope.html or fix the link.",
+      ],
+    ]);
+  });
+
   it("warns when a referenced asset is missing", async () => {
     const diagnostics = await validateWithPublic([
       makePage({ id: "a.mdx", links: [link("/missing.png")], route: "/a" }),

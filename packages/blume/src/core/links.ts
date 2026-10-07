@@ -346,6 +346,32 @@ const partialLinkHint = (
   return `${path} exists, but a name starting with "_" marks a partial, which isn't published as a page. Splice it in with <include> instead, rename it to publish it, or add "!**/_*" to content.exclude to publish every underscore file.`;
 };
 
+const HTML_EXT = /\.html?$/iu;
+
+/**
+ * The page an `.html` link means, when one is served there: `/guides/setup`
+ * for `/guides/setup.html`, `/guides` for `/guides/index.html`. A page is
+ * served at its route, never at an `.html` URL (only a `public/` file is),
+ * so the link 404s, and this is the route to link instead. Resolved like
+ * any page link: based unless raw, then moved into the reader's locale.
+ */
+const htmlPageRoute = (
+  resolved: string,
+  page: PageRecord,
+  link: PageLink,
+  ctx: LinkContext
+): string | undefined => {
+  if (!HTML_EXT.test(resolved)) {
+    return undefined;
+  }
+  const path = resolved.replace(HTML_EXT, "");
+  const authored = toRoute(link.raw ? path : withBasePath(ctx.basePath, path));
+  const route = servedRoute(authored, page, ctx);
+  return ctx.routes.has(route) || ctx.extraRoutes.has(route)
+    ? authored
+    : undefined;
+};
+
 /** Validate a resolved internal path: asset, route, then optional anchor. */
 const checkPathLink = (
   resolved: string,
@@ -421,6 +447,16 @@ const checkPathLink = (
         severity: "warning",
         suggestion:
           "Add the file next to the page source or fix the reference.",
+      };
+    }
+    const pageRoute = htmlPageRoute(resolved, page, link, ctx);
+    if (pageRoute !== undefined) {
+      return {
+        ...site,
+        code: "BLUME_BROKEN_ASSET",
+        message: `Link ${link.target}${via} points at ${assetPath}, which public/ doesn't have, and pages aren't served at .html URLs.`,
+        severity: "warning",
+        suggestion: `Link the page at ${pageRoute} instead.`,
       };
     }
     // With no `public/` folder at all, the site ships no such file either.
