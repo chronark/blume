@@ -68,6 +68,15 @@ export const contentAssetUrl = (param: string, deployBase?: string): string =>
     .map(encodeURIComponent)
     .join("/")}`;
 
+// Where a link (`[spec](./spec.pdf)`, `[spec]: ./spec.pdf`) or an element's
+// `href`/`src` could name a file beside the page: a destination or value not
+// written as a root path or a fragment, which `resolveRelativeFile` never
+// resolves. They're read in the text as it stands, code included, so a page
+// without one, like a page that links only to routes and anchors, has
+// nothing to rewrite and skips the passes that mask its code to look.
+const RELATIVE_DESTINATION = /\][(:][ \t]*(?![/#\s])/u;
+const RELATIVE_ELEMENT_URL = /(?:href|src)=["'](?![/#])/u;
+
 /**
  * Rewrite a page's relative image references, and its links and element
  * URLs naming other files beside it, to their served
@@ -112,10 +121,15 @@ export const rewriteRelativeAssets = (options: {
   // pointed there, which the HTML render reads back (see
   // `markdown/content-assets.ts`), as are links and element URLs naming any
   // other file beside the page.
-  return rewriteElementUrls(
-    rewriteLinkTargets(rewriteCardImages(lines.join("\n"), toUrl), toFileUrl),
-    (url) => (isLinkElementUrl(url) ? toFileUrl(url.value) : null)
-  );
+  const withCards = rewriteCardImages(lines.join("\n"), toUrl);
+  const withLinks = RELATIVE_DESTINATION.test(withCards)
+    ? rewriteLinkTargets(withCards, toFileUrl)
+    : withCards;
+  return RELATIVE_ELEMENT_URL.test(withLinks)
+    ? rewriteElementUrls(withLinks, (url) =>
+        isLinkElementUrl(url) ? toFileUrl(url.value) : null
+      )
+    : withLinks;
 };
 
 /**

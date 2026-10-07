@@ -8,8 +8,15 @@ import {
   collectContentAssets,
   CONTENT_ASSETS_PREFIX,
   contentAssetParam,
+  contentAssetUrl,
   rewriteRelativeAssets,
 } from "../src/core/content-assets.ts";
+import { resolveRelativeFile } from "../src/core/relative-files.ts";
+import {
+  isLinkElementUrl,
+  rewriteElementUrls,
+  rewriteLinkTargets,
+} from "../src/core/sources/normalize.ts";
 
 let root: string;
 let pagePath: string;
@@ -43,6 +50,24 @@ const rewrite = (
     sourcePath: pagePath,
     ...over,
   });
+
+/** A link target's served URL, when it names a file beside the page. */
+const fileUrl = (target: string): string | null => {
+  const file = resolveRelativeFile(join(root, "docs"), target);
+  return file === null
+    ? null
+    : `${contentAssetUrl(contentAssetParam(root, file.path))}${file.suffix}`;
+};
+
+/**
+ * The link and element-URL passes run unconditionally: what the rewrite must
+ * match, whether or not a page's text has a destination that could be
+ * relative.
+ */
+const fullPasses = (source: string): string =>
+  rewriteElementUrls(rewriteLinkTargets(source, fileUrl), (url) =>
+    isLinkElementUrl(url) ? fileUrl(url.value) : null
+  );
 
 describe("rewriteRelativeAssets", () => {
   it("rewrites a colocated relative image to its served URL", () => {
@@ -221,6 +246,33 @@ describe("rewriteRelativeAssets — other files beside the page", () => {
       "```",
     ].join("\n");
     expect(rewrite(source)).toBe(source);
+  });
+
+  it("leaves a page that links only to routes and anchors as it is", () => {
+    const source = [
+      "[Guide](/guide) and [usage](#usage), or [top]( /).",
+      "[ref]: /reference",
+      '<Card title="G" href="/guide" /> <img src="/logo.png"> <a href=\'#x\'>x</a>',
+    ].join("\n");
+    expect(rewrite(source)).toBe(source);
+  });
+
+  it("rewrites every link and element URL the full passes rewrite", () => {
+    const sources = [
+      "[Guide](/guide) [usage](#usage) [web](https://x.dev/a.pdf)",
+      // A code span blanks the bracket that ends the label, so the link reads
+      // past it.
+      "[a`]`](./spec.pdf) and [b](`x`./spec.pdf)",
+      "[spaced](  ./spec.pdf) [angled](<./spec.pdf>) [escaped](\\./spec.pdf)",
+      "[spec]:\t ./spec.pdf\n[route]: /spec.pdf",
+      "[a long\nlabel](spec.pdf#page=2)",
+      "<a href='./spec.pdf'>x</a> <video\n  src=\"spec.pdf\"></video>",
+      '<img src="/logo.png"> <Card href="#x" /> <Card href="./spec.pdf" />',
+    ];
+    for (const source of sources) {
+      expect(rewrite(source)).toBe(fullPasses(source));
+    }
+    expect(rewrite("[a`]`](./spec.pdf)")).toBe(`[a\`]\`](${served})`);
   });
 });
 
