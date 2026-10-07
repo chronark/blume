@@ -589,6 +589,48 @@ describe("pin-heading-ids", () => {
     expect(report.notes.join("\n")).not.toContain("/install");
   });
 
+  it("pairs an h1 the source kept beside the title with the old title", async () => {
+    const root = await fixture();
+    await put(
+      join(root, "docs", "install.md"),
+      ["# Install", "", "Intro.", "", "## Install", "", "## Verify", ""].join(
+        "\n"
+      )
+    );
+    const manifestPath = join(root, ".blume", "blume.manifest.json");
+    // SAFETY: the fixture wrote this manifest with exactly these fields.
+    const manifest = JSON.parse(await readFile(manifestPath, "utf-8")) as {
+      routes: { path: string; sourcePath: string }[];
+    };
+    manifest.routes.push({
+      path: "/install",
+      sourcePath: join(root, "docs", "install.md"),
+    });
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    // The title comes from the kept h1, which Blume renders a second time with
+    // its id, so the section is #install-1 on both sites.
+    await put(
+      join(root, "dist", "install", "index.html"),
+      builtPage("Install", [
+        '<h1 id="install">Install</h1>',
+        blumeHeading(2, "install-1", "Install"),
+        blumeHeading(2, "verify", "Verify"),
+      ])
+    );
+    await put(
+      join(root, "old", "install.html"),
+      oldPage([
+        '<h1 id="install"><a class="header" href="#install">Install</a></h1>',
+        '<h2 id="install-1"><a class="header" href="#install-1">Install</a></h2>',
+        '<h2 id="verify"><a class="header" href="#verify">Verify</a></h2>',
+      ])
+    );
+
+    const report = jsonReport(root, "--old", "old");
+    expect(report.pins.filter((pin) => pin.route === "/install")).toEqual([]);
+    expect(report.notes.join("\n")).not.toContain("/install");
+  });
+
   it("reads a server build's client half", async () => {
     const root = await fixture();
     const dist = join(root, "dist");

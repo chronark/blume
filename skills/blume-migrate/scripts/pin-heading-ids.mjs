@@ -745,17 +745,20 @@ const oldTitleIndex = (before, builtHtml) => {
 };
 
 /**
- * The next old heading, from the cursor on, with the same text as `key`,
- * passing over the one the page title took: a section that repeats the
- * title's text (`# Install`, then `## Install`, which the old site gave
- * `#install-1`) pairs with its own old heading. A later h1 (a section the
- * migration turned into an h2) still pairs.
+ * The next old heading, from the cursor on, with the same text as `key`.
+ * A section heading passes over the one the page title took: a section that
+ * repeats the title's text (`# Install`, then `## Install`, which the old site
+ * gave `#install-1`) pairs with its own old heading. A built h1 is the source's
+ * own `# Install`, kept beside the title, so it pairs with the old title. A
+ * later old h1 (a section the migration turned into an h2) still pairs.
  */
-const takeOld = (before, state, key, title) => {
+const takeOld = (before, state, heading, title) => {
+  const key = normalize(heading.text);
+  const skip = heading.level > 1 ? title : -1;
   let k = state.oldCursor;
   while (
     k < before.length &&
-    (k === title || normalize(before[k].text) !== key)
+    (k === skip || normalize(before[k].text) !== key)
   ) {
     k += 1;
   }
@@ -841,7 +844,7 @@ const pairPage = (result, page, oldHtml, builtHtml) => {
     const key = normalize(heading.text);
     // Source lines and rendered headings share an order, so both scan forward.
     const entry = takeSource(lines, state, key);
-    const k = takeOld(before, state, key, title);
+    const k = takeOld(before, state, heading, title);
     const oldId = k === -1 ? heading.id : before[k].id;
     if (k !== -1) {
       pairedOld.add(k);
